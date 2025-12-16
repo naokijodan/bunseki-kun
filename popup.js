@@ -448,6 +448,7 @@ async function updateMarketDataInfo() {
 
 /**
  * URLから市場データを取得
+ * URLを自動で開き、データ取得後にタブを閉じる
  */
 async function captureMarketDataFromUrl() {
   const urlInput = document.getElementById('ebayUrlInput');
@@ -460,61 +461,53 @@ async function captureMarketDataFromUrl() {
       return;
     }
 
-    showLoading('市場データを取得中...');
+    showLoading('ページを開いています...');
+
+    let createdTabId = null;
 
     try {
-      // 指定URLと一致するタブを探す
-      let targetTab = null;
-      const tabs = await chrome.tabs.query({});
+      // バックグラウンドでタブを開く
+      const tab = await chrome.tabs.create({
+        url: url,
+        active: false  // バックグラウンドで開く
+      });
+      createdTabId = tab.id;
 
-      for (const tab of tabs) {
-        if (tab.url && tab.url === url) {
-          targetTab = tab;
-          break;
-        }
-      }
+      showLoading('ページの読み込みを待っています...');
 
-      // 新しいタブで開く（バックグラウンドで）
-      let createdTab = false;
-      if (!targetTab) {
-        targetTab = await chrome.tabs.create({ url, active: false });
-        createdTab = true;
+      // ページの読み込み完了を待つ
+      await waitForTabComplete(tab.id, 30000); // 最大30秒待機
 
-        // タブの読み込み完了を待つ
-        await waitForTabLoad(targetTab.id);
-      }
+      showLoading('市場データを取得中...');
 
-      // content scriptが動作するか確認、リトライ
+      // 少し待ってからcontent scriptにメッセージ送信
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // content scriptにメッセージ送信（リトライ付き）
       let response = null;
       let retries = 5;
-      let lastError = null;
 
       while (retries > 0) {
         try {
-          console.log('市場データ取得リトライ:', 6 - retries, 'tabId:', targetTab.id);
-          response = await chrome.tabs.sendMessage(targetTab.id, {
+          response = await chrome.tabs.sendMessage(tab.id, {
             action: 'captureMarketData'
           });
-          console.log('レスポンス:', response);
           break;
         } catch (e) {
-          lastError = e;
-          console.log('sendMessageエラー:', e.message);
+          console.log('sendMessageエラー:', e.message, 'リトライ残り:', retries - 1);
           retries--;
           if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         }
       }
 
-      // 自分で開いたタブは閉じる
-      if (createdTab && targetTab) {
-        try {
-          await chrome.tabs.remove(targetTab.id);
-          console.log('タブを閉じました');
-        } catch (e) {
-          console.log('タブを閉じる際のエラー:', e.message);
-        }
+      // タブを閉じる
+      try {
+        await chrome.tabs.remove(tab.id);
+        createdTabId = null;
+      } catch (e) {
+        console.log('タブ削除エラー:', e.message);
       }
 
       if (response && response.success) {
@@ -529,11 +522,20 @@ async function captureMarketDataFromUrl() {
         // 入力をクリア
         urlInput.value = '';
       } else {
-        throw new Error(response?.error || 'データ取得に失敗しました。eBay検索結果ページ（/sch/）かTerapeakページ（/sh/research）を指定してください。');
+        throw new Error(response?.error || 'データ取得に失敗しました');
       }
     } catch (error) {
       console.error('市場データ取得エラー:', error);
       showAlert('市場データの取得に失敗しました: ' + error.message, 'danger');
+
+      // エラー時もタブを閉じる
+      if (createdTabId) {
+        try {
+          await chrome.tabs.remove(createdTabId);
+        } catch (e) {
+          console.log('エラー時タブ削除失敗:', e.message);
+        }
+      }
     } finally {
       hideLoading();
     }
@@ -546,22 +548,32 @@ async function captureMarketDataFromUrl() {
 /**
  * タブの読み込み完了を待つ
  */
-function waitForTabLoad(tabId) {
-  return new Promise((resolve) => {
-    const listener = (updatedTabId, changeInfo) => {
-      if (updatedTabId === tabId && changeInfo.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        // content scriptが実行されるまで待つ（Terapeakは重いので長め）
-        setTimeout(resolve, 3000);
+function waitForTabComplete(tabId, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+
+    const checkTab = async () => {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+
+        if (tab.status === 'complete') {
+          resolve(tab);
+          return;
+        }
+
+        if (Date.now() - startTime > timeout) {
+          reject(new Error('ページ読み込みタイムアウト'));
+          return;
+        }
+
+        // 500ms後に再チェック
+        setTimeout(checkTab, 500);
+      } catch (e) {
+        reject(new Error('タブが見つかりません: ' + e.message));
       }
     };
-    chrome.tabs.onUpdated.addListener(listener);
 
-    // タイムアウト（15秒）
-    setTimeout(() => {
-      chrome.tabs.onUpdated.removeListener(listener);
-      resolve();
-    }, 15000);
+    checkTab();
   });
 }
 
