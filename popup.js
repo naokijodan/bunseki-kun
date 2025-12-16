@@ -1904,6 +1904,7 @@ function setupWatchFilterEvents() {
 
 /**
  * カテゴリ別パフォーマンス分析を生成（階層構造対応）
+ * 大分類と細分類を別々のセクションで表示
  */
 function generateCategoryPerformanceAnalysis() {
   const categories = analyzer.results.categoryStats || Object.values(analyzer.results.byCategory || {});
@@ -1922,49 +1923,72 @@ function generateCategoryPerformanceAnalysis() {
   const totalSold = categories.reduce((sum, c) => sum + c.sold, 0);
   const totalRevenue = categories.reduce((sum, c) => sum + (c.revenue || 0), 0);
 
-  // 階層表示用のHTML生成
-  function generateCategoryRows(categories) {
-    let rows = '';
-    for (const cat of categories.slice(0, 20)) {
+  // 大分類テーブルのHTML生成
+  function generateMainCategoryRows(categories) {
+    return categories.slice(0, 20).map(cat => {
       const total = cat.active + cat.sold;
       const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
-      const hasSubcategories = cat.subcategoriesArray && cat.subcategoriesArray.length > 1;
-      const catId = `cat-${escapeHtml(cat.category).replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-      // 大分類行
-      rows += `
-        <tr class="main-category-row ${hasSubcategories ? 'expandable' : ''}"
-            data-category-id="${catId}"
-            onclick="${hasSubcategories ? `toggleSubcategories('${catId}')` : ''}">
-          <td>
-            ${hasSubcategories ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon-placeholder"></span>'}
-            <strong>${escapeHtml(cat.category)}</strong>
-          </td>
+      return `
+        <tr>
+          <td><strong>${escapeHtml(cat.category)}</strong></td>
           <td>${cat.active}</td>
           <td>${cat.sold}</td>
           <td>${sellRate}%</td>
           <td>$${(cat.revenue || 0).toFixed(0)}</td>
         </tr>
       `;
+    }).join('');
+  }
 
-      // 細分類行（折りたたみ）
-      if (hasSubcategories) {
-        for (const subCat of cat.subcategoriesArray) {
-          const subTotal = subCat.active + subCat.sold;
-          const subSellRate = subTotal > 0 ? Math.round((subCat.sold / subTotal) * 100) : 0;
-          rows += `
-            <tr class="sub-category-row" data-parent="${catId}" style="display: none;">
-              <td class="sub-category-name">└ ${escapeHtml(subCat.category)}</td>
-              <td>${subCat.active}</td>
-              <td>${subCat.sold}</td>
-              <td>${subSellRate}%</td>
-              <td>$${(subCat.revenue || 0).toFixed(0)}</td>
-            </tr>
-          `;
-        }
-      }
+  // 細分類セクションのHTML生成（展開式）
+  function generateSubcategorySection(categories) {
+    let html = '';
+    for (const cat of categories) {
+      const hasSubcategories = cat.subcategoriesArray && cat.subcategoriesArray.length > 0;
+      if (!hasSubcategories) continue;
+
+      const catId = `subcat-${escapeHtml(cat.category).replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const total = cat.active + cat.sold;
+
+      html += `
+        <div class="subcategory-group">
+          <div class="subcategory-header" onclick="toggleSubcategoryGroup('${catId}')">
+            <span class="expand-icon" id="icon-${catId}">▶</span>
+            <strong>${escapeHtml(cat.category)}</strong>
+            <span class="subcategory-count">(${total}件)</span>
+          </div>
+          <div class="subcategory-content" id="${catId}" style="display: none;">
+            <table class="data-table subcategory-table">
+              <thead>
+                <tr>
+                  <th>細分類</th>
+                  <th>出品中</th>
+                  <th>販売済</th>
+                  <th>売上率</th>
+                  <th>売上</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cat.subcategoriesArray.map(subCat => {
+                  const subTotal = subCat.active + subCat.sold;
+                  const subSellRate = subTotal > 0 ? Math.round((subCat.sold / subTotal) * 100) : 0;
+                  return `
+                    <tr>
+                      <td>${escapeHtml(subCat.category)}</td>
+                      <td>${subCat.active}</td>
+                      <td>${subCat.sold}</td>
+                      <td>${subSellRate}%</td>
+                      <td>$${(subCat.revenue || 0).toFixed(0)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
     }
-    return rows;
+    return html;
   }
 
   let html = `
@@ -1992,8 +2016,8 @@ function generateCategoryPerformanceAnalysis() {
     </div>
 
     <div class="analysis-detail">
-      <h4>カテゴリ別パフォーマンス <small style="color: #666; font-weight: normal;">（▶をクリックで細分類を展開）</small></h4>
-      <table class="data-table category-hierarchy-table">
+      <h4>📁 大分類カテゴリ</h4>
+      <table class="data-table">
         <thead>
           <tr>
             <th>カテゴリ</th>
@@ -2004,9 +2028,16 @@ function generateCategoryPerformanceAnalysis() {
           </tr>
         </thead>
         <tbody>
-          ${generateCategoryRows(categories)}
+          ${generateMainCategoryRows(categories)}
         </tbody>
       </table>
+    </div>
+
+    <div class="analysis-detail" style="margin-top: 20px;">
+      <h4>📂 細分類の詳細 <small style="color: #666; font-weight: normal;">（クリックで展開）</small></h4>
+      <div class="subcategory-list">
+        ${generateSubcategorySection(categories)}
+      </div>
     </div>
   `;
 
@@ -2018,25 +2049,18 @@ function generateCategoryPerformanceAnalysis() {
 }
 
 /**
- * 細分類の展開/折りたたみ
+ * 細分類グループの展開/折りたたみ
  */
-function toggleSubcategories(categoryId) {
-  const mainRow = document.querySelector(`tr[data-category-id="${categoryId}"]`);
-  const subRows = document.querySelectorAll(`tr[data-parent="${categoryId}"]`);
-  const expandIcon = mainRow.querySelector('.expand-icon');
+function toggleSubcategoryGroup(categoryId) {
+  const content = document.getElementById(categoryId);
+  const icon = document.getElementById(`icon-${categoryId}`);
 
-  const isExpanded = mainRow.classList.contains('expanded');
-
-  if (isExpanded) {
-    // 折りたたむ
-    mainRow.classList.remove('expanded');
-    expandIcon.textContent = '▶';
-    subRows.forEach(row => row.style.display = 'none');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.textContent = '▼';
   } else {
-    // 展開する
-    mainRow.classList.add('expanded');
-    expandIcon.textContent = '▼';
-    subRows.forEach(row => row.style.display = '');
+    content.style.display = 'none';
+    icon.textContent = '▶';
   }
 }
 
