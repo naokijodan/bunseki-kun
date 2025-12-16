@@ -720,13 +720,33 @@ class EbayAnalyzer {
           category,
           active: 0,
           sold: 0,
-          totalWatchers: 0
+          totalWatchers: 0,
+          revenue: 0
         };
       }
       categoryStats[category].active++;
-      categoryStats[category].totalWatchers += item.watchers;
+      categoryStats[category].totalWatchers += item.watchers || 0;
     }
 
+    // 販売済のカテゴリ集計
+    for (const item of this.soldItems) {
+      const category = item.category || '(不明)';
+      if (!categoryStats[category]) {
+        categoryStats[category] = {
+          category,
+          active: 0,
+          sold: 0,
+          totalWatchers: 0,
+          revenue: 0
+        };
+      }
+      categoryStats[category].sold += item.quantity || 1;
+      categoryStats[category].revenue += (item.soldFor || 0) * (item.quantity || 1);
+    }
+
+    // 配列に変換してソート
+    this.results.categoryStats = Object.values(categoryStats)
+      .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
     this.results.byCategory = categoryStats;
   }
 

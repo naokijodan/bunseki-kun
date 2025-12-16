@@ -1210,3 +1210,128 @@ body {
   margin-bottom: 10px;
   color: var(--text-primary);
 }
+
+/* Matrix Summary (ブランド×カテゴリ分析) */
+.matrix-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-secondary);
+}
+
+.summary-card h5 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.summary-card.strength {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(129, 199, 132, 0.15) 100%);
+  border-left: 3px solid #4caf50;
+}
+
+.summary-card.weakness {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(248, 113, 113, 0.15) 100%);
+  border-left: 3px solid #ef4444;
+}
+
+.summary-card.opportunity {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 224, 130, 0.15) 100%);
+  border-left: 3px solid #ffc107;
+}
+
+.summary-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.summary-card li {
+  font-size: 11px;
+  padding: 4px 0;
+  color: var(--text-secondary);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.summary-card li:last-child {
+  border-bottom: none;
+}
+
+/* No Data Message */
+.no-data-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.no-data-message p {
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+/* Close Button */
+.close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Watch Insight Cards */
+.watch-insight {
+  margin: 12px 0;
+}
+
+.insight-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--border-radius-sm);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.insight-card .icon {
+  font-size: 16px;
+}
+
+.insight-card.warning {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(255, 183, 77, 0.15) 100%);
+  border-left: 3px solid #ff9800;
+  color: #e65100;
+}
+
+.insight-card.info {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(100, 181, 246, 0.15) 100%);
+  border-left: 3px solid #2196f3;
+  color: #1565c0;
+}
+
+.insight-card.success {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(129, 199, 132, 0.15) 100%);
+  border-left: 3px solid #4caf50;
+  color: #2e7d32;
+}

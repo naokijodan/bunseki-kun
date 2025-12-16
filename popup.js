@@ -1078,13 +1078,58 @@ function generateBrandPerformanceAnalysis() {
 function generateWatchAnalysis() {
   const watchRanking = analyzer.results.watchRanking || [];
   const top20 = watchRanking.slice(0, 20);
+  const summary = analyzer.results.summary || {};
+
+  // Watch数の分布を計算
+  const watchDistribution = {
+    high: analyzer.activeListings?.filter(i => i.watchers >= 10).length || 0,
+    medium: analyzer.activeListings?.filter(i => i.watchers >= 5 && i.watchers < 10).length || 0,
+    low: analyzer.activeListings?.filter(i => i.watchers >= 1 && i.watchers < 5).length || 0,
+    zero: analyzer.activeListings?.filter(i => !i.watchers || i.watchers === 0).length || 0
+  };
+
+  if (!top20 || top20.length === 0) {
+    return `
+      <div class="no-data-message">
+        <p>Watch数データがありません。</p>
+        <p>CSVファイルを読み込んでください。</p>
+      </div>
+    `;
+  }
 
   let html = `
     <div class="analysis-summary">
       <div class="summary-row">
         <span class="label">総Watch数</span>
-        <span class="value">${analyzer.results.summary?.totalWatchers || 0}</span>
+        <span class="value">${summary.totalWatchers || 0}</span>
       </div>
+      <div class="summary-row">
+        <span class="label">10+Watch</span>
+        <span class="value">${watchDistribution.high}件</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">5-9Watch</span>
+        <span class="value">${watchDistribution.medium}件</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">1-4Watch</span>
+        <span class="value">${watchDistribution.low}件</span>
+      </div>
+    </div>
+
+    <div class="watch-insight">
+      ${watchDistribution.high >= 5 ? `
+        <div class="insight-card warning">
+          <span class="icon">⚠️</span>
+          <span>Watch数10以上の商品が${watchDistribution.high}件あります。価格見直しを検討してください。</span>
+        </div>
+      ` : ''}
+      ${watchDistribution.zero > summary.totalActive * 0.7 ? `
+        <div class="insight-card info">
+          <span class="icon">💡</span>
+          <span>Watch数0の商品が多いです。タイトルや価格の最適化を検討してください。</span>
+        </div>
+      ` : ''}
     </div>
 
     <div class="analysis-detail">
@@ -1095,16 +1140,16 @@ function generateWatchAnalysis() {
             <th>商品名</th>
             <th>Watch数</th>
             <th>価格</th>
-            <th>出品日数</th>
+            <th>ブランド</th>
           </tr>
         </thead>
         <tbody>
           ${top20.map(item => `
             <tr>
-              <td class="title-cell" title="${escapeHtml(item.title)}">${truncateText(item.title, 40)}</td>
+              <td class="title-cell" title="${escapeHtml(item.title)}">${truncateText(item.title, 35)}</td>
               <td class="watch-count">${item.watchers}</td>
               <td>$${item.price ? item.price.toFixed(2) : '-'}</td>
-              <td>${item.daysListed || '-'}日</td>
+              <td>${item.brand || '-'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -1119,10 +1164,43 @@ function generateWatchAnalysis() {
  * カテゴリ別パフォーマンス分析を生成
  */
 function generateCategoryPerformanceAnalysis() {
-  const categories = analyzer.results.categoryStats || [];
+  const categories = analyzer.results.categoryStats || Object.values(analyzer.results.byCategory || {});
+
+  if (!categories || categories.length === 0) {
+    return `
+      <div class="no-data-message">
+        <p>カテゴリデータがありません。</p>
+        <p>CSVファイルを読み込んでください。</p>
+      </div>
+    `;
+  }
+
+  // 集計
+  const totalActive = categories.reduce((sum, c) => sum + c.active, 0);
+  const totalSold = categories.reduce((sum, c) => sum + c.sold, 0);
+  const totalRevenue = categories.reduce((sum, c) => sum + (c.revenue || 0), 0);
 
   let html = `
-    <div class="chart-container">
+    <div class="analysis-summary">
+      <div class="summary-row">
+        <span class="label">カテゴリ数</span>
+        <span class="value">${categories.length}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">総出品数</span>
+        <span class="value">${totalActive}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">総販売数</span>
+        <span class="value">${totalSold}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">総売上</span>
+        <span class="value">$${totalRevenue.toFixed(0)}</span>
+      </div>
+    </div>
+
+    <div class="chart-container" style="height: 250px;">
       <canvas id="analysisChart"></canvas>
     </div>
 
@@ -1135,10 +1213,11 @@ function generateCategoryPerformanceAnalysis() {
             <th>出品中</th>
             <th>販売済</th>
             <th>売上率</th>
+            <th>売上</th>
           </tr>
         </thead>
         <tbody>
-          ${categories.map(cat => {
+          ${categories.slice(0, 20).map(cat => {
             const total = cat.active + cat.sold;
             const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
             return `
@@ -1147,6 +1226,7 @@ function generateCategoryPerformanceAnalysis() {
                 <td>${cat.active}</td>
                 <td>${cat.sold}</td>
                 <td>${sellRate}%</td>
+                <td>$${(cat.revenue || 0).toFixed(0)}</td>
               </tr>
             `;
           }).join('')}
@@ -1156,7 +1236,7 @@ function generateCategoryPerformanceAnalysis() {
   `;
 
   setTimeout(() => {
-    drawCategoryChart(categories);
+    drawCategoryChart(categories.slice(0, 10));
   }, 100);
 
   return html;
