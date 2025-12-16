@@ -3,10 +3,117 @@
  * ぶんせき君 v2.1.2 - 統合版
  */
 
+// カテゴリ正規化マッピング（英語eBayカテゴリ → 統一カテゴリ名）
+const CATEGORY_NORMALIZATION = {
+  // 時計関連
+  'wristwatches': '時計',
+  'watches': '時計',
+  'watch': '時計',
+  'pocket watches': '時計',
+  'smart watches': 'スマートウォッチ',
+  'smartwatches': 'スマートウォッチ',
+
+  // ジュエリー関連
+  'jewelry': 'ジュエリー',
+  'jewellery': 'ジュエリー',
+  'fine jewelry': 'ジュエリー',
+  'fashion jewelry': 'ジュエリー',
+  'necklaces & pendants': 'ネックレス',
+  'necklace': 'ネックレス',
+  'bracelets': 'ブレスレット',
+  'bracelet': 'ブレスレット',
+  'rings': 'リング',
+  'ring': 'リング',
+  'earrings': 'ピアス・イヤリング',
+  'earring': 'ピアス・イヤリング',
+  'brooches & pins': 'ブローチ',
+  'brooch': 'ブローチ',
+
+  // バッグ関連
+  'handbags': 'バッグ',
+  'handbag': 'バッグ',
+  'bags': 'バッグ',
+  'bag': 'バッグ',
+  'shoulder bags': 'バッグ',
+  'tote bags': 'バッグ',
+  'crossbody bags': 'バッグ',
+  'clutches': 'バッグ',
+  'backpacks': 'バッグ',
+  'wallets': '財布',
+  'wallet': '財布',
+
+  // 衣類関連
+  'clothing': '衣類',
+  'clothes': '衣類',
+  "women's clothing": '衣類',
+  "men's clothing": '衣類',
+  'tops': '衣類',
+  'dresses': '衣類',
+  'coats & jackets': 'アウター',
+  'outerwear': 'アウター',
+
+  // 靴関連
+  'shoes': '靴',
+  "women's shoes": '靴',
+  "men's shoes": '靴',
+  'sneakers': 'スニーカー',
+  'boots': 'ブーツ',
+  'heels': '靴',
+
+  // アクセサリー関連
+  'accessories': 'アクセサリー',
+  'belts': 'ベルト',
+  'belt': 'ベルト',
+  'scarves': 'スカーフ',
+  'scarf': 'スカーフ',
+  'sunglasses': 'サングラス',
+  'eyeglasses': 'メガネ',
+
+  // コレクティブル
+  'collectibles': 'コレクティブル',
+  'trading cards': 'トレカ',
+  'sports cards': 'トレカ',
+  'figurines': 'フィギュア',
+  'figures': 'フィギュア',
+  'vintage': 'ヴィンテージ',
+  'antiques': 'アンティーク'
+};
+
 class EbayAnalyzer {
   constructor() {
     this.customBrandRules = {}; // AI学習したカスタムブランドルール
     this.reset();
+  }
+
+  /**
+   * カテゴリを正規化（統一）
+   * @param {string} category - 元のカテゴリ名
+   * @returns {string} - 正規化されたカテゴリ名
+   */
+  normalizeCategory(category) {
+    if (!category) return '(不明)';
+
+    const categoryLower = category.toLowerCase().trim();
+
+    // 正規化マッピングをチェック
+    if (CATEGORY_NORMALIZATION[categoryLower]) {
+      return CATEGORY_NORMALIZATION[categoryLower];
+    }
+
+    // 部分一致でチェック（例: "Wristwatches, Parts & Accessories" → "時計"）
+    for (const [key, value] of Object.entries(CATEGORY_NORMALIZATION)) {
+      if (categoryLower.includes(key)) {
+        return value;
+      }
+    }
+
+    // 日本語カテゴリはそのまま返す
+    if (/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(category)) {
+      return category;
+    }
+
+    // マッチしない場合は元のカテゴリを返す
+    return category;
   }
 
   /**
@@ -213,12 +320,15 @@ class EbayAnalyzer {
         }
       }
 
+      // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
+      const normalizedCategory = this.normalizeCategory(category || '(不明)');
+
       items.push({
         title,
         startDate,
         watchers,
         price,
-        category: category || '(不明)',
+        category: normalizedCategory,
         sku,
         brand
       });
@@ -283,6 +393,8 @@ class EbayAnalyzer {
         if (!category) {
           category = this.extractCategoryFromBrand(title);
         }
+        // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
+        const normalizedCategory = this.normalizeCategory(category || '(不明)');
 
         items.push({
           title,
@@ -291,7 +403,7 @@ class EbayAnalyzer {
           sku,
           quantity,
           brand,
-          category: category || '(不明)'
+          category: normalizedCategory
         });
       }
     }
@@ -743,6 +855,9 @@ class EbayAnalyzer {
       if (aiClassifications[item.title] && aiClassifications[item.title].category) {
         category = aiClassifications[item.title].category;
       }
+      // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
+      category = this.normalizeCategory(category);
+
       if (!categoryStats[category]) {
         categoryStats[category] = {
           category,
@@ -763,6 +878,9 @@ class EbayAnalyzer {
       if (aiClassifications[item.title] && aiClassifications[item.title].category) {
         category = aiClassifications[item.title].category;
       }
+      // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
+      category = this.normalizeCategory(category);
+
       if (!categoryStats[category]) {
         categoryStats[category] = {
           category,
