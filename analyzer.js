@@ -3,80 +3,310 @@
  * ぶんせき君 v2.1.2 - 統合版
  */
 
-// カテゴリ正規化マッピング（英語eBayカテゴリ → 統一カテゴリ名）
-const CATEGORY_NORMALIZATION = {
+// ========================================
+// カテゴリ階層構造（大分類 → 細分類）
+// ========================================
+const CATEGORY_HIERARCHY = {
+  '時計': {
+    subcategories: ['腕時計', '懐中時計', 'スマートウォッチ', '時計アクセサリー'],
+    keywords: ['watch', 'wristwatch', 'timepiece', 'clock', 'chronograph']
+  },
+  'アクセサリー': {
+    subcategories: ['ネックレス', 'ブレスレット', 'リング', 'ピアス・イヤリング', 'ブローチ', 'アンクレット', 'カフス', 'その他アクセサリー'],
+    keywords: ['jewelry', 'jewellery', 'necklace', 'bracelet', 'ring', 'earring', 'brooch', 'pendant', 'charm', 'anklet', 'cufflink']
+  },
+  'バッグ': {
+    subcategories: ['ハンドバッグ', 'ショルダーバッグ', 'トートバッグ', 'リュック', 'クラッチ', 'ボストンバッグ', 'その他バッグ'],
+    keywords: ['bag', 'handbag', 'shoulder', 'tote', 'backpack', 'clutch', 'crossbody', 'satchel', 'hobo']
+  },
+  '財布・小物': {
+    subcategories: ['長財布', '二つ折り財布', 'コインケース', 'カードケース', 'キーケース', 'その他小物'],
+    keywords: ['wallet', 'purse', 'coin', 'card case', 'key case', 'money clip']
+  },
+  'アウター': {
+    subcategories: ['コート', 'ジャケット', 'ベスト', 'ダウン', 'ブルゾン', 'その他アウター'],
+    keywords: ['coat', 'jacket', 'vest', 'blazer', 'down', 'outerwear', 'parka', 'bomber']
+  },
+  '衣類': {
+    subcategories: ['トップス', 'ボトムス', 'ワンピース', 'スーツ', 'その他衣類'],
+    keywords: ['shirt', 'top', 'pants', 'dress', 'skirt', 'clothing', 'sweater', 'blouse']
+  },
+  '靴': {
+    subcategories: ['スニーカー', 'ブーツ', 'パンプス', 'ローファー', 'サンダル', 'その他靴'],
+    keywords: ['shoes', 'sneaker', 'boot', 'pump', 'loafer', 'sandal', 'heel', 'oxford']
+  },
+  'スカーフ・マフラー': {
+    subcategories: ['シルクスカーフ', 'マフラー', 'ストール', 'バンダナ', 'その他スカーフ'],
+    keywords: ['scarf', 'muffler', 'stole', 'shawl', 'bandana', 'wrap', 'twilly']
+  },
+  '帽子': {
+    subcategories: ['キャップ', 'ハット', 'ニット帽', 'ベレー帽', 'その他帽子'],
+    keywords: ['hat', 'cap', 'beanie', 'beret', 'fedora', 'bucket']
+  },
+  '手袋': {
+    subcategories: ['革手袋', 'ニット手袋', 'その他手袋'],
+    keywords: ['glove', 'mitten']
+  },
+  'ベルト': {
+    subcategories: ['レザーベルト', 'その他ベルト'],
+    keywords: ['belt']
+  },
+  'ネクタイ': {
+    subcategories: ['ネクタイ', '蝶ネクタイ', 'その他'],
+    keywords: ['tie', 'necktie', 'bow tie']
+  },
+  'サングラス・メガネ': {
+    subcategories: ['サングラス', 'メガネ', 'その他'],
+    keywords: ['sunglasses', 'eyeglasses', 'glasses']
+  },
+  'フィギュア・おもちゃ': {
+    subcategories: ['フィギュア', 'プラモデル', 'ぬいぐるみ', 'ミニカー', 'その他おもちゃ'],
+    keywords: ['figure', 'figurine', 'toy', 'model', 'plush', 'doll', 'action figure']
+  },
+  'トレカ・ゲーム': {
+    subcategories: ['ポケモンカード', '遊戯王', 'スポーツカード', 'ゲームソフト', 'その他'],
+    keywords: ['card', 'trading card', 'pokemon', 'game', 'tcg']
+  },
+  'インテリア・雑貨': {
+    subcategories: ['食器', 'スノードーム', '花瓶', 'プレート', 'その他雑貨'],
+    keywords: ['decor', 'plate', 'vase', 'snow globe', 'ornament', 'home']
+  },
+  'その他': {
+    subcategories: ['その他'],
+    keywords: []
+  }
+};
+
+// 細分類 → 大分類のマッピング（自動生成）
+const SUBCATEGORY_TO_MAIN = {};
+for (const [mainCat, data] of Object.entries(CATEGORY_HIERARCHY)) {
+  for (const subCat of data.subcategories) {
+    SUBCATEGORY_TO_MAIN[subCat] = mainCat;
+  }
+}
+
+// カテゴリ正規化マッピング（英語eBayカテゴリ/日本語 → {main, sub}）
+const CATEGORY_MAPPING = {
   // 時計関連
-  'wristwatches': '時計',
-  'watches': '時計',
-  'watch': '時計',
-  'pocket watches': '時計',
-  'smart watches': 'スマートウォッチ',
-  'smartwatches': 'スマートウォッチ',
-
-  // ジュエリー関連
-  'jewelry': 'ジュエリー',
-  'jewellery': 'ジュエリー',
-  'fine jewelry': 'ジュエリー',
-  'fashion jewelry': 'ジュエリー',
-  'necklaces & pendants': 'ネックレス',
-  'necklace': 'ネックレス',
-  'bracelets': 'ブレスレット',
-  'bracelet': 'ブレスレット',
-  'rings': 'リング',
-  'ring': 'リング',
-  'earrings': 'ピアス・イヤリング',
-  'earring': 'ピアス・イヤリング',
-  'brooches & pins': 'ブローチ',
-  'brooch': 'ブローチ',
-
-  // バッグ関連
-  'handbags': 'バッグ',
-  'handbag': 'バッグ',
-  'bags': 'バッグ',
-  'bag': 'バッグ',
-  'shoulder bags': 'バッグ',
-  'tote bags': 'バッグ',
-  'crossbody bags': 'バッグ',
-  'clutches': 'バッグ',
-  'backpacks': 'バッグ',
-  'wallets': '財布',
-  'wallet': '財布',
-
-  // 衣類関連
-  'clothing': '衣類',
-  'clothes': '衣類',
-  "women's clothing": '衣類',
-  "men's clothing": '衣類',
-  'tops': '衣類',
-  'dresses': '衣類',
-  'coats & jackets': 'アウター',
-  'outerwear': 'アウター',
-
-  // 靴関連
-  'shoes': '靴',
-  "women's shoes": '靴',
-  "men's shoes": '靴',
-  'sneakers': 'スニーカー',
-  'boots': 'ブーツ',
-  'heels': '靴',
+  'wristwatches': { main: '時計', sub: '腕時計' },
+  'watches': { main: '時計', sub: '腕時計' },
+  'watch': { main: '時計', sub: '腕時計' },
+  '時計': { main: '時計', sub: '腕時計' },
+  '腕時計': { main: '時計', sub: '腕時計' },
+  'pocket watches': { main: '時計', sub: '懐中時計' },
+  '懐中時計': { main: '時計', sub: '懐中時計' },
+  'smart watches': { main: '時計', sub: 'スマートウォッチ' },
+  'smartwatches': { main: '時計', sub: 'スマートウォッチ' },
+  'スマートウォッチ': { main: '時計', sub: 'スマートウォッチ' },
+  'watch accessories': { main: '時計', sub: '時計アクセサリー' },
 
   // アクセサリー関連
-  'accessories': 'アクセサリー',
-  'belts': 'ベルト',
-  'belt': 'ベルト',
-  'scarves': 'スカーフ',
-  'scarf': 'スカーフ',
-  'sunglasses': 'サングラス',
-  'eyeglasses': 'メガネ',
+  'jewelry': { main: 'アクセサリー', sub: 'その他アクセサリー' },
+  'jewellery': { main: 'アクセサリー', sub: 'その他アクセサリー' },
+  'fine jewelry': { main: 'アクセサリー', sub: 'その他アクセサリー' },
+  'fashion jewelry': { main: 'アクセサリー', sub: 'その他アクセサリー' },
+  'アクセサリー': { main: 'アクセサリー', sub: 'その他アクセサリー' },
+  'necklaces & pendants': { main: 'アクセサリー', sub: 'ネックレス' },
+  'necklace': { main: 'アクセサリー', sub: 'ネックレス' },
+  'ネックレス': { main: 'アクセサリー', sub: 'ネックレス' },
+  'pendants': { main: 'アクセサリー', sub: 'ネックレス' },
+  'bracelets': { main: 'アクセサリー', sub: 'ブレスレット' },
+  'bracelet': { main: 'アクセサリー', sub: 'ブレスレット' },
+  'ブレスレット': { main: 'アクセサリー', sub: 'ブレスレット' },
+  'charms & charm bracelets': { main: 'アクセサリー', sub: 'ブレスレット' },
+  'rings': { main: 'アクセサリー', sub: 'リング' },
+  'ring': { main: 'アクセサリー', sub: 'リング' },
+  'リング': { main: 'アクセサリー', sub: 'リング' },
+  '指輪': { main: 'アクセサリー', sub: 'リング' },
+  'earrings': { main: 'アクセサリー', sub: 'ピアス・イヤリング' },
+  'earring': { main: 'アクセサリー', sub: 'ピアス・イヤリング' },
+  'ピアス': { main: 'アクセサリー', sub: 'ピアス・イヤリング' },
+  'イヤリング': { main: 'アクセサリー', sub: 'ピアス・イヤリング' },
+  'ピアス・イヤリング': { main: 'アクセサリー', sub: 'ピアス・イヤリング' },
+  'brooches & pins': { main: 'アクセサリー', sub: 'ブローチ' },
+  'brooch': { main: 'アクセサリー', sub: 'ブローチ' },
+  'ブローチ': { main: 'アクセサリー', sub: 'ブローチ' },
+  'anklets': { main: 'アクセサリー', sub: 'アンクレット' },
+  'cufflinks': { main: 'アクセサリー', sub: 'カフス' },
+  'body jewelry': { main: 'アクセサリー', sub: 'その他アクセサリー' },
 
-  // コレクティブル
-  'collectibles': 'コレクティブル',
-  'trading cards': 'トレカ',
-  'sports cards': 'トレカ',
-  'figurines': 'フィギュア',
-  'figures': 'フィギュア',
-  'vintage': 'ヴィンテージ',
-  'antiques': 'アンティーク'
+  // バッグ関連
+  'handbags': { main: 'バッグ', sub: 'ハンドバッグ' },
+  'handbag': { main: 'バッグ', sub: 'ハンドバッグ' },
+  'ハンドバッグ': { main: 'バッグ', sub: 'ハンドバッグ' },
+  'shoulder bags': { main: 'バッグ', sub: 'ショルダーバッグ' },
+  'ショルダーバッグ': { main: 'バッグ', sub: 'ショルダーバッグ' },
+  'crossbody bags': { main: 'バッグ', sub: 'ショルダーバッグ' },
+  'tote bags': { main: 'バッグ', sub: 'トートバッグ' },
+  'tote': { main: 'バッグ', sub: 'トートバッグ' },
+  'トートバッグ': { main: 'バッグ', sub: 'トートバッグ' },
+  'backpacks': { main: 'バッグ', sub: 'リュック' },
+  'backpack': { main: 'バッグ', sub: 'リュック' },
+  'リュック': { main: 'バッグ', sub: 'リュック' },
+  'clutches': { main: 'バッグ', sub: 'クラッチ' },
+  'clutch': { main: 'バッグ', sub: 'クラッチ' },
+  'クラッチ': { main: 'バッグ', sub: 'クラッチ' },
+  'bags': { main: 'バッグ', sub: 'その他バッグ' },
+  'bag': { main: 'バッグ', sub: 'その他バッグ' },
+  'バッグ': { main: 'バッグ', sub: 'その他バッグ' },
+
+  // 財布・小物関連
+  'wallets': { main: '財布・小物', sub: '長財布' },
+  'wallet': { main: '財布・小物', sub: '長財布' },
+  '財布': { main: '財布・小物', sub: '長財布' },
+  '長財布': { main: '財布・小物', sub: '長財布' },
+  '財布・小物': { main: '財布・小物', sub: 'その他小物' },
+  'coin purse': { main: '財布・小物', sub: 'コインケース' },
+  'コインケース': { main: '財布・小物', sub: 'コインケース' },
+  'card case': { main: '財布・小物', sub: 'カードケース' },
+  'card holder': { main: '財布・小物', sub: 'カードケース' },
+  'カードケース': { main: '財布・小物', sub: 'カードケース' },
+  'key case': { main: '財布・小物', sub: 'キーケース' },
+  'キーケース': { main: '財布・小物', sub: 'キーケース' },
+
+  // アウター関連
+  'coats': { main: 'アウター', sub: 'コート' },
+  'coat': { main: 'アウター', sub: 'コート' },
+  'コート': { main: 'アウター', sub: 'コート' },
+  'coats & jackets': { main: 'アウター', sub: 'コート' },
+  'coats, jackets & vests': { main: 'アウター', sub: 'コート' },
+  'jackets': { main: 'アウター', sub: 'ジャケット' },
+  'jacket': { main: 'アウター', sub: 'ジャケット' },
+  'ジャケット': { main: 'アウター', sub: 'ジャケット' },
+  'blazer': { main: 'アウター', sub: 'ジャケット' },
+  'vests': { main: 'アウター', sub: 'ベスト' },
+  'vest': { main: 'アウター', sub: 'ベスト' },
+  'ベスト': { main: 'アウター', sub: 'ベスト' },
+  'down': { main: 'アウター', sub: 'ダウン' },
+  'ダウン': { main: 'アウター', sub: 'ダウン' },
+  'outerwear': { main: 'アウター', sub: 'その他アウター' },
+  'アウター': { main: 'アウター', sub: 'その他アウター' },
+  'activewear jackets': { main: 'アウター', sub: 'ジャケット' },
+
+  // 衣類関連
+  'tops': { main: '衣類', sub: 'トップス' },
+  'トップス': { main: '衣類', sub: 'トップス' },
+  'shirts': { main: '衣類', sub: 'トップス' },
+  'shirt': { main: '衣類', sub: 'トップス' },
+  'pants': { main: '衣類', sub: 'ボトムス' },
+  'ボトムス': { main: '衣類', sub: 'ボトムス' },
+  'jeans': { main: '衣類', sub: 'ボトムス' },
+  'dresses': { main: '衣類', sub: 'ワンピース' },
+  'dress': { main: '衣類', sub: 'ワンピース' },
+  'ワンピース': { main: '衣類', sub: 'ワンピース' },
+  'clothing': { main: '衣類', sub: 'その他衣類' },
+  '衣類': { main: '衣類', sub: 'その他衣類' },
+  "women's clothing": { main: '衣類', sub: 'その他衣類' },
+  "men's clothing": { main: '衣類', sub: 'その他衣類' },
+
+  // 靴関連
+  'shoes': { main: '靴', sub: 'その他靴' },
+  '靴': { main: '靴', sub: 'その他靴' },
+  "women's shoes": { main: '靴', sub: 'その他靴' },
+  "men's shoes": { main: '靴', sub: 'その他靴' },
+  'sneakers': { main: '靴', sub: 'スニーカー' },
+  'スニーカー': { main: '靴', sub: 'スニーカー' },
+  'boots': { main: '靴', sub: 'ブーツ' },
+  'ブーツ': { main: '靴', sub: 'ブーツ' },
+  'pumps': { main: '靴', sub: 'パンプス' },
+  'パンプス': { main: '靴', sub: 'パンプス' },
+  'heels': { main: '靴', sub: 'パンプス' },
+  'loafers': { main: '靴', sub: 'ローファー' },
+  'ローファー': { main: '靴', sub: 'ローファー' },
+  'sandals': { main: '靴', sub: 'サンダル' },
+  'サンダル': { main: '靴', sub: 'サンダル' },
+
+  // スカーフ・マフラー関連
+  'scarves': { main: 'スカーフ・マフラー', sub: 'シルクスカーフ' },
+  'scarf': { main: 'スカーフ・マフラー', sub: 'シルクスカーフ' },
+  'スカーフ': { main: 'スカーフ・マフラー', sub: 'シルクスカーフ' },
+  'scarves & wraps': { main: 'スカーフ・マフラー', sub: 'シルクスカーフ' },
+  'スカーフ・マフラー': { main: 'スカーフ・マフラー', sub: 'シルクスカーフ' },
+  'muffler': { main: 'スカーフ・マフラー', sub: 'マフラー' },
+  'マフラー': { main: 'スカーフ・マフラー', sub: 'マフラー' },
+  'stole': { main: 'スカーフ・マフラー', sub: 'ストール' },
+  'ストール': { main: 'スカーフ・マフラー', sub: 'ストール' },
+  'shawl': { main: 'スカーフ・マフラー', sub: 'ストール' },
+
+  // 帽子関連
+  'hats': { main: '帽子', sub: 'ハット' },
+  'hat': { main: '帽子', sub: 'ハット' },
+  '帽子': { main: '帽子', sub: 'ハット' },
+  'caps': { main: '帽子', sub: 'キャップ' },
+  'cap': { main: '帽子', sub: 'キャップ' },
+  'キャップ': { main: '帽子', sub: 'キャップ' },
+  'beanie': { main: '帽子', sub: 'ニット帽' },
+  'ニット帽': { main: '帽子', sub: 'ニット帽' },
+  'beret': { main: '帽子', sub: 'ベレー帽' },
+  'ベレー帽': { main: '帽子', sub: 'ベレー帽' },
+
+  // 手袋関連
+  'gloves & mittens': { main: '手袋', sub: 'その他手袋' },
+  'gloves': { main: '手袋', sub: 'その他手袋' },
+  '手袋': { main: '手袋', sub: 'その他手袋' },
+
+  // ベルト関連
+  'belts': { main: 'ベルト', sub: 'レザーベルト' },
+  'belt': { main: 'ベルト', sub: 'レザーベルト' },
+  'ベルト': { main: 'ベルト', sub: 'レザーベルト' },
+
+  // ネクタイ関連
+  'ties': { main: 'ネクタイ', sub: 'ネクタイ' },
+  'tie': { main: 'ネクタイ', sub: 'ネクタイ' },
+  'necktie': { main: 'ネクタイ', sub: 'ネクタイ' },
+  'ネクタイ': { main: 'ネクタイ', sub: 'ネクタイ' },
+  'bow ties': { main: 'ネクタイ', sub: '蝶ネクタイ' },
+  'bow tie': { main: 'ネクタイ', sub: '蝶ネクタイ' },
+  '蝶ネクタイ': { main: 'ネクタイ', sub: '蝶ネクタイ' },
+
+  // サングラス・メガネ関連
+  'sunglasses': { main: 'サングラス・メガネ', sub: 'サングラス' },
+  'サングラス': { main: 'サングラス・メガネ', sub: 'サングラス' },
+  'eyeglasses': { main: 'サングラス・メガネ', sub: 'メガネ' },
+  'メガネ': { main: 'サングラス・メガネ', sub: 'メガネ' },
+  'glasses': { main: 'サングラス・メガネ', sub: 'メガネ' },
+
+  // フィギュア・おもちゃ関連
+  'figurines': { main: 'フィギュア・おもちゃ', sub: 'フィギュア' },
+  'figures': { main: 'フィギュア・おもちゃ', sub: 'フィギュア' },
+  'action figures': { main: 'フィギュア・おもちゃ', sub: 'フィギュア' },
+  'フィギュア': { main: 'フィギュア・おもちゃ', sub: 'フィギュア' },
+  'フィギュア・おもちゃ': { main: 'フィギュア・おもちゃ', sub: 'フィギュア' },
+  'toys': { main: 'フィギュア・おもちゃ', sub: 'その他おもちゃ' },
+  'toy': { main: 'フィギュア・おもちゃ', sub: 'その他おもちゃ' },
+  'other animation merchandise': { main: 'フィギュア・おもちゃ', sub: 'その他おもちゃ' },
+  'animation merchandise': { main: 'フィギュア・おもちゃ', sub: 'その他おもちゃ' },
+  'plush': { main: 'フィギュア・おもちゃ', sub: 'ぬいぐるみ' },
+  'ぬいぐるみ': { main: 'フィギュア・おもちゃ', sub: 'ぬいぐるみ' },
+  'ぬいぐるみ・コレクション': { main: 'フィギュア・おもちゃ', sub: 'ぬいぐるみ' },
+
+  // トレカ・ゲーム関連
+  'trading cards': { main: 'トレカ・ゲーム', sub: 'その他' },
+  'トレカ': { main: 'トレカ・ゲーム', sub: 'その他' },
+  'sports cards': { main: 'トレカ・ゲーム', sub: 'スポーツカード' },
+  'pokemon': { main: 'トレカ・ゲーム', sub: 'ポケモンカード' },
+  'ポケモンカード': { main: 'トレカ・ゲーム', sub: 'ポケモンカード' },
+  'ゲーム': { main: 'トレカ・ゲーム', sub: 'ゲームソフト' },
+
+  // インテリア・雑貨関連
+  'snow globes': { main: 'インテリア・雑貨', sub: 'スノードーム' },
+  'スノードーム': { main: 'インテリア・雑貨', sub: 'スノードーム' },
+  'plates': { main: 'インテリア・雑貨', sub: 'プレート' },
+  'plate': { main: 'インテリア・雑貨', sub: 'プレート' },
+  'プレート': { main: 'インテリア・雑貨', sub: 'プレート' },
+  '食器': { main: 'インテリア・雑貨', sub: '食器' },
+  'decorative collectibles': { main: 'インテリア・雑貨', sub: 'その他雑貨' },
+  'home décor': { main: 'インテリア・雑貨', sub: 'その他雑貨' },
+  'home decor': { main: 'インテリア・雑貨', sub: 'その他雑貨' },
+  'インテリア・雑貨': { main: 'インテリア・雑貨', sub: 'その他雑貨' },
+  'vase': { main: 'インテリア・雑貨', sub: '花瓶' },
+  '花瓶': { main: 'インテリア・雑貨', sub: '花瓶' },
+
+  // その他
+  'collectibles': { main: 'その他', sub: 'その他' },
+  'vintage': { main: 'その他', sub: 'その他' },
+  'antiques': { main: 'その他', sub: 'その他' },
+  'accessories': { main: 'その他', sub: 'その他' }
 };
 
 class EbayAnalyzer {
@@ -86,34 +316,65 @@ class EbayAnalyzer {
   }
 
   /**
-   * カテゴリを正規化（統一）
+   * カテゴリを正規化（統一）- 階層構造対応
    * @param {string} category - 元のカテゴリ名
-   * @returns {string} - 正規化されたカテゴリ名
+   * @returns {object} - { main: 大分類, sub: 細分類 }
    */
   normalizeCategory(category) {
-    if (!category) return '(不明)';
+    if (!category || category === '(不明)') {
+      return { main: 'その他', sub: 'その他' };
+    }
 
     const categoryLower = category.toLowerCase().trim();
 
-    // 正規化マッピングをチェック
-    if (CATEGORY_NORMALIZATION[categoryLower]) {
-      return CATEGORY_NORMALIZATION[categoryLower];
+    // 完全一致でマッピングをチェック
+    if (CATEGORY_MAPPING[categoryLower]) {
+      return CATEGORY_MAPPING[categoryLower];
     }
 
-    // 部分一致でチェック（例: "Wristwatches, Parts & Accessories" → "時計"）
-    for (const [key, value] of Object.entries(CATEGORY_NORMALIZATION)) {
-      if (categoryLower.includes(key)) {
+    // 日本語カテゴリもチェック
+    if (CATEGORY_MAPPING[category]) {
+      return CATEGORY_MAPPING[category];
+    }
+
+    // 部分一致でチェック（例: "Wristwatches, Parts & Accessories" → 時計）
+    for (const [key, value] of Object.entries(CATEGORY_MAPPING)) {
+      if (categoryLower.includes(key.toLowerCase())) {
         return value;
       }
     }
 
-    // 日本語カテゴリはそのまま返す
-    if (/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(category)) {
-      return category;
+    // CATEGORY_HIERARCHYのキーワードでチェック
+    for (const [mainCat, data] of Object.entries(CATEGORY_HIERARCHY)) {
+      for (const keyword of data.keywords) {
+        if (categoryLower.includes(keyword.toLowerCase())) {
+          return { main: mainCat, sub: data.subcategories[data.subcategories.length - 1] }; // 「その他○○」
+        }
+      }
     }
 
-    // マッチしない場合は元のカテゴリを返す
-    return category;
+    // マッチしない場合は「その他」
+    return { main: 'その他', sub: 'その他' };
+  }
+
+  /**
+   * 大分類のみ取得（互換性用）
+   * @param {string} category - 元のカテゴリ名
+   * @returns {string} - 大分類名
+   */
+  getMainCategory(category) {
+    const normalized = this.normalizeCategory(category);
+    return normalized.main;
+  }
+
+  /**
+   * 細分類を取得
+   * @param {string} category - 元のカテゴリ名
+   * @returns {string} - 細分類名
+   */
+  getSubCategory(category) {
+    const normalized = this.normalizeCategory(category);
+    return normalized.sub;
   }
 
   /**
@@ -328,7 +589,9 @@ class EbayAnalyzer {
         startDate,
         watchers,
         price,
-        category: normalizedCategory,
+        categoryMain: normalizedCategory.main,  // 大分類
+        categorySub: normalizedCategory.sub,    // 細分類
+        category: normalizedCategory.main,      // 互換性のため大分類を保持
         sku,
         brand
       });
@@ -403,7 +666,9 @@ class EbayAnalyzer {
           sku,
           quantity,
           brand,
-          category: normalizedCategory
+          categoryMain: normalizedCategory.main,  // 大分類
+          categorySub: normalizedCategory.sub,    // 細分類
+          category: normalizedCategory.main       // 互換性のため大分類を保持
         });
       }
     }
@@ -841,63 +1106,125 @@ class EbayAnalyzer {
   }
 
   /**
-   * カテゴリ別分析
+   * カテゴリ別分析（階層構造対応）
+   * 大分類・細分類の両方で集計
    */
   calculateCategoryStats() {
-    const categoryStats = {};
+    // 大分類の集計
+    const mainCategoryStats = {};
+    // 細分類の集計（大分類ごと）
+    const subCategoryStats = {};
+
     // AI分類結果を参照（popup.jsから設定される）
     const aiClassifications = window.aiClassificationResults || {};
 
     // 出品中のカテゴリ集計
     for (const item of this.activeListings) {
-      // AI分類結果があればそれを優先
-      let category = item.category || '(不明)';
-      if (aiClassifications[item.title] && aiClassifications[item.title].category) {
-        category = aiClassifications[item.title].category;
-      }
-      // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
-      category = this.normalizeCategory(category);
+      // itemに既にcategoryMain/categorySubがあればそれを使用
+      let mainCat = item.categoryMain;
+      let subCat = item.categorySub;
 
-      if (!categoryStats[category]) {
-        categoryStats[category] = {
-          category,
+      // なければ正規化して取得
+      if (!mainCat) {
+        let category = item.category || '(不明)';
+        if (aiClassifications[item.title] && aiClassifications[item.title].category) {
+          category = aiClassifications[item.title].category;
+        }
+        const normalized = this.normalizeCategory(category);
+        mainCat = normalized.main;
+        subCat = normalized.sub;
+      }
+
+      // 大分類の集計
+      if (!mainCategoryStats[mainCat]) {
+        mainCategoryStats[mainCat] = {
+          category: mainCat,
+          active: 0,
+          sold: 0,
+          totalWatchers: 0,
+          revenue: 0,
+          subcategories: {}
+        };
+      }
+      mainCategoryStats[mainCat].active++;
+      mainCategoryStats[mainCat].totalWatchers += item.watchers || 0;
+
+      // 細分類の集計
+      if (!mainCategoryStats[mainCat].subcategories[subCat]) {
+        mainCategoryStats[mainCat].subcategories[subCat] = {
+          category: subCat,
+          parentCategory: mainCat,
           active: 0,
           sold: 0,
           totalWatchers: 0,
           revenue: 0
         };
       }
-      categoryStats[category].active++;
-      categoryStats[category].totalWatchers += item.watchers || 0;
+      mainCategoryStats[mainCat].subcategories[subCat].active++;
+      mainCategoryStats[mainCat].subcategories[subCat].totalWatchers += item.watchers || 0;
     }
 
     // 販売済のカテゴリ集計
     for (const item of this.soldItems) {
-      // AI分類結果があればそれを優先
-      let category = item.category || '(不明)';
-      if (aiClassifications[item.title] && aiClassifications[item.title].category) {
-        category = aiClassifications[item.title].category;
-      }
-      // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
-      category = this.normalizeCategory(category);
+      // itemに既にcategoryMain/categorySubがあればそれを使用
+      let mainCat = item.categoryMain;
+      let subCat = item.categorySub;
 
-      if (!categoryStats[category]) {
-        categoryStats[category] = {
-          category,
+      // なければ正規化して取得
+      if (!mainCat) {
+        let category = item.category || '(不明)';
+        if (aiClassifications[item.title] && aiClassifications[item.title].category) {
+          category = aiClassifications[item.title].category;
+        }
+        const normalized = this.normalizeCategory(category);
+        mainCat = normalized.main;
+        subCat = normalized.sub;
+      }
+
+      // 大分類の集計
+      if (!mainCategoryStats[mainCat]) {
+        mainCategoryStats[mainCat] = {
+          category: mainCat,
+          active: 0,
+          sold: 0,
+          totalWatchers: 0,
+          revenue: 0,
+          subcategories: {}
+        };
+      }
+      mainCategoryStats[mainCat].sold += item.quantity || 1;
+      mainCategoryStats[mainCat].revenue += (item.soldFor || 0) * (item.quantity || 1);
+
+      // 細分類の集計
+      if (!mainCategoryStats[mainCat].subcategories[subCat]) {
+        mainCategoryStats[mainCat].subcategories[subCat] = {
+          category: subCat,
+          parentCategory: mainCat,
           active: 0,
           sold: 0,
           totalWatchers: 0,
           revenue: 0
         };
       }
-      categoryStats[category].sold += item.quantity || 1;
-      categoryStats[category].revenue += (item.soldFor || 0) * (item.quantity || 1);
+      mainCategoryStats[mainCat].subcategories[subCat].sold += item.quantity || 1;
+      mainCategoryStats[mainCat].subcategories[subCat].revenue += (item.soldFor || 0) * (item.quantity || 1);
     }
 
-    // 配列に変換してソート
-    this.results.categoryStats = Object.values(categoryStats)
+    // 各大分類のsubcategoriesを配列に変換してソート
+    for (const mainCat of Object.values(mainCategoryStats)) {
+      mainCat.subcategoriesArray = Object.values(mainCat.subcategories)
+        .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
+    }
+
+    // 配列に変換してソート（大分類）
+    this.results.categoryStats = Object.values(mainCategoryStats)
       .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
-    this.results.byCategory = categoryStats;
+
+    // 互換性のため byCategory も設定（大分類のみ）
+    this.results.byCategory = mainCategoryStats;
+
+    // 階層構造のカテゴリデータ
+    this.results.categoryHierarchy = mainCategoryStats;
   }
 
   /**

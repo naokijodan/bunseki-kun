@@ -1187,6 +1187,52 @@ body {
   color: var(--primary-color);
 }
 
+/* カテゴリ階層表示 */
+.category-hierarchy-table .main-category-row {
+  background: var(--bg-secondary);
+}
+
+.category-hierarchy-table .main-category-row.expandable {
+  cursor: pointer;
+}
+
+.category-hierarchy-table .main-category-row.expandable:hover {
+  background: var(--primary-light);
+}
+
+.category-hierarchy-table .expand-icon {
+  display: inline-block;
+  width: 16px;
+  margin-right: 4px;
+  color: var(--primary-color);
+  font-size: 10px;
+  transition: transform var(--transition-fast);
+}
+
+.category-hierarchy-table .expand-icon-placeholder {
+  display: inline-block;
+  width: 16px;
+  margin-right: 4px;
+}
+
+.category-hierarchy-table .main-category-row.expanded .expand-icon {
+  transform: rotate(0deg);
+}
+
+.category-hierarchy-table .sub-category-row {
+  background: #fff;
+}
+
+.category-hierarchy-table .sub-category-row:hover {
+  background: #fafafa;
+}
+
+.category-hierarchy-table .sub-category-name {
+  padding-left: 28px !important;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
 .pace-table-scroll {
   max-height: 200px;
   overflow-y: auto;

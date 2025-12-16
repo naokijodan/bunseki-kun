@@ -1903,7 +1903,7 @@ function setupWatchFilterEvents() {
 }
 
 /**
- * カテゴリ別パフォーマンス分析を生成
+ * カテゴリ別パフォーマンス分析を生成（階層構造対応）
  */
 function generateCategoryPerformanceAnalysis() {
   const categories = analyzer.results.categoryStats || Object.values(analyzer.results.byCategory || {});
@@ -1922,10 +1922,55 @@ function generateCategoryPerformanceAnalysis() {
   const totalSold = categories.reduce((sum, c) => sum + c.sold, 0);
   const totalRevenue = categories.reduce((sum, c) => sum + (c.revenue || 0), 0);
 
+  // 階層表示用のHTML生成
+  function generateCategoryRows(categories) {
+    let rows = '';
+    for (const cat of categories.slice(0, 20)) {
+      const total = cat.active + cat.sold;
+      const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
+      const hasSubcategories = cat.subcategoriesArray && cat.subcategoriesArray.length > 1;
+      const catId = `cat-${escapeHtml(cat.category).replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+      // 大分類行
+      rows += `
+        <tr class="main-category-row ${hasSubcategories ? 'expandable' : ''}"
+            data-category-id="${catId}"
+            onclick="${hasSubcategories ? `toggleSubcategories('${catId}')` : ''}">
+          <td>
+            ${hasSubcategories ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon-placeholder"></span>'}
+            <strong>${escapeHtml(cat.category)}</strong>
+          </td>
+          <td>${cat.active}</td>
+          <td>${cat.sold}</td>
+          <td>${sellRate}%</td>
+          <td>$${(cat.revenue || 0).toFixed(0)}</td>
+        </tr>
+      `;
+
+      // 細分類行（折りたたみ）
+      if (hasSubcategories) {
+        for (const subCat of cat.subcategoriesArray) {
+          const subTotal = subCat.active + subCat.sold;
+          const subSellRate = subTotal > 0 ? Math.round((subCat.sold / subTotal) * 100) : 0;
+          rows += `
+            <tr class="sub-category-row" data-parent="${catId}" style="display: none;">
+              <td class="sub-category-name">└ ${escapeHtml(subCat.category)}</td>
+              <td>${subCat.active}</td>
+              <td>${subCat.sold}</td>
+              <td>${subSellRate}%</td>
+              <td>$${(subCat.revenue || 0).toFixed(0)}</td>
+            </tr>
+          `;
+        }
+      }
+    }
+    return rows;
+  }
+
   let html = `
     <div class="analysis-summary">
       <div class="summary-row">
-        <span class="label">カテゴリ数</span>
+        <span class="label">大分類カテゴリ数</span>
         <span class="value">${categories.length}</span>
       </div>
       <div class="summary-row">
@@ -1947,8 +1992,8 @@ function generateCategoryPerformanceAnalysis() {
     </div>
 
     <div class="analysis-detail">
-      <h4>カテゴリ別パフォーマンス</h4>
-      <table class="data-table">
+      <h4>カテゴリ別パフォーマンス <small style="color: #666; font-weight: normal;">（▶をクリックで細分類を展開）</small></h4>
+      <table class="data-table category-hierarchy-table">
         <thead>
           <tr>
             <th>カテゴリ</th>
@@ -1959,19 +2004,7 @@ function generateCategoryPerformanceAnalysis() {
           </tr>
         </thead>
         <tbody>
-          ${categories.slice(0, 20).map(cat => {
-            const total = cat.active + cat.sold;
-            const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
-            return `
-              <tr>
-                <td>${escapeHtml(cat.category)}</td>
-                <td>${cat.active}</td>
-                <td>${cat.sold}</td>
-                <td>${sellRate}%</td>
-                <td>$${(cat.revenue || 0).toFixed(0)}</td>
-              </tr>
-            `;
-          }).join('')}
+          ${generateCategoryRows(categories)}
         </tbody>
       </table>
     </div>
@@ -1982,6 +2015,29 @@ function generateCategoryPerformanceAnalysis() {
   }, 100);
 
   return html;
+}
+
+/**
+ * 細分類の展開/折りたたみ
+ */
+function toggleSubcategories(categoryId) {
+  const mainRow = document.querySelector(`tr[data-category-id="${categoryId}"]`);
+  const subRows = document.querySelectorAll(`tr[data-parent="${categoryId}"]`);
+  const expandIcon = mainRow.querySelector('.expand-icon');
+
+  const isExpanded = mainRow.classList.contains('expanded');
+
+  if (isExpanded) {
+    // 折りたたむ
+    mainRow.classList.remove('expanded');
+    expandIcon.textContent = '▶';
+    subRows.forEach(row => row.style.display = 'none');
+  } else {
+    // 展開する
+    mainRow.classList.add('expanded');
+    expandIcon.textContent = '▼';
+    subRows.forEach(row => row.style.display = '');
+  }
 }
 
 /**
