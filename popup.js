@@ -1943,16 +1943,19 @@ function generateCategoryPerformanceAnalysis() {
   // 細分類セクションのHTML生成（展開式）
   function generateSubcategorySection(categories) {
     let html = '';
+    let index = 0;
     for (const cat of categories) {
       const hasSubcategories = cat.subcategoriesArray && cat.subcategoriesArray.length > 0;
       if (!hasSubcategories) continue;
 
-      const catId = `subcat-${escapeHtml(cat.category).replace(/[^a-zA-Z0-9]/g, '_')}`;
+      // シンプルな連番IDを使用（日本語・特殊文字の問題を回避）
+      const catId = `subcat_${index}`;
+      index++;
       const total = cat.active + cat.sold;
 
       html += `
         <div class="subcategory-group">
-          <div class="subcategory-header" onclick="toggleSubcategoryGroup('${catId}')">
+          <div class="subcategory-header" data-target="${catId}">
             <span class="expand-icon" id="icon-${catId}">▶</span>
             <strong>${escapeHtml(cat.category)}</strong>
             <span class="subcategory-count">(${total}件)</span>
@@ -2043,25 +2046,35 @@ function generateCategoryPerformanceAnalysis() {
 
   setTimeout(() => {
     drawCategoryChart(categories.slice(0, 10));
+    // 細分類ヘッダーにクリックイベントを追加
+    setupSubcategoryToggle();
   }, 100);
 
   return html;
 }
 
 /**
- * 細分類グループの展開/折りたたみ
+ * 細分類ヘッダーのクリックイベントを設定
  */
-function toggleSubcategoryGroup(categoryId) {
-  const content = document.getElementById(categoryId);
-  const icon = document.getElementById(`icon-${categoryId}`);
+function setupSubcategoryToggle() {
+  const headers = document.querySelectorAll('.subcategory-header');
+  headers.forEach(header => {
+    header.addEventListener('click', function() {
+      const targetId = this.getAttribute('data-target');
+      const content = document.getElementById(targetId);
+      const icon = document.getElementById(`icon-${targetId}`);
 
-  if (content.style.display === 'none') {
-    content.style.display = 'block';
-    icon.textContent = '▼';
-  } else {
-    content.style.display = 'none';
-    icon.textContent = '▶';
-  }
+      if (content && icon) {
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          icon.textContent = '▼';
+        } else {
+          content.style.display = 'none';
+          icon.textContent = '▶';
+        }
+      }
+    });
+  });
 }
 
 /**
