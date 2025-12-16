@@ -474,9 +474,11 @@ async function captureMarketDataFromUrl() {
         }
       }
 
+      // 新しいタブで開く（バックグラウンドで）
+      let createdTab = false;
       if (!targetTab) {
-        // 新しいタブで開く
-        targetTab = await chrome.tabs.create({ url, active: true });
+        targetTab = await chrome.tabs.create({ url, active: false });
+        createdTab = true;
 
         // タブの読み込み完了を待つ
         await waitForTabLoad(targetTab.id);
@@ -484,12 +486,12 @@ async function captureMarketDataFromUrl() {
 
       // content scriptが動作するか確認、リトライ
       let response = null;
-      let retries = 3;
+      let retries = 5;
       let lastError = null;
 
       while (retries > 0) {
         try {
-          console.log('市場データ取得リトライ:', 4 - retries, 'tabId:', targetTab.id);
+          console.log('市場データ取得リトライ:', 6 - retries, 'tabId:', targetTab.id);
           response = await chrome.tabs.sendMessage(targetTab.id, {
             action: 'captureMarketData'
           });
@@ -500,8 +502,18 @@ async function captureMarketDataFromUrl() {
           console.log('sendMessageエラー:', e.message);
           retries--;
           if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
+        }
+      }
+
+      // 自分で開いたタブは閉じる
+      if (createdTab && targetTab) {
+        try {
+          await chrome.tabs.remove(targetTab.id);
+          console.log('タブを閉じました');
+        } catch (e) {
+          console.log('タブを閉じる際のエラー:', e.message);
         }
       }
 
@@ -539,17 +551,17 @@ function waitForTabLoad(tabId) {
     const listener = (updatedTabId, changeInfo) => {
       if (updatedTabId === tabId && changeInfo.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
-        // content scriptが実行されるまで少し待つ
-        setTimeout(resolve, 1000);
+        // content scriptが実行されるまで待つ（Terapeakは重いので長め）
+        setTimeout(resolve, 3000);
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
 
-    // タイムアウト（10秒）
+    // タイムアウト（15秒）
     setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
       resolve();
-    }, 10000);
+    }, 15000);
   });
 }
 
