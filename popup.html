@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ぶんせき君 - eBay分析</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="app-icon">🔶</span>
+        <h1 class="app-title">ぶんせき君</h1>
+        <span class="version-badge">v4.0</span>
+      </div>
+      <div class="header-right">
+        <button id="settingsBtn" class="icon-btn" title="設定">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- メインタブ -->
+    <nav class="main-tabs">
+      <button class="main-tab active" data-tab="data-input">
+        <span class="tab-icon">📥</span>
+        <span class="tab-label">データ入力</span>
+      </button>
+      <button class="main-tab" data-tab="analysis">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">分析</span>
+      </button>
+      <button class="main-tab" data-tab="ai-suggestions">
+        <span class="tab-icon">🤖</span>
+        <span class="tab-label">AI提案</span>
+      </button>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+
+      <!-- ===================== -->
+      <!-- データ入力タブ -->
+      <!-- ===================== -->
+      <section id="data-input-tab" class="tab-content active">
+
+        <!-- 自分のデータセクション -->
+        <div class="data-section">
+          <div class="section-header">
+            <h2><span class="section-icon">📦</span> 自分のデータ</h2>
+          </div>
+
+          <div class="data-cards">
+            <!-- Active Listings -->
+            <div class="data-card">
+              <div class="data-card-header">
+                <span class="data-card-icon">📋</span>
+                <span class="data-card-title">Active Listings</span>
+              </div>
+              <div class="data-card-body">
+                <div class="file-upload-area" id="activeListingsUpload">
+                  <input type="file" id="activeListingsFile" accept=".csv" hidden>
+                  <label for="activeListingsFile" class="file-upload-label">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">CSVを選択</span>
+                  </label>
+                </div>
+                <div class="data-status" id="activeListingsStatus">
+                  <span class="status-icon">⏳</span>
+                  <span class="status-text">未読み込み</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Orders -->
+            <div class="data-card">
+              <div class="data-card-header">
+                <span class="data-card-icon">💰</span>
+                <span class="data-card-title">Orders (売上)</span>
+              </div>
+              <div class="data-card-body">
+                <div class="file-upload-area" id="ordersUpload">
+                  <input type="file" id="ordersFile" accept=".csv" hidden>
+                  <label for="ordersFile" class="file-upload-label">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">CSVを選択</span>
+                  </label>
+                </div>
+                <div class="data-status" id="ordersStatus">
+                  <span class="status-icon">⏳</span>
+                  <span class="status-text">未読み込み</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 自分のデータサマリー -->
+          <div class="data-summary" id="myDataSummary" style="display: none;">
+            <div class="summary-item">
+              <span class="summary-label">出品中</span>
+              <span class="summary-value" id="myActiveCount">0</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">売却済</span>
+              <span class="summary-value" id="mySoldCount">0</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">ブランド数</span>
+              <span class="summary-value" id="myBrandCount">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 市場データセクション -->
+        <div class="data-section">
+          <div class="section-header">
+            <h2><span class="section-icon">🌐</span> 市場データ</h2>
+          </div>
+
+          <!-- URL入力 -->
+          <div class="url-input-group">
+            <input type="text" id="ebayUrlInput" class="url-input" placeholder="https://www.ebay.com/sch/... のURLを入力">
+            <button id="captureMarketBtn" class="action-btn primary">
+              <span class="btn-icon">📡</span>
+              取得
+            </button>
+          </div>
+          <p class="input-hint">eBay検索結果ページのURLを入力して市場データを取得</p>
+
+          <!-- 取得結果表示 -->
+          <div id="marketCaptureResult" class="capture-result" style="display: none;">
+            <span class="added">+<span id="marketAddedCount">0</span>件追加</span>
+            <span class="duplicates">(<span id="marketDuplicateCount">0</span>件重複スキップ)</span>
+          </div>
+
+          <div class="market-data-info">
+            <div class="market-stats">
+              <div class="stat-item">
+                <span class="stat-value" id="marketTotalCount">0</span>
+                <span class="stat-label">件登録済み</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="marketBrandCount">0</span>
+                <span class="stat-label">ブランド</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="marketLastUpdate">-</span>
+                <span class="stat-label">最終更新</span>
+              </div>
+            </div>
+
+            <div class="market-actions">
+              <button id="importMarketCsvBtn" class="action-btn secondary">
+                <span class="btn-icon">📁</span>
+                CSVインポート
+              </button>
+              <button id="clearMarketDataBtn" class="action-btn danger">
+                <span class="btn-icon">🗑️</span>
+                クリア
+              </button>
+            </div>
+          </div>
+
+          <!-- 市場データCSVインポート（hidden） -->
+          <input type="file" id="marketCsvFile" accept=".csv" hidden>
+        </div>
+
+        <!-- データ保存アクション -->
+        <div class="data-actions">
+          <button id="saveAllDataBtn" class="action-btn primary full-width">
+            <span class="btn-icon">💾</span>
+            現在のデータを保存
+          </button>
+          <p class="action-hint" id="lastSavedInfo">保存済みデータなし</p>
+        </div>
+      </section>
+
+      <!-- ===================== -->
+      <!-- 分析タブ -->
+      <!-- ===================== -->
+      <section id="analysis-tab" class="tab-content">
+
+        <!-- 自分のデータ分析 -->
+        <div class="analysis-section">
+          <div class="section-header">
+            <h2><span class="section-icon">📈</span> 自分のデータ分析</h2>
+          </div>
+
+          <div class="analysis-buttons">
+            <button class="analysis-btn" data-analysis="listing-pace">
+              <span class="btn-icon">📅</span>
+              <span class="btn-label">出品ペース</span>
+              <span class="btn-desc">出品・販売の推移</span>
+            </button>
+            <button class="analysis-btn" data-analysis="brand-performance">
+              <span class="btn-icon">🏷️</span>
+              <span class="btn-label">ブランド別</span>
+              <span class="btn-desc">ブランド毎の成績</span>
+            </button>
+            <button class="analysis-btn" data-analysis="watch-analysis">
+              <span class="btn-icon">👁️</span>
+              <span class="btn-label">Watch数分析</span>
+              <span class="btn-desc">注目度の高い商品</span>
+            </button>
+            <button class="analysis-btn" data-analysis="category-performance">
+              <span class="btn-icon">📂</span>
+              <span class="btn-label">カテゴリ別</span>
+              <span class="btn-desc">カテゴリ毎の成績</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 市場比較分析 -->
+        <div class="analysis-section">
+          <div class="section-header">
+            <h2><span class="section-icon">🔄</span> 市場比較分析</h2>
+          </div>
+
+          <div class="analysis-buttons">
+            <button class="analysis-btn featured" data-analysis="category-comparison">
+              <span class="btn-icon">📊</span>
+              <span class="btn-label">カテゴリ分析</span>
+              <span class="btn-desc">市場とのカテゴリ比較</span>
+            </button>
+            <button class="analysis-btn featured" data-analysis="brand-category-matrix">
+              <span class="btn-icon">🎯</span>
+              <span class="btn-label">ブランド×カテゴリ</span>
+              <span class="btn-desc">強み・弱みの発見</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 分析結果表示エリア -->
+        <div id="analysisResultArea" class="analysis-result-area" style="display: none;">
+          <div class="result-header">
+            <h3 id="analysisResultTitle">分析結果</h3>
+            <button id="closeAnalysisResult" class="close-btn">✕</button>
+          </div>
+          <div id="analysisResultContent" class="result-content">
+            <!-- 動的に生成 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== -->
+      <!-- AI提案タブ -->
+      <!-- ===================== -->
+      <section id="ai-suggestions-tab" class="tab-content">
+
+        <!-- AI選択 -->
+        <div class="ai-section">
+          <div class="section-header">
+            <h2><span class="section-icon">🤖</span> AI選択</h2>
+          </div>
+
+          <div class="ai-selector">
+            <label class="ai-option">
+              <input type="radio" name="aiProvider" value="openai" checked>
+              <span class="ai-option-content">
+                <span class="ai-logo">🟢</span>
+                <span class="ai-name">OpenAI</span>
+                <span class="ai-model">GPT-4o</span>
+              </span>
+            </label>
+            <label class="ai-option">
+              <input type="radio" name="aiProvider" value="claude">
+              <span class="ai-option-content">
+                <span class="ai-logo">🟠</span>
+                <span class="ai-name">Claude</span>
+                <span class="ai-model">Claude 3.5</span>
+              </span>
+            </label>
+            <label class="ai-option">
+              <input type="radio" name="aiProvider" value="gemini">
+              <span class="ai-option-content">
+                <span class="ai-logo">🔵</span>
+                <span class="ai-name">Gemini</span>
+                <span class="ai-model">Gemini Pro</span>
+              </span>
+            </label>
+            <label class="ai-option compare-all">
+              <input type="radio" name="aiProvider" value="compare">
+              <span class="ai-option-content">
+                <span class="ai-logo">⚡</span>
+                <span class="ai-name">全てで比較</span>
+                <span class="ai-model">3つのAIで分析</span>
+              </span>
+            </label>
+          </div>
+
+          <!-- API接続状態 -->
+          <div class="api-status-bar">
+            <div class="api-status-item" id="openaiStatus">
+              <span class="status-dot"></span>
+              <span>OpenAI</span>
+            </div>
+            <div class="api-status-item" id="claudeStatus">
+              <span class="status-dot"></span>
+              <span>Claude</span>
+            </div>
+            <div class="api-status-item" id="geminiStatus">
+              <span class="status-dot"></span>
+              <span>Gemini</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分析実行 -->
+        <div class="ai-section">
+          <div class="section-header">
+            <h2><span class="section-icon">🎯</span> AI分析を実行</h2>
+          </div>
+
+          <div class="ai-analysis-options">
+            <label class="checkbox-option">
+              <input type="checkbox" id="includeStrengths" checked>
+              <span>強み・弱み分析</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" id="includePurchasing" checked>
+              <span>仕入れ推奨</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" id="includePricing" checked>
+              <span>価格戦略</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" id="includeMarketTrends" checked>
+              <span>市場トレンド</span>
+            </label>
+          </div>
+
+          <button id="runAIAnalysisBtn" class="action-btn primary full-width large">
+            <span class="btn-icon">🚀</span>
+            総合AI分析を実行
+          </button>
+        </div>
+
+        <!-- AI分析結果 -->
+        <div id="aiResultArea" class="ai-result-area" style="display: none;">
+          <div class="ai-result-tabs" id="aiResultTabs">
+            <!-- 動的に生成（比較モード時） -->
+          </div>
+          <div id="aiResultContent" class="ai-result-content">
+            <!-- 動的に生成 -->
+          </div>
+        </div>
+
+        <!-- AIチャット -->
+        <div class="ai-section">
+          <div class="section-header">
+            <h2><span class="section-icon">💬</span> AIに質問</h2>
+          </div>
+
+          <div class="chat-container">
+            <div id="chatMessages" class="chat-messages">
+              <div class="chat-placeholder">
+                分析結果について質問できます
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <textarea id="chatInput" class="chat-input" placeholder="質問を入力..." rows="2"></textarea>
+              <button id="sendChatBtn" class="chat-send-btn">
+                <span>➤</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- アラート表示 -->
+    <div id="alertContainer" class="alert-container"></div>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+      <div class="loading-spinner"></div>
+      <p id="loadingMessage">処理中...</p>
+    </div>
+
+    <!-- 分析モーダル -->
+    <div id="analysisModal" class="modal-overlay" style="display: none;">
+      <div class="modal-container large">
+        <div class="modal-header">
+          <h2 id="modalTitle">分析</h2>
+          <button id="closeModalBtn" class="close-btn">✕</button>
+        </div>
+        <div id="modalContent" class="modal-content">
+          <!-- 動的に生成 -->
+        </div>
+        <div class="modal-footer">
+          <button id="modalActionBtn" class="action-btn primary" style="display: none;">
+            実行
+          </button>
+          <button id="modalCloseBtn" class="action-btn secondary">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="chart.min.js"></script>
+  <script src="category-rules.js"></script>
+  <script src="db.js"></script>
+  <script src="analyzer.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

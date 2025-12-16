@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ぶんせき君 - eBay分析</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <header class="header">
+      <div class="logo">
+        <img src="icon128.png" alt="ぶんせき君" class="logo-icon">
+        <h1>ぶんせき君</h1>
+      </div>
+      <div class="header-actions">
+        <button id="categoryAnalysisBtn" class="category-analysis-btn" title="カテゴリ分析">
+          <span class="btn-icon">📊</span>
+          カテゴリ分析
+        </button>
+        <button id="settingsBtn" class="settings-btn" title="設定">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- アラートエリア -->
+    <div id="alertArea" class="alert-area hidden"></div>
+
+    <!-- タブナビゲーション -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="input">データ入力</button>
+      <button class="tab-btn" data-tab="results">分析結果</button>
+      <button class="tab-btn" data-tab="market">市場比較</button>
+      <button class="tab-btn" data-tab="ai">AI提案</button>
+    </nav>
+
+    <!-- データ入力タブ -->
+    <div id="input-tab" class="tab-content active">
+      <!-- Active Listings -->
+      <div class="input-section">
+        <h2>📦 出品中データ (Active Listings)</h2>
+        <p class="section-hint">Seller Hub → Reports → Active listings からエクスポート</p>
+
+        <div class="file-upload" id="activeDropZone">
+          <div class="upload-icon">📁</div>
+          <p>Active Listings CSVをドロップ</p>
+          <p class="sub-text">または クリックして選択</p>
+          <input type="file" id="activeFile" accept=".csv" hidden>
+        </div>
+        <div id="activeFileInfo" class="file-info hidden">
+          <span class="file-name"></span>
+          <span class="file-count"></span>
+          <button class="clear-btn" data-target="active">×</button>
+        </div>
+      </div>
+
+      <!-- Orders (Sold) -->
+      <div class="input-section">
+        <h2>💰 販売データ (Orders)</h2>
+        <p class="section-hint">Seller Hub → Orders → All Orders からエクスポート</p>
+
+        <div class="file-upload" id="ordersDropZone">
+          <div class="upload-icon">📁</div>
+          <p>Orders CSVをドロップ</p>
+          <p class="sub-text">または クリックして選択</p>
+          <input type="file" id="ordersFile" accept=".csv" hidden>
+        </div>
+        <div id="ordersFileInfo" class="file-info hidden">
+          <span class="file-name"></span>
+          <span class="file-count"></span>
+          <button class="clear-btn" data-target="orders">×</button>
+        </div>
+      </div>
+
+      <!-- 分析開始ボタン -->
+      <button id="analyzeBtn" class="primary-btn" disabled>
+        <span class="btn-icon">🔍</span>
+        分析開始
+      </button>
+      <p class="analyze-hint">※ 少なくとも1つのCSVを読み込んでください</p>
+
+      <!-- データ保存ボタン -->
+      <div class="save-section">
+        <button id="saveDataBtn" class="secondary-btn">
+          <span class="btn-icon">💾</span>
+          現在のデータを保存
+        </button>
+        <button id="clearDataBtn" class="danger-btn">
+          <span class="btn-icon">🗑️</span>
+          保存データをクリア
+        </button>
+        <p id="savedDataInfo" class="saved-info hidden"></p>
+      </div>
+    </div>
+
+    <!-- 分析結果タブ -->
+    <div id="results-tab" class="tab-content">
+      <div class="results-section">
+        <!-- 期間選択 -->
+        <div class="period-selector">
+          <span class="period-label">表示期間:</span>
+          <div class="period-buttons">
+            <button class="period-btn" data-days="7">7日</button>
+            <button class="period-btn" data-days="30">30日</button>
+            <button class="period-btn" data-days="90">90日</button>
+            <button class="period-btn active" data-days="0">全期間</button>
+          </div>
+        </div>
+
+        <!-- 集計サマリー -->
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="card-value" id="totalActive">0</div>
+            <div class="card-label">出品中</div>
+          </div>
+          <div class="summary-card">
+            <div class="card-value" id="totalSold">0</div>
+            <div class="card-label">販売済</div>
+          </div>
+          <div class="summary-card">
+            <div class="card-value" id="totalWatchers">0</div>
+            <div class="card-label">総Watch数</div>
+          </div>
+          <div class="summary-card">
+            <div class="card-value" id="daysSinceLastList">-</div>
+            <div class="card-label">最終出品から</div>
+          </div>
+        </div>
+
+        <!-- 不明商品の警告とAI判定 -->
+        <div id="unknownAlert" class="unknown-alert hidden">
+          <div class="unknown-alert-header">
+            <span class="unknown-icon">⚠️</span>
+            <span id="unknownCount">0</span>件の商品が「不明」です
+          </div>
+          <p class="unknown-hint">ブランド・カテゴリを判定できなかった商品があります</p>
+          <button id="classifyWithAIBtn" class="ai-classify-btn">
+            <span class="btn-icon">🤖</span>
+            AIで自動判定する
+          </button>
+          <div id="aiClassifyProgress" class="ai-progress hidden">
+            <div class="progress-bar">
+              <div class="progress-fill" id="aiProgressFill"></div>
+            </div>
+            <span id="aiProgressText">0/0 判定中...</span>
+          </div>
+        </div>
+
+        <!-- 出品ペース -->
+        <div class="chart-section">
+          <h3>📈 出品ペース（過去30日）</h3>
+          <div class="chart-container">
+            <canvas id="listingPaceChart"></canvas>
+          </div>
+        </div>
+
+        <!-- ブランド別パフォーマンス -->
+        <div class="chart-section">
+          <div class="brand-header">
+            <h3>📊 ブランド別パフォーマンス</h3>
+            <div class="brand-filter">
+              <label>表示件数:</label>
+              <select id="brandLimitFilter">
+                <option value="10">10件</option>
+                <option value="20" selected>20件</option>
+                <option value="30">30件</option>
+                <option value="50">50件</option>
+                <option value="100">全て</option>
+              </select>
+            </div>
+          </div>
+          <p class="section-hint">ブランドをクリックすると詳細を表示</p>
+          <div class="chart-toggle">
+            <button class="chart-toggle-btn active" data-chart="brand-bar">棒グラフ</button>
+            <button class="chart-toggle-btn" data-chart="brand-pie">円グラフ</button>
+          </div>
+          <div class="chart-container chart-scrollable" id="brandBarContainer">
+            <canvas id="brandChart"></canvas>
+          </div>
+          <div class="chart-container hidden" id="brandPieContainer">
+            <canvas id="brandPieChart"></canvas>
+          </div>
+        </div>
+
+        <!-- ブランド詳細（ドリルダウン） -->
+        <div id="brandDetail" class="brand-detail-section hidden">
+          <div class="brand-detail-header">
+            <h3 id="brandDetailTitle">ブランド詳細</h3>
+            <button id="closeBrandDetail" class="close-btn">×</button>
+          </div>
+          <div class="brand-detail-stats">
+            <div class="detail-stat">
+              <span class="stat-value" id="detailActive">0</span>
+              <span class="stat-label">出品中</span>
+            </div>
+            <div class="detail-stat">
+              <span class="stat-value" id="detailSold">0</span>
+              <span class="stat-label">販売済</span>
+            </div>
+            <div class="detail-stat">
+              <span class="stat-value" id="detailRate">0%</span>
+              <span class="stat-label">売上率</span>
+            </div>
+            <div class="detail-stat">
+              <span class="stat-value" id="detailRevenue">$0</span>
+              <span class="stat-label">売上</span>
+            </div>
+          </div>
+          <h4>カテゴリ内訳</h4>
+          <div class="chart-container">
+            <canvas id="brandCategoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Watch数ランキング -->
+        <div class="list-section">
+          <div class="watch-header">
+            <h3>👀 Watch数が多い商品</h3>
+            <div class="watch-filter">
+              <label>最低Watch数:</label>
+              <select id="watchMinFilter">
+                <option value="1">1以上</option>
+                <option value="2" selected>2以上</option>
+                <option value="3">3以上</option>
+                <option value="5">5以上</option>
+                <option value="10">10以上</option>
+              </select>
+              <label>表示件数:</label>
+              <select id="watchLimitFilter">
+                <option value="10">10件</option>
+                <option value="20">20件</option>
+                <option value="50">50件</option>
+                <option value="100">全て</option>
+              </select>
+            </div>
+          </div>
+          <div id="watchRanking" class="ranking-list"></div>
+        </div>
+
+        <!-- カテゴリ別 -->
+        <div class="chart-section">
+          <h3>📊 カテゴリ別</h3>
+          <div class="chart-toggle">
+            <button class="chart-toggle-btn active" data-chart="category-pie">円グラフ</button>
+            <button class="chart-toggle-btn" data-chart="category-bar">棒グラフ</button>
+          </div>
+          <div class="chart-container" id="categoryPieContainer">
+            <canvas id="categoryChart"></canvas>
+          </div>
+          <div class="chart-container chart-tall hidden" id="categoryBarContainer">
+            <canvas id="categoryBarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- CSV出力 -->
+        <button id="downloadCsv" class="secondary-btn">
+          <span class="btn-icon">📥</span>
+          分析結果をCSVダウンロード
+        </button>
+      </div>
+    </div>
+
+    <!-- 市場比較タブ -->
+    <div id="market-tab" class="tab-content">
+      <div class="market-section">
+        <!-- ハイライト設定 -->
+        <div class="highlight-settings">
+          <h3>🎨 eBayページでのハイライト</h3>
+          <p class="section-hint">TerapeakやeBay検索結果で、分析結果に基づいてハイライト表示</p>
+
+          <div class="toggle-setting">
+            <label>
+              <input type="checkbox" id="highlightEnabled" checked>
+              <span class="toggle-label">ハイライト機能を有効にする</span>
+            </label>
+          </div>
+
+          <div class="highlight-legend">
+            <div class="legend-item">
+              <span class="legend-color strong"></span>
+              <span class="legend-text">強いブランド（売上率50%以上）</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color opportunity"></span>
+              <span class="legend-text">チャンス（市場で売れてるが未出品）</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color price-alert"></span>
+              <span class="legend-text">価格見直し推奨</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color owned"></span>
+              <span class="legend-text">取り扱い中</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color excluded"></span>
+              <span class="legend-text">除外済み</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 市場データ取得 -->
+        <div class="market-capture">
+          <h3>📊 市場データ取得（蓄積可能）</h3>
+          <p class="section-hint">複数ページのデータを蓄積できます。重複は自動で除外されます。</p>
+
+          <div class="url-input-group">
+            <input type="text" id="ebayUrlInput" class="url-input" placeholder="https://www.ebay.com/sch/... または Terapeak URL">
+            <button id="captureMarketBtn" class="primary-btn">
+              <span class="btn-icon">📡</span>
+              追加取得
+            </button>
+          </div>
+
+          <div id="marketDataInfo" class="market-info">
+            <div class="market-info-header">
+              <div class="market-stats">
+                <span>蓄積データ: <strong id="marketDataCount">0</strong>件</span>
+                <span id="marketLastCapture" class="time-label"></span>
+              </div>
+              <button id="clearMarketDataBtn" class="clear-market-btn">
+                <span class="btn-icon">🗑️</span>
+                クリア
+              </button>
+            </div>
+            <div id="marketCaptureResult" class="capture-result hidden">
+              <span class="added">+<span id="marketAddedCount">0</span>件追加</span>
+              <span class="duplicates">(<span id="marketDuplicateCount">0</span>件重複スキップ)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ブランド内カテゴリ分析（市場比較付き） -->
+        <div class="brand-category-analysis">
+          <h3>🔍 ブランド×カテゴリ分析（市場比較）</h3>
+          <p class="section-hint">自分の出品と市場で売れているカテゴリを比較して、強化すべきカテゴリを発見</p>
+
+          <div class="brand-select-group">
+            <label>分析するブランドを選択:</label>
+            <select id="brandCategorySelect" class="brand-select">
+              <option value="">ブランドを選択...</option>
+            </select>
+            <button id="analyzeBrandCategoryBtn" class="primary-btn small">
+              <span class="btn-icon">🔍</span>
+              分析
+            </button>
+          </div>
+
+          <div id="brandCategoryResult" class="brand-category-result hidden">
+            <div class="brand-category-header">
+              <h4 id="brandCategoryName">-</h4>
+              <div class="brand-category-summary">
+                <span class="summary-item">自分の出品: <strong id="bcActive">0</strong>件</span>
+                <span class="summary-item">販売済: <strong id="bcSold">0</strong>件</span>
+                <span class="summary-item">売上率: <strong id="bcRate">0</strong>%</span>
+                <span class="summary-item market">市場データ: <strong id="bcMarketCount">0</strong>件</span>
+              </div>
+            </div>
+
+            <!-- 比較チャート（自分 vs 市場） -->
+            <div class="comparison-chart-section">
+              <h5>📊 カテゴリ別比較（自分 vs 市場）</h5>
+              <div class="chart-container chart-medium">
+                <canvas id="brandCategoryAnalysisChart"></canvas>
+              </div>
+            </div>
+
+            <!-- 分析結果サマリー -->
+            <div id="brandCategoryInsight" class="category-insight hidden">
+              <h5>💡 分析結果</h5>
+              <div id="insightContent" class="insight-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 市場データサマリー -->
+        <div class="market-summary">
+          <h3>📈 市場データ分析</h3>
+
+          <div id="noMarketDataMessage" class="no-data-message">
+            <p>市場データがありません</p>
+            <p class="hint">上の「追加取得」ボタンでeBayページからデータを取得してください</p>
+          </div>
+
+          <div id="marketSummaryData" class="hidden">
+            <!-- AI分類ボタン -->
+            <div class="ai-classify-market hidden">
+              <div class="classify-info">
+                ⚠️ <span id="marketUnclassifiedCount">0</span>件が未分類です
+              </div>
+              <button id="classifyMarketWithAIBtn" class="ai-classify-btn small">
+                <span class="btn-icon">🤖</span>
+                AIでカテゴリ判定
+              </button>
+              <div id="marketAIProgress" class="ai-progress hidden">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="marketAIProgressFill"></div>
+                </div>
+                <span id="marketAIProgressText">0/0 判定中...</span>
+              </div>
+            </div>
+
+            <!-- 市場トップブランド（グラフ表示） -->
+            <div class="sw-card market-top">
+              <div class="market-top-header">
+                <h4>🔥 市場で売れているブランド</h4>
+                <div class="market-controls">
+                  <select id="marketBrandLimit" class="limit-select">
+                    <option value="10">TOP 10</option>
+                    <option value="20">TOP 20</option>
+                    <option value="30" selected>TOP 30</option>
+                    <option value="50">TOP 50</option>
+                    <option value="100">ALL</option>
+                  </select>
+                </div>
+              </div>
+              <div id="marketBrandChartContainer" class="market-brand-chart-container">
+                <canvas id="marketBrandChart"></canvas>
+              </div>
+              <div id="marketTopBrandsList" class="brand-tags hidden"></div>
+            </div>
+
+            <!-- 市場カテゴリ -->
+            <div class="sw-card market-category">
+              <div class="market-top-header">
+                <h4>📊 市場カテゴリ分布</h4>
+                <div class="market-controls">
+                  <select id="marketCategoryLimit" class="limit-select">
+                    <option value="10">TOP 10</option>
+                    <option value="20" selected>TOP 20</option>
+                    <option value="50">ALL</option>
+                  </select>
+                </div>
+              </div>
+              <div id="marketCategoryList" class="category-distribution"></div>
+            </div>
+
+            <!-- 平均価格帯 -->
+            <div class="market-price-info">
+              <div class="price-stat">
+                <span class="price-label">市場平均価格:</span>
+                <span id="marketAvgPrice" class="price-value">-</span>
+              </div>
+              <div class="price-stat">
+                <span class="price-label">取得日時:</span>
+                <span id="marketCaptureTime" class="time-value">-</span>
+              </div>
+            </div>
+
+            <!-- 仕入れチャンス -->
+            <div class="sw-card opportunity-brands">
+              <h4>🎯 仕入れチャンス（市場で売れているが自分は未出品/少ない）</h4>
+              <div id="opportunityBrandsList" class="opportunity-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 除外ブランド管理 -->
+        <div class="excluded-brands">
+          <h3>🚫 除外ブランド</h3>
+          <p class="section-hint">ハイライトしないブランド（グレー表示）</p>
+
+          <div class="excluded-input">
+            <input type="text" id="excludeBrandInput" placeholder="ブランド名を入力...">
+            <button id="addExcludeBtn" class="add-btn">追加</button>
+          </div>
+
+          <div id="excludedBrandsList" class="brand-tags excluded-tags"></div>
+        </div>
+
+        <!-- カスタムブランド登録 -->
+        <div class="custom-brands">
+          <h3>✏️ カスタムブランド登録</h3>
+          <p class="section-hint">手動でブランドとキーワードを登録（次回から自動判定に使用）</p>
+
+          <div class="custom-brand-form">
+            <div class="form-row">
+              <label>ブランド名</label>
+              <input type="text" id="customBrandName" placeholder="例: Shimano">
+            </div>
+            <div class="form-row">
+              <label>キーワード</label>
+              <input type="text" id="customBrandKeywords" placeholder="例: shimano, シマノ（カンマ区切り）">
+            </div>
+            <div class="form-row">
+              <label>カテゴリ</label>
+              <select id="customBrandCategory">
+                <option value="その他">その他</option>
+                <option value="トップス">トップス</option>
+                <option value="アウター">アウター</option>
+                <option value="ボトムス">ボトムス</option>
+                <option value="ワンピース">ワンピース</option>
+                <option value="バッグ">バッグ</option>
+                <option value="財布・小物">財布・小物</option>
+                <option value="靴">靴</option>
+                <option value="時計">時計</option>
+                <option value="アクセサリー">アクセサリー</option>
+                <option value="帽子">帽子</option>
+                <option value="スカーフ・マフラー">スカーフ・マフラー</option>
+                <option value="食器">食器</option>
+                <option value="インテリア・雑貨">インテリア・雑貨</option>
+                <option value="トレカ">トレカ</option>
+                <option value="ゲーム">ゲーム</option>
+                <option value="フィギュア・おもちゃ">フィギュア・おもちゃ</option>
+                <option value="本・マンガ">本・マンガ</option>
+                <option value="CD・DVD">CD・DVD</option>
+                <option value="ぬいぐるみ・コレクション">ぬいぐるみ・コレクション</option>
+                <option value="スマホ・タブレット">スマホ・タブレット</option>
+                <option value="オーディオ">オーディオ</option>
+                <option value="PC・周辺機器">PC・周辺機器</option>
+                <option value="カメラ">カメラ</option>
+                <option value="家電">家電</option>
+                <option value="コスメ・美容">コスメ・美容</option>
+                <option value="スポーツ">スポーツ</option>
+                <option value="アウトドア">アウトドア</option>
+                <option value="ベビー・キッズ">ベビー・キッズ</option>
+                <option value="自転車・パーツ">自転車・パーツ</option>
+                <option value="車・バイク用品">車・バイク用品</option>
+              </select>
+            </div>
+            <button id="addCustomBrandBtn" class="primary-btn small">
+              <span class="btn-icon">➕</span>
+              ブランドを登録
+            </button>
+          </div>
+
+          <div class="custom-brands-list">
+            <h4>登録済みカスタムブランド</h4>
+            <div id="customBrandsList" class="brand-tags custom-tags">
+              <span class="no-data">まだ登録されていません</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI提案タブ -->
+    <div id="ai-tab" class="tab-content">
+      <div class="ai-section">
+        <div id="aiStatus" class="ai-status">
+          <p>分析データを入力して「分析開始」を押してください</p>
+        </div>
+
+        <div id="aiResults" class="ai-results hidden">
+          <!-- アラート -->
+          <div id="aiAlerts" class="ai-card alert hidden">
+            <h3>⚠️ アラート</h3>
+            <div id="alertList" class="ai-list"></div>
+          </div>
+
+          <!-- 強化推奨 -->
+          <div class="ai-card strength">
+            <h3>💪 仕入れ強化推奨ブランド</h3>
+            <div id="strengthList" class="ai-list"></div>
+          </div>
+
+          <!-- 見直し推奨 -->
+          <div class="ai-card review">
+            <h3>🔄 見直し推奨</h3>
+            <div id="reviewList" class="ai-list"></div>
+          </div>
+
+          <!-- 狙い目 -->
+          <div class="ai-card opportunity">
+            <h3>🎯 売れ筋ブランド</h3>
+            <div id="opportunityList" class="ai-list"></div>
+          </div>
+
+          <!-- 総合提案 -->
+          <div class="ai-card suggestion">
+            <h3>💡 総合提案</h3>
+            <div id="suggestionText" class="ai-text"></div>
+          </div>
+        </div>
+
+        <button id="reanalyzeBtn" class="secondary-btn hidden">
+          <span class="btn-icon">🔄</span>
+          再分析
+        </button>
+
+        <!-- AIチャット機能 -->
+        <div id="aiChatSection" class="ai-chat-section hidden">
+          <h3>💬 AIと戦略を相談</h3>
+          <p class="section-hint">分析結果をもとに、戦略について質問・相談できます</p>
+
+          <div id="chatMessages" class="chat-messages">
+            <!-- チャットメッセージがここに表示される -->
+          </div>
+
+          <div class="chat-input-area">
+            <textarea id="chatInput" class="chat-input" placeholder="質問を入力... 例: このブランドをもっと仕入れるべき？価格設定はどうすべき？" rows="2"></textarea>
+            <button id="sendChatBtn" class="chat-send-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+
+          <div class="chat-suggestions">
+            <button class="suggestion-chip" data-question="売上を伸ばすために、今すぐできることは？">売上アップのコツ</button>
+            <button class="suggestion-chip" data-question="Watch数が多いのに売れていない商品はどうすべき？">Watch多いが売れない</button>
+            <button class="suggestion-chip" data-question="仕入れを増やすべきブランドはどれ？その理由は？">仕入れ強化ブランド</button>
+            <button class="suggestion-chip" data-question="価格設定を見直すべき商品はある？">価格の見直し</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ローディング -->
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p id="loadingText">分析中...</p>
+    </div>
+  </div>
+
+  <!-- カテゴリ分析ウィザードモーダル -->
+  <div id="analysisWizardModal" class="modal-overlay hidden">
+    <div class="wizard-modal">
+      <div class="wizard-header">
+        <h2>📊 カテゴリ分析ウィザード</h2>
+        <button id="closeWizardBtn" class="modal-close-btn">&times;</button>
+      </div>
+
+      <!-- ステップインジケーター -->
+      <div class="wizard-steps">
+        <div class="step active" data-step="1">
+          <span class="step-number">1</span>
+          <span class="step-label">カテゴリ選択</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2">
+          <span class="step-number">2</span>
+          <span class="step-label">データ抽出</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3">
+          <span class="step-number">3</span>
+          <span class="step-label">市場比較</span>
+        </div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4">
+          <span class="step-number">4</span>
+          <span class="step-label">AI分析</span>
+        </div>
+      </div>
+
+      <!-- STEP 1: カテゴリ選択 -->
+      <div id="wizardStep1" class="wizard-content active">
+        <h3>分析するカテゴリを選択してください</h3>
+        <p class="wizard-hint">複数選択可能。eBayの全カテゴリから分析対象を選べます</p>
+
+        <!-- 一括選択ボタン -->
+        <div class="category-bulk-actions">
+          <button type="button" id="selectAllCategories" class="bulk-btn">全選択</button>
+          <button type="button" id="deselectAllCategories" class="bulk-btn">全解除</button>
+          <span class="selected-count">選択中: <span id="selectedCategoryCount">0</span>件</span>
+        </div>
+
+        <div class="category-selection multi-select">
+          <!-- ファッション・アパレル系 -->
+          <div class="category-group">
+            <div class="category-group-header">👗 ファッション・アパレル</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="clothing_shoes">
+                
+                <span class="category-name">Clothing, Shoes & Accessories</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="jewelry_watches">
+                
+                <span class="category-name">Jewelry & Watches</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="health_beauty">
+                
+                <span class="category-name">Health & Beauty</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="baby">
+                
+                <span class="category-name">Baby</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- エレクトロニクス・テクノロジー系 -->
+          <div class="category-group">
+            <div class="category-group-header">📱 エレクトロニクス・テクノロジー</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="cell_phones">
+                
+                <span class="category-name">Cell Phones & Accessories</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="computers">
+                
+                <span class="category-name">Computers/Tablets & Networking</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="consumer_electronics">
+                
+                <span class="category-name">Consumer Electronics</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="cameras">
+                
+                <span class="category-name">Cameras & Photo</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="video_games">
+                
+                <span class="category-name">Video Games & Consoles</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- コレクション・ホビー系 -->
+          <div class="category-group">
+            <div class="category-group-header">🎴 コレクション・ホビー</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="collectibles">
+                
+                <span class="category-name">Collectibles</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="sports_mem">
+                
+                <span class="category-name">Sports Mem, Cards & Fan Shop</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="toys_hobbies">
+                
+                <span class="category-name">Toys & Hobbies</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="dolls_bears">
+                
+                <span class="category-name">Dolls & Bears</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="coins">
+                
+                <span class="category-name">Coins & Paper Money</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="stamps">
+                
+                <span class="category-name">Stamps</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="antiques">
+                
+                <span class="category-name">Antiques</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="art">
+                
+                <span class="category-name">Art</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- エンターテイメント・メディア系 -->
+          <div class="category-group">
+            <div class="category-group-header">🎬 エンターテイメント・メディア</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="entertainment_mem">
+                
+                <span class="category-name">Entertainment Memorabilia</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="movies_tv">
+                
+                <span class="category-name">Movies & TV</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="music">
+                
+                <span class="category-name">Music</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="books">
+                
+                <span class="category-name">Books & Magazines</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="musical_instruments">
+                
+                <span class="category-name">Musical Instruments & Gear</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- ホーム・ガーデン系 -->
+          <div class="category-group">
+            <div class="category-group-header">🏠 ホーム・ガーデン</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="home_garden">
+                
+                <span class="category-name">Home & Garden</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="pottery_glass">
+                
+                <span class="category-name">Pottery & Glass</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="crafts">
+                
+                <span class="category-name">Crafts</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="pet_supplies">
+                
+                <span class="category-name">Pet Supplies</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- スポーツ・アウトドア系 -->
+          <div class="category-group">
+            <div class="category-group-header">⚽ スポーツ・アウトドア</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="sporting_goods">
+                
+                <span class="category-name">Sporting Goods</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 自動車・産業系 -->
+          <div class="category-group">
+            <div class="category-group-header">🚗 自動車・産業</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="ebay_motors">
+                
+                <span class="category-name">eBay Motors</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="business_industrial">
+                
+                <span class="category-name">Business & Industrial</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- その他 -->
+          <div class="category-group">
+            <div class="category-group-header">📦 その他</div>
+            <div class="category-grid">
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="gift_cards">
+                
+                <span class="category-name">Gift Cards & Coupons</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="tickets">
+                
+                <span class="category-name">Tickets & Experiences</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="travel">
+                
+                <span class="category-name">Travel</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="specialty_services">
+                
+                <span class="category-name">Specialty Services</span>
+              </label>
+              <label class="category-checkbox">
+                <input type="checkbox" name="mainCategory" value="everything_else">
+                
+                <span class="category-name">Everything Else</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 全カテゴリオプション -->
+          <div class="category-all-option">
+            <label class="category-checkbox all-category">
+              <input type="checkbox" name="mainCategory" value="all" id="selectAllAsCategory">
+              
+              <span class="category-name">📊 全カテゴリで分析（フィルタなし）</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: データ抽出 -->
+      <div id="wizardStep2" class="wizard-content hidden">
+        <h3>データ抽出中...</h3>
+        <p class="wizard-hint">選択したカテゴリのデータを抽出しています</p>
+
+        <div class="extraction-progress">
+          <div class="progress-bar">
+            <div id="extractionProgressFill" class="progress-fill"></div>
+          </div>
+          <p id="extractionStatus">準備中...</p>
+        </div>
+
+        <div id="extractionResults" class="extraction-results hidden">
+          <div class="extraction-summary">
+            <div class="summary-card my-data">
+              <h4>📦 自分のデータ</h4>
+              <div class="summary-stats">
+                <div class="stat">
+                  <span class="stat-value" id="myActiveCount">0</span>
+                  <span class="stat-label">出品中</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value" id="mySoldCount">0</span>
+                  <span class="stat-label">売却済</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value" id="myTotalCount">0</span>
+                  <span class="stat-label">合計</span>
+                </div>
+              </div>
+            </div>
+            <div class="summary-card market-data">
+              <h4>🌐 市場データ</h4>
+              <div class="summary-stats">
+                <div class="stat">
+                  <span class="stat-value" id="marketDataCount">0</span>
+                  <span class="stat-label">件</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value" id="marketBrandCount">0</span>
+                  <span class="stat-label">ブランド</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="noDataWarning" class="warning-message hidden">
+            <span class="warning-icon">⚠️</span>
+            <span>データが不足しています。CSVを読み込むか、市場データを取得してください。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: 市場比較 -->
+      <div id="wizardStep3" class="wizard-content hidden">
+        <h3>市場との比較分析</h3>
+        <p class="wizard-hint">選択カテゴリにおける自分と市場の比較</p>
+
+        <div class="comparison-section">
+          <!-- ブランド分布比較 -->
+          <div class="comparison-card">
+            <h4>🏷️ ブランド分布比較</h4>
+            <div class="chart-container">
+              <canvas id="wizardBrandChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 価格帯分布 -->
+          <div class="comparison-card">
+            <h4>💰 価格帯分布</h4>
+            <div class="chart-container">
+              <canvas id="wizardPriceChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 詳細カテゴリ内訳 -->
+          <div class="comparison-card">
+            <h4>📂 詳細カテゴリ内訳</h4>
+            <div id="wizardSubcategoryList" class="subcategory-breakdown">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 主要な発見 -->
+          <div class="comparison-card insights">
+            <h4>💡 主要な発見</h4>
+            <ul id="wizardInsightsList" class="insights-list">
+              <!-- 動的に生成 -->
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: AI分析 -->
+      <div id="wizardStep4" class="wizard-content hidden">
+        <h3>AI分析レポート</h3>
+        <p class="wizard-hint">選択カテゴリに特化した戦略提案</p>
+
+        <div id="aiAnalysisLoading" class="ai-loading">
+          <div class="spinner small"></div>
+          <p>AIが分析中...</p>
+        </div>
+
+        <div id="aiAnalysisResult" class="ai-analysis-result hidden">
+          <!-- 強み -->
+          <div class="analysis-section strengths">
+            <h4>💪 あなたの強み</h4>
+            <div id="wizardStrengths" class="analysis-content">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 改善点 -->
+          <div class="analysis-section improvements">
+            <h4>📈 改善ポイント</h4>
+            <div id="wizardImprovements" class="analysis-content">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 仕入れ推奨 -->
+          <div class="analysis-section recommendations">
+            <h4>🛒 仕入れ推奨</h4>
+            <div id="wizardRecommendations" class="analysis-content">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 戦略提案 -->
+          <div class="analysis-section strategy">
+            <h4>🎯 戦略提案</h4>
+            <div id="wizardStrategy" class="analysis-content">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ナビゲーションボタン -->
+      <div class="wizard-navigation">
+        <button id="wizardPrevBtn" class="wizard-btn secondary" disabled>
+          ← 戻る
+        </button>
+        <button id="wizardNextBtn" class="wizard-btn primary">
+          次へ →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="chart.min.js"></script>
+  <script src="category-rules.js"></script>
+  <script src="db.js"></script>
+  <script src="analyzer.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

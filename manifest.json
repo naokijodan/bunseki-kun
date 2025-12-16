@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "ぶんせき君",
+  "short_name": "ぶんせき君",
+  "version": "4.0.0",
+  "description": "eBay出品データを分析し、市場比較・競合分析・AI提案を行う統合ツール（OpenAI, Claude, Gemini対応）",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.ebay.com/*",
+    "https://*.ebay.co.uk/*",
+    "https://*.ebay.de/*",
+    "https://*.ebay.fr/*",
+    "https://*.ebay.it/*",
+    "https://*.ebay.es/*",
+    "https://*.ebay.com.au/*"
+  ],
+  "action": {
+    "default_icon": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.ebay.com/sh/research*",
+        "https://*.ebay.com/sch/*",
+        "https://*.ebay.co.uk/sh/research*",
+        "https://*.ebay.co.uk/sch/*",
+        "https://*.ebay.de/sh/research*",
+        "https://*.ebay.de/sch/*",
+        "https://*.ebay.fr/sh/research*",
+        "https://*.ebay.fr/sch/*",
+        "https://*.ebay.it/sh/research*",
+        "https://*.ebay.it/sch/*",
+        "https://*.ebay.es/sh/research*",
+        "https://*.ebay.es/sch/*",
+        "https://*.ebay.com.au/sh/research*",
+        "https://*.ebay.com.au/sch/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content-styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "icons": {
+    "128": "icon128.png"
+  }
+}

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ぶんせき君 - 設定</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #f5a623 0%, #ff6b35 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    header .icon {
+      width: 48px;
+      height: 48px;
+      font-size: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    header h1 {
+      font-size: 24px;
+      color: #333;
+    }
+
+    header span {
+      font-size: 14px;
+      color: #999;
+      margin-left: auto;
+      background: #f5f5f5;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    .section h2 {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section h2 .icon {
+      font-size: 20px;
+    }
+
+    .api-section {
+      background: #f9f9f9;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #eee;
+    }
+
+    .api-section.openai {
+      border-left: 4px solid #10a37f;
+    }
+
+    .api-section.claude {
+      border-left: 4px solid #f5a623;
+    }
+
+    .api-section.gemini {
+      border-left: 4px solid #4285f4;
+    }
+
+    .api-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .api-logo {
+      font-size: 24px;
+    }
+
+    .api-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .api-subtitle {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .api-status {
+      margin-left: auto;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 13px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #f5a623;
+      box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.1);
+    }
+
+    .form-group .hint {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    .form-group .hint a {
+      color: #f5a623;
+      text-decoration: none;
+    }
+
+    .form-group .hint a:hover {
+      text-decoration: underline;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-wrapper input {
+      padding-right: 44px;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #999;
+      padding: 4px;
+      font-size: 16px;
+    }
+
+    .toggle-password:hover {
+      color: #666;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .status-badge.success {
+      background: #e8f5e9;
+      color: #4caf50;
+    }
+
+    .status-badge.error {
+      background: #ffebee;
+      color: #f44336;
+    }
+
+    .status-badge.pending {
+      background: #f5f5f5;
+      color: #999;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #f5a623 0%, #ff6b35 100%);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 166, 35, 0.4);
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:hover {
+      background: #eee;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .alert-success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+    }
+
+    .alert-error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ffcdd2;
+    }
+
+    .info-box {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    .info-box strong {
+      color: #333;
+    }
+
+    .info-box ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .info-box li {
+      margin-bottom: 4px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      color: #999;
+      font-size: 12px;
+    }
+
+    footer a {
+      color: #f5a623;
+      text-decoration: none;
+    }
+
+    .test-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="icon">🔶</div>
+      <h1>ぶんせき君 設定</h1>
+      <span>v4.0.0</span>
+    </header>
+
+    <div id="alert" class="alert" style="display: none;"></div>
+
+    <div class="section">
+      <h2><span class="icon">🤖</span> AI API設定</h2>
+      <p style="font-size: 13px; color: #666; margin-bottom: 16px;">
+        AI分析を使用するには、少なくとも1つのAPIキーを設定してください。
+      </p>
+
+      <!-- OpenAI -->
+      <div class="api-section openai">
+        <div class="api-header">
+          <span class="api-logo">🟢</span>
+          <div>
+            <div class="api-title">OpenAI</div>
+            <div class="api-subtitle">GPT-4o / GPT-4o-mini</div>
+          </div>
+          <div class="api-status">
+            <span id="openaiStatus" class="status-badge pending">未設定</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="openaiApiKey">APIキー</label>
+          <div class="password-wrapper">
+            <input type="password" id="openaiApiKey" placeholder="sk-...">
+            <button type="button" class="toggle-password" data-target="openaiApiKey">👁</button>
+          </div>
+          <p class="hint">
+            <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI APIキーを取得</a>
+          </p>
+        </div>
+        <div class="test-row">
+          <button type="button" class="btn btn-secondary btn-sm" data-test="openai">接続テスト</button>
+        </div>
+      </div>
+
+      <!-- Claude -->
+      <div class="api-section claude">
+        <div class="api-header">
+          <span class="api-logo">🟠</span>
+          <div>
+            <div class="api-title">Anthropic Claude</div>
+            <div class="api-subtitle">Claude 3.5 Sonnet</div>
+          </div>
+          <div class="api-status">
+            <span id="claudeStatus" class="status-badge pending">未設定</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="claudeApiKey">APIキー</label>
+          <div class="password-wrapper">
+            <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
+            <button type="button" class="toggle-password" data-target="claudeApiKey">👁</button>
+          </div>
+          <p class="hint">
+            <a href="https://console.anthropic.com/settings/keys" target="_blank">Claude APIキーを取得</a>
+          </p>
+        </div>
+        <div class="test-row">
+          <button type="button" class="btn btn-secondary btn-sm" data-test="claude">接続テスト</button>
+        </div>
+      </div>
+
+      <!-- Gemini -->
+      <div class="api-section gemini">
+        <div class="api-header">
+          <span class="api-logo">🔵</span>
+          <div>
+            <div class="api-title">Google Gemini</div>
+            <div class="api-subtitle">Gemini Pro</div>
+          </div>
+          <div class="api-status">
+            <span id="geminiStatus" class="status-badge pending">未設定</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="geminiApiKey">APIキー</label>
+          <div class="password-wrapper">
+            <input type="password" id="geminiApiKey" placeholder="AIza...">
+            <button type="button" class="toggle-password" data-target="geminiApiKey">👁</button>
+          </div>
+          <p class="hint">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank">Gemini APIキーを取得</a>
+          </p>
+        </div>
+        <div class="test-row">
+          <button type="button" class="btn btn-secondary btn-sm" data-test="gemini">接続テスト</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="icon">💡</span> AI比較機能について</h2>
+      <div class="info-box">
+        <p><strong>複数のAIで分析結果を比較できます</strong></p>
+        <ul>
+          <li>AI提案タブで「全てで比較」を選択すると、設定されているすべてのAIで同時に分析を実行</li>
+          <li>各AIの視点を比較して、より良い戦略を発見できます</li>
+          <li>APIキーが設定されていないAIはスキップされます</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+      <button type="button" class="btn btn-secondary" id="resetBtn">リセット</button>
+    </div>
+
+    <footer>
+      <p>ぶんせき君 v4.0 &copy; 2024</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
