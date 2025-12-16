@@ -669,12 +669,14 @@ class EbayAnalyzer {
           sold: 0,
           totalWatchers: 0,
           revenue: 0,
+          totalActivePrice: 0,
           avgDaysToSell: null,
           daysToSellList: []
         };
       }
       brandStats[brand].active++;
-      brandStats[brand].totalWatchers += item.watchers;
+      brandStats[brand].totalWatchers += item.watchers || 0;
+      brandStats[brand].totalActivePrice += item.price || 0;
     }
 
     // 売れたブランド集計
@@ -691,25 +693,35 @@ class EbayAnalyzer {
           sold: 0,
           totalWatchers: 0,
           revenue: 0,
+          totalActivePrice: 0,
           avgDaysToSell: null,
           daysToSellList: []
         };
       }
-      brandStats[brand].sold += item.quantity;
-      brandStats[brand].revenue += item.soldFor * item.quantity;
+      brandStats[brand].sold += item.quantity || 1;
+      brandStats[brand].revenue += (item.soldFor || 0) * (item.quantity || 1);
     }
 
-    // 売上率を計算してソート
+    // 売上率と平均価格を計算してソート
     const performance = Object.values(brandStats)
-      .map(stat => ({
-        ...stat,
-        sellThroughRate: stat.active + stat.sold > 0
-          ? ((stat.sold / (stat.active + stat.sold)) * 100).toFixed(1)
-          : 0,
-        avgWatchers: stat.active > 0
-          ? (stat.totalWatchers / stat.active).toFixed(1)
-          : 0
-      }))
+      .map(stat => {
+        // 平均価格: 出品中の平均価格（売却済みは売却価格/revenueで別計算）
+        const avgPrice = stat.active > 0 ? stat.totalActivePrice / stat.active : 0;
+        // 売却平均価格
+        const avgSoldPrice = stat.sold > 0 ? stat.revenue / stat.sold : 0;
+
+        return {
+          ...stat,
+          sellThroughRate: stat.active + stat.sold > 0
+            ? ((stat.sold / (stat.active + stat.sold)) * 100).toFixed(1)
+            : 0,
+          avgWatchers: stat.active > 0
+            ? (stat.totalWatchers / stat.active).toFixed(1)
+            : 0,
+          avgPrice: avgPrice,
+          avgSoldPrice: avgSoldPrice
+        };
+      })
       .sort((a, b) => (b.sold + b.active) - (a.sold + a.active));
 
     this.results.brandPerformance = performance;
