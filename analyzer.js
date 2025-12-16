@@ -652,10 +652,16 @@ class EbayAnalyzer {
    */
   calculateBrandPerformance() {
     const brandStats = {};
+    // AI分類結果を参照（popup.jsから設定される）
+    const aiClassifications = window.aiClassificationResults || {};
 
     // 出品中のブランド集計
     for (const item of this.activeListings) {
-      const brand = item.brand || '(不明)';
+      // AI分類結果があればそれを優先
+      let brand = item.brand || '(不明)';
+      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+        brand = aiClassifications[item.title].brand;
+      }
       if (!brandStats[brand]) {
         brandStats[brand] = {
           brand,
@@ -673,7 +679,11 @@ class EbayAnalyzer {
 
     // 売れたブランド集計
     for (const item of this.soldItems) {
-      const brand = item.brand || '(不明)';
+      // AI分類結果があればそれを優先
+      let brand = item.brand || '(不明)';
+      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+        brand = aiClassifications[item.title].brand;
+      }
       if (!brandStats[brand]) {
         brandStats[brand] = {
           brand,
@@ -711,10 +721,16 @@ class EbayAnalyzer {
    */
   calculateCategoryStats() {
     const categoryStats = {};
+    // AI分類結果を参照（popup.jsから設定される）
+    const aiClassifications = window.aiClassificationResults || {};
 
     // 出品中のカテゴリ集計
     for (const item of this.activeListings) {
-      const category = item.category || '(不明)';
+      // AI分類結果があればそれを優先
+      let category = item.category || '(不明)';
+      if (aiClassifications[item.title] && aiClassifications[item.title].category) {
+        category = aiClassifications[item.title].category;
+      }
       if (!categoryStats[category]) {
         categoryStats[category] = {
           category,
@@ -730,7 +746,11 @@ class EbayAnalyzer {
 
     // 販売済のカテゴリ集計
     for (const item of this.soldItems) {
-      const category = item.category || '(不明)';
+      // AI分類結果があればそれを優先
+      let category = item.category || '(不明)';
+      if (aiClassifications[item.title] && aiClassifications[item.title].category) {
+        category = aiClassifications[item.title].category;
+      }
       if (!categoryStats[category]) {
         categoryStats[category] = {
           category,

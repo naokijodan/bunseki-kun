@@ -159,6 +159,26 @@ const BunsekiDB = {
     });
   },
 
+  /**
+   * 出品中データをクリア
+   */
+  async clearActiveListings() {
+    await this.init();
+
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('activeListings', 'readwrite');
+      const store = tx.objectStore('activeListings');
+      store.clear();
+
+      tx.oncomplete = () => {
+        console.log('Active listings cleared');
+        resolve();
+      };
+
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
   // ========================================
   // Sold Items 操作
   // ========================================
@@ -231,6 +251,26 @@ const BunsekiDB = {
       const request = store.count();
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+    });
+  },
+
+  /**
+   * 販売済データをクリア
+   */
+  async clearSoldItems() {
+    await this.init();
+
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('soldItems', 'readwrite');
+      const store = tx.objectStore('soldItems');
+      store.clear();
+
+      tx.oncomplete = () => {
+        console.log('Sold items cleared');
+        resolve();
+      };
+
+      tx.onerror = () => reject(tx.error);
     });
   },
 

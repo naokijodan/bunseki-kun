@@ -106,10 +106,103 @@
               <span class="summary-label">売却済</span>
               <span class="summary-value" id="mySoldCount">0</span>
             </div>
-            <div class="summary-item">
-              <span class="summary-label">ブランド数</span>
-              <span class="summary-value" id="myBrandCount">0</span>
+          </div>
+
+          <!-- 自分のデータ操作ボタン -->
+          <div class="my-data-actions" id="myDataActions" style="display: none;">
+            <button id="analyzeMyDataBtn" class="action-btn primary">
+              <span class="btn-icon">🔍</span>
+              分析する
+            </button>
+            <button id="clearMyDataBtn" class="action-btn danger small">
+              <span class="btn-icon">🗑️</span>
+              クリア
+            </button>
+          </div>
+
+          <!-- 自分のデータ分析結果 -->
+          <div id="myDataAnalysisResult" class="data-analysis-result" style="display: none;">
+            <div class="analysis-result-header">
+              <h3>📊 分析結果</h3>
+              <span class="save-status" id="myDataSaveStatus">
+                <span class="save-icon">💾</span>
+                <span class="save-text">自動保存済み</span>
+              </span>
             </div>
+            <div class="analysis-stats">
+              <div class="stat-box classified">
+                <span class="stat-icon">✅</span>
+                <span class="stat-label">分類済み</span>
+                <span class="stat-value" id="myClassifiedCount">0</span>
+              </div>
+              <div class="stat-box unclassified clickable" id="myUnclassifiedBox" title="クリックで未分類リスト表示">
+                <span class="stat-icon">❓</span>
+                <span class="stat-label">未分類</span>
+                <span class="stat-value" id="myUnclassifiedCount">0</span>
+                <span class="click-hint">▼ 詳細</span>
+              </div>
+              <div class="stat-box brands">
+                <span class="stat-icon">🏷️</span>
+                <span class="stat-label">ブランド数</span>
+                <span class="stat-value" id="myBrandCount">0</span>
+              </div>
+            </div>
+
+            <!-- 未分類リスト（クリックで展開） -->
+            <div id="myUnclassifiedList" class="unclassified-list" style="display: none;">
+              <div class="unclassified-list-header">
+                <h4>未分類アイテム一覧</h4>
+                <button id="closeMyUnclassifiedList" class="close-list-btn">✕</button>
+              </div>
+              <div id="myUnclassifiedItems" class="unclassified-items">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- AI再判定ボタン（未分類がある場合のみ表示） -->
+            <div id="myDataAiSection" class="ai-reclassify-section" style="display: none;">
+              <p class="ai-hint">
+                <span class="hint-icon">💡</span>
+                未分類の商品をAIで自動判定できます
+              </p>
+              <button id="classifyWithAIBtn" class="ai-classify-btn">
+                <span class="btn-icon">🤖</span>
+                AIで再判定する
+              </button>
+              <div id="aiClassifyProgress" class="ai-progress" style="display: none;">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="aiProgressFill"></div>
+                </div>
+                <span id="aiProgressText">0/0 判定中...</span>
+              </div>
+            </div>
+
+            <!-- ブランド別内訳（トップ10） -->
+            <div class="brand-breakdown">
+              <h4>ブランド別内訳（上位10）</h4>
+              <div id="myBrandBreakdown" class="breakdown-list">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- 保存アクション -->
+            <div class="analysis-save-actions">
+              <button id="saveMyDataBtn" class="save-btn">
+                <span class="btn-icon">💾</span>
+                データを保存
+              </button>
+              <span class="save-info" id="myDataSaveInfo"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI学習済みルール表示 -->
+        <div class="data-section" id="learnedRulesSection" style="display: none;">
+          <div class="section-header">
+            <h2><span class="section-icon">🧠</span> AI学習済みルール</h2>
+          </div>
+          <div id="learnedRulesContent">
+            <!-- 動的に生成 -->
           </div>
         </div>
 
@@ -135,31 +228,106 @@
             <span class="duplicates">(<span id="marketDuplicateCount">0</span>件重複スキップ)</span>
           </div>
 
-          <div class="market-data-info">
-            <div class="market-stats">
-              <div class="stat-item">
-                <span class="stat-value" id="marketTotalCount">0</span>
-                <span class="stat-label">件登録済み</span>
+          <!-- 市場データサマリー -->
+          <div class="data-summary" id="marketDataSummary" style="display: none;">
+            <div class="summary-item">
+              <span class="summary-label">登録件数</span>
+              <span class="summary-value" id="marketTotalCount">0</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">最終更新</span>
+              <span class="summary-value small" id="marketLastUpdate">-</span>
+            </div>
+          </div>
+
+          <!-- 市場データ操作ボタン -->
+          <div class="market-data-actions" id="marketDataActions" style="display: none;">
+            <button id="analyzeMarketDataBtn" class="action-btn primary">
+              <span class="btn-icon">🔍</span>
+              分析する
+            </button>
+            <button id="importMarketCsvBtn" class="action-btn secondary small">
+              <span class="btn-icon">📁</span>
+              CSV
+            </button>
+            <button id="clearMarketDataBtn" class="action-btn danger small">
+              <span class="btn-icon">🗑️</span>
+              クリア
+            </button>
+          </div>
+
+          <!-- 市場データ分析結果 -->
+          <div id="marketDataAnalysisResult" class="data-analysis-result" style="display: none;">
+            <div class="analysis-result-header">
+              <h3>📊 分析結果</h3>
+              <span class="save-status" id="marketDataSaveStatus">
+                <span class="save-icon">💾</span>
+                <span class="save-text">自動保存済み</span>
+              </span>
+            </div>
+            <div class="analysis-stats">
+              <div class="stat-box classified">
+                <span class="stat-icon">✅</span>
+                <span class="stat-label">分類済み</span>
+                <span class="stat-value" id="marketClassifiedCount">0</span>
               </div>
-              <div class="stat-item">
+              <div class="stat-box unclassified clickable" id="marketUnclassifiedBox" title="クリックで未分類リスト表示">
+                <span class="stat-icon">❓</span>
+                <span class="stat-label">未分類</span>
+                <span class="stat-value" id="marketUnclassifiedCount">0</span>
+                <span class="click-hint">▼ 詳細</span>
+              </div>
+              <div class="stat-box brands">
+                <span class="stat-icon">🏷️</span>
+                <span class="stat-label">ブランド数</span>
                 <span class="stat-value" id="marketBrandCount">0</span>
-                <span class="stat-label">ブランド</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value" id="marketLastUpdate">-</span>
-                <span class="stat-label">最終更新</span>
               </div>
             </div>
 
-            <div class="market-actions">
-              <button id="importMarketCsvBtn" class="action-btn secondary">
-                <span class="btn-icon">📁</span>
-                CSVインポート
+            <!-- 未分類リスト（クリックで展開） -->
+            <div id="marketUnclassifiedList" class="unclassified-list" style="display: none;">
+              <div class="unclassified-list-header">
+                <h4>未分類アイテム一覧</h4>
+                <button id="closeMarketUnclassifiedList" class="close-list-btn">✕</button>
+              </div>
+              <div id="marketUnclassifiedItems" class="unclassified-items">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- AI再判定ボタン（未分類がある場合のみ表示） -->
+            <div id="marketAiSection" class="ai-reclassify-section" style="display: none;">
+              <p class="ai-hint">
+                <span class="hint-icon">💡</span>
+                未分類のデータをAIで自動判定できます
+              </p>
+              <button id="classifyMarketWithAIBtn" class="ai-classify-btn">
+                <span class="btn-icon">🤖</span>
+                AIで再判定する
               </button>
-              <button id="clearMarketDataBtn" class="action-btn danger">
-                <span class="btn-icon">🗑️</span>
-                クリア
+              <div id="marketAiProgress" class="ai-progress" style="display: none;">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="marketAiProgressFill"></div>
+                </div>
+                <span id="marketAiProgressText">0/0 判定中...</span>
+              </div>
+            </div>
+
+            <!-- ブランド別内訳（トップ10） -->
+            <div class="brand-breakdown">
+              <h4>ブランド別内訳（上位10）</h4>
+              <div id="marketBrandBreakdown" class="breakdown-list">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- 保存アクション -->
+            <div class="analysis-save-actions">
+              <button id="saveMarketDataBtn" class="save-btn">
+                <span class="btn-icon">💾</span>
+                データを保存
               </button>
+              <span class="save-info" id="marketDataSaveInfo"></span>
             </div>
           </div>
 

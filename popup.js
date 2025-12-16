@@ -289,6 +289,75 @@ function initDataInput() {
   if (saveAllDataBtn) {
     saveAllDataBtn.addEventListener('click', saveAllData);
   }
+
+  // AI分類ボタン（自分のデータ用）
+  const classifyWithAIBtn = document.getElementById('classifyWithAIBtn');
+  if (classifyWithAIBtn) {
+    classifyWithAIBtn.addEventListener('click', () => classifyUnknownItemsWithAI(false));
+  }
+
+  // 自分のデータクリアボタン
+  const clearMyDataBtn = document.getElementById('clearMyDataBtn');
+  if (clearMyDataBtn) {
+    clearMyDataBtn.addEventListener('click', clearMyData);
+  }
+
+  // 市場データAI分類ボタン
+  const classifyMarketWithAIBtn = document.getElementById('classifyMarketWithAIBtn');
+  if (classifyMarketWithAIBtn) {
+    classifyMarketWithAIBtn.addEventListener('click', classifyMarketDataWithAI);
+  }
+
+  // 自分のデータ分析ボタン
+  const analyzeMyDataBtn = document.getElementById('analyzeMyDataBtn');
+  if (analyzeMyDataBtn) {
+    analyzeMyDataBtn.addEventListener('click', analyzeMyData);
+  }
+
+  // 市場データ分析ボタン
+  const analyzeMarketDataBtn = document.getElementById('analyzeMarketDataBtn');
+  if (analyzeMarketDataBtn) {
+    analyzeMarketDataBtn.addEventListener('click', analyzeMarketData);
+  }
+
+  // 自分のデータ保存ボタン（分析結果内）
+  const saveMyDataBtn = document.getElementById('saveMyDataBtn');
+  if (saveMyDataBtn) {
+    saveMyDataBtn.addEventListener('click', () => saveMyDataToStorage());
+  }
+
+  // 市場データ保存ボタン（分析結果内）
+  const saveMarketDataBtn = document.getElementById('saveMarketDataBtn');
+  if (saveMarketDataBtn) {
+    saveMarketDataBtn.addEventListener('click', () => saveMarketDataToStorage());
+  }
+
+  // 未分類ボックスクリック（自分のデータ）
+  const myUnclassifiedBox = document.getElementById('myUnclassifiedBox');
+  if (myUnclassifiedBox) {
+    myUnclassifiedBox.addEventListener('click', () => toggleUnclassifiedList('my'));
+  }
+
+  // 未分類ボックスクリック（市場データ）
+  const marketUnclassifiedBox = document.getElementById('marketUnclassifiedBox');
+  if (marketUnclassifiedBox) {
+    marketUnclassifiedBox.addEventListener('click', () => toggleUnclassifiedList('market'));
+  }
+
+  // 未分類リスト閉じるボタン
+  const closeMyUnclassifiedList = document.getElementById('closeMyUnclassifiedList');
+  if (closeMyUnclassifiedList) {
+    closeMyUnclassifiedList.addEventListener('click', () => {
+      document.getElementById('myUnclassifiedList').style.display = 'none';
+    });
+  }
+
+  const closeMarketUnclassifiedList = document.getElementById('closeMarketUnclassifiedList');
+  if (closeMarketUnclassifiedList) {
+    closeMarketUnclassifiedList.addEventListener('click', () => {
+      document.getElementById('marketUnclassifiedList').style.display = 'none';
+    });
+  }
 }
 
 /**
@@ -379,29 +448,348 @@ function updateMyDataSummary() {
   const summaryEl = document.getElementById('myDataSummary');
   if (!summaryEl) return;
 
-  const activeItems = activeListingsData ? analyzer.parseActiveListingsCsv(activeListingsData) : [];
-  const soldItems = ordersData ? analyzer.parseOrdersCsv(ordersData) : [];
+  // CSVデータがあればパース、なければanalyzerの既存データを使用
+  let activeItems = [];
+  let soldItems = [];
+
+  if (activeListingsData) {
+    activeItems = analyzer.parseActiveListingsCsv(activeListingsData);
+  } else if (analyzer.activeListings && analyzer.activeListings.length > 0) {
+    activeItems = analyzer.activeListings;
+  }
+
+  if (ordersData) {
+    soldItems = analyzer.parseOrdersCsv(ordersData);
+  } else if (analyzer.soldItems && analyzer.soldItems.length > 0) {
+    soldItems = analyzer.soldItems;
+  }
+
+  const myDataActions = document.getElementById('myDataActions');
+  const analysisResult = document.getElementById('myDataAnalysisResult');
 
   if (activeItems.length > 0 || soldItems.length > 0) {
     summaryEl.style.display = 'flex';
-
-    // ブランド数を計算
-    const brands = new Set();
-    activeItems.forEach(item => {
-      const brand = extractBrandFromTitle(item.title);
-      if (brand && brand !== '(不明)') brands.add(brand);
-    });
-    soldItems.forEach(item => {
-      const brand = extractBrandFromTitle(item.title);
-      if (brand && brand !== '(不明)') brands.add(brand);
-    });
+    if (myDataActions) myDataActions.style.display = 'flex';
 
     document.getElementById('myActiveCount').textContent = activeItems.length.toLocaleString();
     document.getElementById('mySoldCount').textContent = soldItems.length.toLocaleString();
-    document.getElementById('myBrandCount').textContent = brands.size.toLocaleString();
   } else {
     summaryEl.style.display = 'none';
+    if (myDataActions) myDataActions.style.display = 'none';
+    if (analysisResult) analysisResult.style.display = 'none';
   }
+}
+
+/**
+ * 自分のデータを分析
+ */
+async function analyzeMyData() {
+  // CSVデータがあればパース、なければanalyzerの既存データを使用
+  let activeItems = [];
+  let soldItems = [];
+
+  if (activeListingsData) {
+    activeItems = analyzer.parseActiveListingsCsv(activeListingsData);
+    analyzer.activeListings = activeItems;
+  } else if (analyzer.activeListings && analyzer.activeListings.length > 0) {
+    activeItems = analyzer.activeListings;
+  }
+
+  if (ordersData) {
+    soldItems = analyzer.parseOrdersCsv(ordersData);
+    analyzer.soldItems = soldItems;
+  } else if (analyzer.soldItems && analyzer.soldItems.length > 0) {
+    soldItems = analyzer.soldItems;
+  }
+
+  const allItems = [...activeItems, ...soldItems];
+
+  if (allItems.length === 0) {
+    showAlert('分析するデータがありません', 'warning');
+    return;
+  }
+
+  // ブランド分類を実行
+  // 優先順位: 1. 既存のitem.brand（AI分類済み） 2. aiClassificationResults 3. extractBrandFromTitle
+  const brands = {};
+  let classifiedCount = 0;
+  let unclassifiedCount = 0;
+
+  allItems.forEach(item => {
+    let brand = item.brand; // まず既存の値をチェック
+
+    // 未分類の場合のみ再判定
+    if (!brand || brand === '(不明)' || brand === 'その他' || brand === '(未分類)') {
+      // AI分類結果があればそれを使用
+      if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+        brand = window.aiClassificationResults[item.title].brand;
+      } else {
+        // なければextractBrandFromTitle（customBrandRulesも参照）
+        brand = extractBrandFromTitle(item.title);
+      }
+      item.brand = brand; // 更新
+    }
+
+    if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== null && brand !== '(未分類)') {
+      classifiedCount++;
+      brands[brand] = (brands[brand] || 0) + 1;
+    } else {
+      unclassifiedCount++;
+      brands['(未分類)'] = (brands['(未分類)'] || 0) + 1;
+    }
+
+    // カテゴリも設定（未設定の場合のみ）
+    if (!item.category || item.category === 'その他') {
+      if (window.aiClassificationResults && window.aiClassificationResults[item.title]?.category) {
+        item.category = window.aiClassificationResults[item.title].category;
+      } else {
+        item.category = detectCategoryFromTitle(item.title);
+      }
+    }
+  });
+
+  // analyzerの分析も実行（分析タブで使用）
+  analyzer.calculateBrandPerformance();
+  analyzer.calculateCategoryStats();
+  analyzer.calculateListingPace();
+  analyzer.calculateSummary();
+
+  // IndexedDBに保存（10万件以上対応）
+  let saveSuccess = false;
+  try {
+    await BunsekiDB.setActiveListings(analyzer.activeListings);
+    await BunsekiDB.setSoldItems(analyzer.soldItems);
+
+    // メタデータをChrome Storageに保存
+    const metaData = {
+      results: analyzer.results,
+      savedAt: new Date().toISOString(),
+      counts: {
+        active: analyzer.activeListings.length,
+        sold: analyzer.soldItems.length
+      }
+    };
+    await chrome.storage.local.set({ savedAnalysisMeta: metaData });
+    console.log('自分のデータをIndexedDBに保存しました');
+    saveSuccess = true;
+    updateLastSavedInfo();
+  } catch (error) {
+    console.error('データ保存エラー:', error);
+  }
+
+  // 分析結果を表示
+  const resultEl = document.getElementById('myDataAnalysisResult');
+  if (resultEl) {
+    resultEl.style.display = 'block';
+
+    // 統計値を更新
+    document.getElementById('myClassifiedCount').textContent = classifiedCount.toLocaleString();
+    document.getElementById('myUnclassifiedCount').textContent = unclassifiedCount.toLocaleString();
+    document.getElementById('myBrandCount').textContent = (Object.keys(brands).length - (brands['(未分類)'] ? 1 : 0)).toLocaleString();
+
+    // AI再判定セクション表示
+    const aiSection = document.getElementById('myDataAiSection');
+    const aiBtn = document.getElementById('classifyWithAIBtn');
+    if (aiSection) {
+      if (unclassifiedCount > 0) {
+        aiSection.style.display = 'block';
+        // ボタンをリセット（再チャレンジ可能に）
+        if (aiBtn) {
+          aiBtn.disabled = false;
+          aiBtn.innerHTML = '<span class="btn-icon">🤖</span> AIで再判定する';
+        }
+        // プログレスを非表示
+        const progressEl = document.getElementById('aiClassifyProgress');
+        if (progressEl) progressEl.style.display = 'none';
+      } else {
+        aiSection.style.display = 'none';
+      }
+    }
+
+    // ブランド内訳を表示
+    const breakdownEl = document.getElementById('myBrandBreakdown');
+    if (breakdownEl) {
+      const sortedBrands = Object.entries(brands)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      breakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
+        <div class="breakdown-item ${brand === '(未分類)' ? 'unknown' : ''}">
+          <span class="brand-name">${escapeHtml(brand)}</span>
+          <span class="brand-count">${count}件</span>
+        </div>
+      `).join('');
+    }
+
+    // 保存ステータス表示
+    const saveStatus = document.getElementById('myDataSaveStatus');
+    const saveInfo = document.getElementById('myDataSaveInfo');
+    if (saveStatus) {
+      saveStatus.style.display = saveSuccess ? 'flex' : 'none';
+    }
+    if (saveInfo && saveSuccess) {
+      saveInfo.textContent = `自動保存済み (${formatDateTime(new Date())})`;
+      saveInfo.className = 'save-info success';
+    }
+  }
+
+  showAlert(`${allItems.length}件のデータを分析しました（分析タブで詳細表示可能）`, 'success');
+}
+
+/**
+ * 未分類リストの表示/非表示を切り替え
+ * @param {string} type - 'my' または 'market'
+ */
+async function toggleUnclassifiedList(type) {
+  const listEl = document.getElementById(type === 'my' ? 'myUnclassifiedList' : 'marketUnclassifiedList');
+  const itemsEl = document.getElementById(type === 'my' ? 'myUnclassifiedItems' : 'marketUnclassifiedItems');
+
+  if (!listEl || !itemsEl) return;
+
+  // 表示/非表示をトグル
+  if (listEl.style.display === 'none' || listEl.style.display === '') {
+    // 未分類アイテムを取得
+    let unclassifiedItems = [];
+
+    if (type === 'my') {
+      const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
+      unclassifiedItems = allItems.filter(item => {
+        const brand = item.brand;
+        return !brand || brand === '(不明)' || brand === 'その他' || brand === '(未分類)' || brand === null;
+      });
+    } else {
+      const marketData = await BunsekiDB.getMarketData();
+      unclassifiedItems = (marketData || []).filter(item => {
+        const brand = item.brand;
+        return !brand || brand === '(不明)' || brand === 'その他' || brand === '(未分類)' || brand === null;
+      });
+    }
+
+    if (unclassifiedItems.length === 0) {
+      itemsEl.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類のアイテムはありません</p>';
+    } else {
+      // リストを生成（最大100件表示）
+      const displayItems = unclassifiedItems.slice(0, 100);
+      itemsEl.innerHTML = displayItems.map((item, idx) => `
+        <div class="unclassified-item">
+          <span class="item-index">${idx + 1}.</span>
+          <span class="item-title">${escapeHtml(item.title || '(タイトルなし)')}</span>
+          <span class="item-price">${item.price ? '$' + Number(item.price).toLocaleString() : ''}</span>
+        </div>
+      `).join('');
+
+      if (unclassifiedItems.length > 100) {
+        itemsEl.innerHTML += `<p style="text-align: center; color: #999; padding: 10px; font-size: 11px;">他 ${unclassifiedItems.length - 100} 件...</p>`;
+      }
+    }
+
+    listEl.style.display = 'flex';
+  } else {
+    listEl.style.display = 'none';
+  }
+}
+
+/**
+ * 未分類アイテム警告の更新
+ */
+function updateUnknownAlert(unknownCount, allItems) {
+  const unknownAlert = document.getElementById('unknownAlert');
+  const unknownCountEl = document.getElementById('unknownCount');
+  const aiClassifySummary = document.getElementById('aiClassifySummary');
+  const aiClassifyProgress = document.getElementById('aiClassifyProgress');
+
+  if (!unknownAlert) return;
+
+  // 保存されたAI分類データがあるかチェック
+  const savedClassifications = window.aiClassificationResults || {};
+  const hasClassifications = Object.keys(savedClassifications).length > 0;
+
+  if (unknownCount > 0 && !hasClassifications) {
+    unknownAlert.style.display = 'block';
+    unknownCountEl.textContent = unknownCount.toLocaleString();
+    // プログレスとサマリーはリセット
+    if (aiClassifyProgress) aiClassifyProgress.style.display = 'none';
+    if (aiClassifySummary) aiClassifySummary.style.display = 'none';
+  } else if (hasClassifications) {
+    // AI分類済みの場合は結果を表示
+    unknownAlert.style.display = 'block';
+    unknownCountEl.textContent = '0';
+    document.querySelector('.unknown-alert-header span:last-child').textContent = 'AI分類済み';
+    document.querySelector('.unknown-hint').textContent = 'ブランド・カテゴリは自動判定されています';
+    document.getElementById('classifyWithAIBtn').style.display = 'none';
+  } else {
+    unknownAlert.style.display = 'none';
+  }
+}
+
+/**
+ * 自分のデータをクリア
+ */
+function clearMyData() {
+  if (!confirm('自分のデータ（Active Listings・Orders）をクリアしますか？')) {
+    return;
+  }
+
+  // データをクリア
+  activeListingsData = null;
+  ordersData = null;
+
+  // analyzerのデータもクリア
+  analyzer.activeListings = [];
+  analyzer.soldItems = [];
+  analyzer.results = {
+    summary: {},
+    listingPace: [],
+    brandPerformance: [],
+    categoryStats: [],
+    watchRanking: [],
+    alerts: []
+  };
+
+  // AI分類結果もクリア
+  window.aiClassificationResults = {};
+
+  // IndexedDBからも削除
+  BunsekiDB.clearActiveListings();
+  BunsekiDB.clearSoldItems();
+  chrome.storage.local.remove(['savedAnalysisMeta']);
+
+  // ステータス表示をリセット
+  updateDataStatus('activeListingsStatus', 0, false);
+  updateDataStatus('ordersStatus', 0, false);
+
+  // ファイル入力をリセット
+  const activeListingsFile = document.getElementById('activeListingsFile');
+  const ordersFile = document.getElementById('ordersFile');
+  if (activeListingsFile) activeListingsFile.value = '';
+  if (ordersFile) ordersFile.value = '';
+
+  // サマリーを更新（非表示になる）
+  updateMyDataSummary();
+
+  // AI分類UIもリセット
+  const unknownAlert = document.getElementById('unknownAlert');
+  const classifyBtn = document.getElementById('classifyWithAIBtn');
+  const aiClassifySummary = document.getElementById('aiClassifySummary');
+  const aiClassifyProgress = document.getElementById('aiClassifyProgress');
+
+  if (unknownAlert) {
+    unknownAlert.style.display = 'none';
+    // テキストをデフォルトに戻す
+    const headerSpan = document.querySelector('.unknown-alert-header span:last-child');
+    if (headerSpan) headerSpan.innerHTML = '<span id="unknownCount">0</span>件の商品が「未分類」です';
+    const hint = document.querySelector('.unknown-hint');
+    if (hint) hint.textContent = 'ブランド・カテゴリを判定できなかった商品があります';
+  }
+  if (classifyBtn) {
+    classifyBtn.style.display = 'flex';
+    classifyBtn.disabled = false;
+    classifyBtn.innerHTML = '<span class="btn-icon">🤖</span> AIで自動判定する';
+  }
+  if (aiClassifySummary) aiClassifySummary.style.display = 'none';
+  if (aiClassifyProgress) aiClassifyProgress.style.display = 'none';
+
+  showAlert('自分のデータをクリアしました', 'success');
 }
 
 /**
@@ -411,21 +799,18 @@ async function updateMarketDataInfo() {
   try {
     const marketData = await BunsekiDB.getMarketData();
 
+    const summaryEl = document.getElementById('marketDataSummary');
+    const actionsEl = document.getElementById('marketDataActions');
     const totalCountEl = document.getElementById('marketTotalCount');
-    const brandCountEl = document.getElementById('marketBrandCount');
     const lastUpdateEl = document.getElementById('marketLastUpdate');
+    const analysisResultEl = document.getElementById('marketDataAnalysisResult');
 
     if (marketData && marketData.length > 0) {
-      // ブランド数を計算
-      const brands = new Set();
-      marketData.forEach(item => {
-        if (item.brand && item.brand !== '(不明)') {
-          brands.add(item.brand);
-        }
-      });
+      // サマリーと操作ボタンを表示
+      if (summaryEl) summaryEl.style.display = 'flex';
+      if (actionsEl) actionsEl.style.display = 'flex';
 
       if (totalCountEl) totalCountEl.textContent = marketData.length.toLocaleString();
-      if (brandCountEl) brandCountEl.textContent = brands.size.toLocaleString();
 
       // 最終更新日
       const latestDate = marketData.reduce((latest, item) => {
@@ -437,13 +822,124 @@ async function updateMarketDataInfo() {
         lastUpdateEl.textContent = formatDate(latestDate);
       }
     } else {
+      if (summaryEl) summaryEl.style.display = 'none';
+      if (actionsEl) actionsEl.style.display = 'none';
+      if (analysisResultEl) analysisResultEl.style.display = 'none';
       if (totalCountEl) totalCountEl.textContent = '0';
-      if (brandCountEl) brandCountEl.textContent = '0';
       if (lastUpdateEl) lastUpdateEl.textContent = '-';
     }
   } catch (error) {
     console.error('市場データ情報の取得に失敗:', error);
   }
+}
+
+/**
+ * 市場データを分析
+ */
+async function analyzeMarketData() {
+  const marketData = await BunsekiDB.getMarketData();
+
+  if (!marketData || marketData.length === 0) {
+    showAlert('分析する市場データがありません', 'warning');
+    return;
+  }
+
+  // ブランド分類を実行（AI分類結果とcustomBrandRulesを使用）
+  const brands = {};
+  let classifiedCount = 0;
+  let unclassifiedCount = 0;
+
+  marketData.forEach(item => {
+    let brand = item.brand;
+
+    // ブランドがない/未分類の場合はextractBrandFromTitle（customBrandRulesも参照）
+    if (!brand || brand === '(不明)' || brand === 'その他') {
+      brand = extractBrandFromTitle(item.title);
+      item.brand = brand; // 更新
+    }
+
+    if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== null) {
+      classifiedCount++;
+      brands[brand] = (brands[brand] || 0) + 1;
+    } else {
+      unclassifiedCount++;
+      brands['(未分類)'] = (brands['(未分類)'] || 0) + 1;
+    }
+
+    // カテゴリも設定
+    if (!item.category || item.category === 'その他') {
+      item.category = detectCategoryFromTitle(item.title);
+    }
+  });
+
+  // 更新した市場データをIndexedDBに保存
+  let saveSuccess = false;
+  try {
+    await BunsekiDB.clearMarketData();
+    await BunsekiDB.addMarketData(marketData);
+    await chrome.storage.local.set({ marketDataSavedAt: new Date().toISOString() });
+    saveSuccess = true;
+  } catch (error) {
+    console.error('市場データ保存エラー:', error);
+  }
+
+  // 分析結果を表示
+  const resultEl = document.getElementById('marketDataAnalysisResult');
+  if (resultEl) {
+    resultEl.style.display = 'block';
+
+    // 統計値を更新
+    document.getElementById('marketClassifiedCount').textContent = classifiedCount.toLocaleString();
+    document.getElementById('marketUnclassifiedCount').textContent = unclassifiedCount.toLocaleString();
+    document.getElementById('marketBrandCount').textContent = (Object.keys(brands).length - (brands['(未分類)'] ? 1 : 0)).toLocaleString();
+
+    // AI再判定セクション表示
+    const aiSection = document.getElementById('marketAiSection');
+    const aiBtn = document.getElementById('classifyMarketWithAIBtn');
+    if (aiSection) {
+      if (unclassifiedCount > 0) {
+        aiSection.style.display = 'block';
+        // ボタンをリセット（再チャレンジ可能に）
+        if (aiBtn) {
+          aiBtn.disabled = false;
+          aiBtn.innerHTML = '<span class="btn-icon">🤖</span> AIで再判定する';
+        }
+        // プログレスを非表示
+        const progressEl = document.getElementById('marketAiProgress');
+        if (progressEl) progressEl.style.display = 'none';
+      } else {
+        aiSection.style.display = 'none';
+      }
+    }
+
+    // ブランド内訳を表示
+    const breakdownEl = document.getElementById('marketBrandBreakdown');
+    if (breakdownEl) {
+      const sortedBrands = Object.entries(brands)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      breakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
+        <div class="breakdown-item ${brand === '(未分類)' ? 'unknown' : ''}">
+          <span class="brand-name">${escapeHtml(brand)}</span>
+          <span class="brand-count">${count}件</span>
+        </div>
+      `).join('');
+    }
+
+    // 保存ステータス表示
+    const saveStatus = document.getElementById('marketDataSaveStatus');
+    const saveInfo = document.getElementById('marketDataSaveInfo');
+    if (saveStatus) {
+      saveStatus.style.display = saveSuccess ? 'flex' : 'none';
+    }
+    if (saveInfo && saveSuccess) {
+      saveInfo.textContent = `自動保存済み (${formatDateTime(new Date())})`;
+      saveInfo.className = 'save-info success';
+    }
+  }
+
+  showAlert(`${marketData.length}件の市場データを分析しました`, 'success');
 }
 
 /**
@@ -782,6 +1278,116 @@ async function saveAllData() {
 }
 
 /**
+ * 自分のデータを保存（分析結果内のボタン用）
+ */
+async function saveMyDataToStorage() {
+  const saveBtn = document.getElementById('saveMyDataBtn');
+  const saveInfo = document.getElementById('myDataSaveInfo');
+  const saveStatus = document.getElementById('myDataSaveStatus');
+
+  try {
+    // ボタンを無効化
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="btn-icon">⏳</span> 保存中...';
+    }
+
+    // IndexedDBに保存
+    await BunsekiDB.setActiveListings(analyzer.activeListings);
+    await BunsekiDB.setSoldItems(analyzer.soldItems);
+
+    // メタデータをChrome Storageに保存
+    const metaData = {
+      results: analyzer.results,
+      savedAt: new Date().toISOString(),
+      counts: {
+        active: analyzer.activeListings.length,
+        sold: analyzer.soldItems.length
+      }
+    };
+    await chrome.storage.local.set({ savedAnalysisMeta: metaData });
+
+    // UI更新
+    if (saveInfo) {
+      saveInfo.textContent = `保存完了 (${formatDateTime(new Date())})`;
+      saveInfo.className = 'save-info success';
+    }
+    if (saveStatus) {
+      saveStatus.style.display = 'flex';
+    }
+    updateLastSavedInfo();
+    showAlert('自分のデータを保存しました', 'success');
+
+  } catch (error) {
+    console.error('自分のデータ保存エラー:', error);
+    if (saveInfo) {
+      saveInfo.textContent = '保存に失敗しました';
+      saveInfo.className = 'save-info';
+    }
+    showAlert('データの保存に失敗しました', 'danger');
+  } finally {
+    // ボタンを復元
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span class="btn-icon">💾</span> データを保存';
+    }
+  }
+}
+
+/**
+ * 市場データを保存（分析結果内のボタン用）
+ */
+async function saveMarketDataToStorage() {
+  const saveBtn = document.getElementById('saveMarketDataBtn');
+  const saveInfo = document.getElementById('marketDataSaveInfo');
+  const saveStatus = document.getElementById('marketDataSaveStatus');
+
+  try {
+    // ボタンを無効化
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="btn-icon">⏳</span> 保存中...';
+    }
+
+    // 市場データはIndexedDBに既に保存されているので、
+    // AI分類結果とカスタムルールを保存
+    await chrome.storage.local.set({
+      aiClassificationResults: window.aiClassificationResults || {},
+      marketDataSavedAt: new Date().toISOString()
+    });
+
+    // カスタムブランドルールも保存
+    if (analyzer.customBrandRules && Object.keys(analyzer.customBrandRules).length > 0) {
+      await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+    }
+
+    // UI更新
+    if (saveInfo) {
+      saveInfo.textContent = `保存完了 (${formatDateTime(new Date())})`;
+      saveInfo.className = 'save-info success';
+    }
+    if (saveStatus) {
+      saveStatus.style.display = 'flex';
+    }
+    showAlert('市場データを保存しました', 'success');
+
+  } catch (error) {
+    console.error('市場データ保存エラー:', error);
+    if (saveInfo) {
+      saveInfo.textContent = '保存に失敗しました';
+      saveInfo.className = 'save-info';
+    }
+    showAlert('データの保存に失敗しました', 'danger');
+  } finally {
+    // ボタンを復元
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span class="btn-icon">💾</span> データを保存';
+    }
+  }
+}
+
+/**
  * 保存済みデータの読み込み
  */
 async function loadSavedData() {
@@ -789,7 +1395,7 @@ async function loadSavedData() {
     // IndexedDBからデータを復元
     const activeListings = await BunsekiDB.getActiveListings();
     const soldItems = await BunsekiDB.getSoldItems();
-    const metaData = await chrome.storage.local.get(['savedAnalysisMeta']);
+    const metaData = await chrome.storage.local.get(['savedAnalysisMeta', 'customBrandRules', 'aiClassificationResults']);
 
     if (activeListings.length > 0 || soldItems.length > 0) {
       analyzer.activeListings = activeListings;
@@ -812,6 +1418,22 @@ async function loadSavedData() {
 
       console.log('保存データを復元しました:', activeListings.length + soldItems.length, '件');
     }
+
+    // AI学習ルールの復元
+    if (metaData.customBrandRules) {
+      analyzer.customBrandRules = metaData.customBrandRules;
+      console.log('AI学習ルールを復元しました:', Object.keys(analyzer.customBrandRules).length, '件');
+    }
+
+    // AI分類結果の復元
+    if (metaData.aiClassificationResults) {
+      window.aiClassificationResults = metaData.aiClassificationResults;
+      console.log('AI分類結果を復元しました:', Object.keys(window.aiClassificationResults).length, '件');
+    }
+
+    // 学習済みルール表示を更新
+    updateLearnedRulesDisplay();
+
   } catch (error) {
     console.error('保存データの読み込みに失敗:', error);
   }
@@ -1029,7 +1651,37 @@ function generateBrandPerformanceAnalysis() {
   const brands = analyzer.results.brandPerformance || [];
   const top20 = brands.slice(0, 20);
 
+  // 未分類（不明・その他）の件数を計算
+  const unknownBrand = brands.find(b => b.brand === '(不明)' || b.brand === 'その他' || b.brand === null);
+  const unknownCount = unknownBrand ? (unknownBrand.active + unknownBrand.sold) : 0;
+
+  // 未分類アラートHTML
+  let unknownAlertHtml = '';
+  if (unknownCount > 0) {
+    unknownAlertHtml = `
+      <div class="unknown-alert-inline" id="brandUnknownAlert">
+        <div class="unknown-alert-header">
+          <span class="unknown-icon">⚠️</span>
+          <span>${unknownCount.toLocaleString()}件の商品が「未分類」です</span>
+        </div>
+        <p class="unknown-hint">ブランドを判定できなかった商品があります。AIで再分類できます。</p>
+        <button id="classifyWithAIBtnInline" class="ai-classify-btn">
+          <span class="btn-icon">🤖</span>
+          AIで自動判定する
+        </button>
+        <div id="aiClassifyProgressInline" class="ai-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="aiProgressFillInline"></div>
+          </div>
+          <span id="aiProgressTextInline">0/0 判定中...</span>
+        </div>
+      </div>
+    `;
+  }
+
   let html = `
+    ${unknownAlertHtml}
+
     <div class="chart-container">
       <canvas id="analysisChart"></canvas>
     </div>
@@ -1050,9 +1702,10 @@ function generateBrandPerformanceAnalysis() {
           ${top20.map(brand => {
             const total = brand.active + brand.sold;
             const sellRate = total > 0 ? Math.round((brand.sold / total) * 100) : 0;
+            const isUnknown = brand.brand === '(不明)' || brand.brand === 'その他';
             return `
-              <tr>
-                <td>${escapeHtml(brand.brand)}</td>
+              <tr class="${isUnknown ? 'unknown-row' : ''}">
+                <td>${escapeHtml(brand.brand)}${isUnknown ? ' ⚠️' : ''}</td>
                 <td>${brand.active}</td>
                 <td>${brand.sold}</td>
                 <td>${sellRate}%</td>
@@ -1067,6 +1720,11 @@ function generateBrandPerformanceAnalysis() {
 
   setTimeout(() => {
     drawBrandChart(top20);
+    // AI判定ボタンのイベントリスナーを設定
+    const aiBtn = document.getElementById('classifyWithAIBtnInline');
+    if (aiBtn) {
+      aiBtn.addEventListener('click', () => classifyUnknownItemsWithAI(true));
+    }
   }, 100);
 
   return html;
@@ -2455,7 +3113,27 @@ function readFileAsText(file) {
 function extractBrandFromTitle(title) {
   if (!title) return '(不明)';
 
+  const titleLower = title.toLowerCase();
   const titleUpper = title.toUpperCase();
+
+  // まずAI学習済みルール（customBrandRules）をチェック
+  if (analyzer.customBrandRules && Object.keys(analyzer.customBrandRules).length > 0) {
+    for (const [brandKey, rule] of Object.entries(analyzer.customBrandRules)) {
+      const brandName = rule.brand || brandKey;
+      // ブランド名自体がタイトルに含まれているか
+      if (titleLower.includes(brandName.toLowerCase())) {
+        return brandName;
+      }
+      // 学習済みキーワードがタイトルに含まれているか
+      if (rule.keywords && rule.keywords.length > 0) {
+        for (const keyword of rule.keywords) {
+          if (keyword && titleLower.includes(keyword.toLowerCase())) {
+            return brandName;
+          }
+        }
+      }
+    }
+  }
 
   // ブランドパターン
   const brandPatterns = [
@@ -2565,9 +3243,542 @@ function detectCategoryFromTitle(title) {
 }
 
 // =====================================
+// AI分類機能
+// =====================================
+
+// AI分類結果を保持
+window.aiClassificationResults = {};
+
+/**
+ * 未分類アイテムをAIで分類
+ * @param {boolean} inline - 分析結果内のインラインボタンから呼ばれた場合true
+ */
+async function classifyUnknownItemsWithAI(inline = false) {
+  // APIキーの取得（syncストレージから）
+  const settings = await chrome.storage.sync.get(['openaiApiKey']);
+  const apiKey = settings.openaiApiKey;
+
+  if (!apiKey) {
+    showAlert('OpenAI APIキーが設定されていません。設定画面から登録してください。', 'warning');
+    return;
+  }
+
+  // analyzerのデータから未分類アイテムを抽出
+  const activeItems = analyzer.activeListings || [];
+  const soldItems = analyzer.soldItems || [];
+  const allItems = [...activeItems, ...soldItems];
+
+  // 未分類 = brand が null, (不明), その他 のもの
+  const unknownItems = allItems.filter(item => {
+    const brand = item.brand;
+    return !brand || brand === '(不明)' || brand === 'その他' || brand === null;
+  });
+
+  if (unknownItems.length === 0) {
+    showAlert('未分類の商品はありません', 'info');
+    return;
+  }
+
+  // UI要素（インラインかデータ入力タブか）
+  const suffix = inline ? 'Inline' : '';
+  const btn = document.getElementById(inline ? 'classifyWithAIBtnInline' : 'classifyWithAIBtn');
+  const progressEl = document.getElementById(`aiClassifyProgress${suffix}`);
+  const progressFill = document.getElementById(`aiProgressFill${suffix}`);
+  const progressText = document.getElementById(`aiProgressText${suffix}`);
+
+  if (!btn) {
+    showAlert('AI分類ボタンが見つかりません', 'error');
+    return;
+  }
+
+  // ボタンを無効化
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-icon">⏳</span> 判定中...';
+
+  // プログレス表示
+  if (progressEl) {
+    progressEl.style.display = 'block';
+    if (progressFill) progressFill.style.width = '0%';
+  }
+
+  try {
+    const titles = unknownItems.map(item => item.title);
+    const batchSize = 30;
+    const results = [];
+    let processed = 0;
+
+    // バッチ処理（進捗表示あり）
+    for (let i = 0; i < titles.length; i += batchSize) {
+      const batch = titles.slice(i, i + batchSize);
+      if (progressText) progressText.textContent = `${processed}/${titles.length} 判定中...`;
+
+      // background.jsにAI分類リクエスト
+      const response = await chrome.runtime.sendMessage({
+        action: 'classifyWithAI',
+        titles: batch,
+        apiKey: apiKey
+      });
+
+      if (response.success) {
+        results.push(...response.data);
+      } else {
+        console.error('バッチ失敗:', response.error);
+        // 失敗してもスキップして続行
+        batch.forEach(() => {
+          results.push({ brand: null, category: 'その他' });
+        });
+      }
+
+      processed += batch.length;
+      const progress = (processed / titles.length) * 100;
+      if (progressFill) progressFill.style.width = `${progress}%`;
+
+      // 次のバッチまで少し待つ（レート制限対策）
+      if (i + batchSize < titles.length) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+
+    if (progressText) progressText.textContent = `${titles.length}/${titles.length} 完了`;
+
+    // 結果を保存
+    const classificationMap = {};
+    results.forEach((result, idx) => {
+      if (result && unknownItems[idx]) {
+        const title = unknownItems[idx].title;
+        classificationMap[title] = {
+          brand: result.brand,
+          category: result.category
+        };
+      }
+    });
+
+    window.aiClassificationResults = classificationMap;
+
+    // AI分類結果をanalyzerのcustomBrandRulesに反映
+    const brandCounts = {};
+    let classifiedCount = 0;
+    results.forEach((result, idx) => {
+      if (result && result.brand && unknownItems[idx]) {
+        const brand = result.brand;
+        brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+        classifiedCount++;
+
+        // customBrandRulesに追加（タイトルの一部をキーワードとして登録）
+        const title = unknownItems[idx].title;
+        if (!analyzer.customBrandRules[brand]) {
+          analyzer.customBrandRules[brand] = {
+            brand: brand,
+            keywords: []
+          };
+        }
+        // タイトルから特徴的なキーワードを抽出して追加
+        const titleWords = title.split(/[\s,\-\/]+/).filter(w => w.length > 3);
+        const brandKeyword = titleWords.find(w =>
+          w.toLowerCase().includes(brand.toLowerCase().split(' ')[0]) ||
+          brand.toLowerCase().includes(w.toLowerCase())
+        );
+        if (brandKeyword && !analyzer.customBrandRules[brand].keywords.includes(brandKeyword)) {
+          analyzer.customBrandRules[brand].keywords.push(brandKeyword);
+        }
+      }
+    });
+
+    // カスタムブランドルールを永続保存
+    await saveCustomBrandRules();
+
+    // activeListingsとsoldItemsのブランドを更新
+    for (const item of analyzer.activeListings) {
+      if (classificationMap[item.title] && classificationMap[item.title].brand) {
+        item.brand = classificationMap[item.title].brand;
+      }
+      if (classificationMap[item.title] && classificationMap[item.title].category) {
+        item.category = classificationMap[item.title].category;
+      }
+    }
+    for (const item of analyzer.soldItems) {
+      if (classificationMap[item.title] && classificationMap[item.title].brand) {
+        item.brand = classificationMap[item.title].brand;
+      }
+      if (classificationMap[item.title] && classificationMap[item.title].category) {
+        item.category = classificationMap[item.title].category;
+      }
+    }
+
+    // 分析を再実行
+    analyzer.calculateBrandPerformance();
+    analyzer.calculateCategoryStats();
+
+    // 上位ブランドを表示
+    const sortedBrands = Object.entries(brandCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    let resultHtml = '';
+    sortedBrands.forEach(([brand, count]) => {
+      resultHtml += `
+        <div class="result-item">
+          <span class="result-brand">${brand || '不明'}</span>
+          <span class="result-count">${count}件</span>
+        </div>
+      `;
+    });
+
+    // 分類できなかったものも表示
+    const unclassifiedCount = results.length - classifiedCount;
+    if (unclassifiedCount > 0) {
+      resultHtml += `
+        <div class="result-item">
+          <span class="result-brand" style="color: #999;">分類不可</span>
+          <span class="result-count">${unclassifiedCount}件</span>
+        </div>
+      `;
+    }
+
+    // ボタンを更新
+    btn.innerHTML = '<span class="btn-icon">✅</span> 分類完了';
+    btn.disabled = true;
+
+    showAlert(`${classifiedCount}件の商品を分類しました`, 'success');
+
+    // AI分類結果をローカルストレージに保存
+    await chrome.storage.local.set({ aiClassificationResults: window.aiClassificationResults });
+
+    // 学習済みルール表示を更新
+    updateLearnedRulesDisplay();
+
+    // 分析結果を再表示（AI判定後に分類済み/未分類の数が変わるため）
+    // IndexedDBへの保存も含む
+    await analyzeMyData();
+
+  } catch (error) {
+    console.error('AI分類エラー:', error);
+    showAlert('AI分類でエラーが発生しました: ' + error.message, 'error');
+
+    // ボタンをリセット
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-icon">🤖</span> AIで自動判定する';
+    if (progressEl) progressEl.style.display = 'none';
+  }
+}
+
+/**
+ * 市場データのAI再分類
+ */
+async function classifyMarketDataWithAI() {
+  // APIキーの取得（syncストレージから）
+  const settings = await chrome.storage.sync.get(['openaiApiKey']);
+  const apiKey = settings.openaiApiKey;
+
+  if (!apiKey) {
+    showAlert('OpenAI APIキーが設定されていません。設定画面から登録してください。', 'warning');
+    return;
+  }
+
+  // 市場データを取得
+  const marketData = await BunsekiDB.getMarketData();
+
+  if (!marketData || marketData.length === 0) {
+    showAlert('市場データがありません', 'info');
+    return;
+  }
+
+  // 未分類のアイテムを抽出
+  const unknownItems = marketData.filter(item => {
+    const brand = item.brand;
+    return !brand || brand === '(不明)' || brand === 'その他' || brand === null;
+  });
+
+  if (unknownItems.length === 0) {
+    showAlert('未分類の市場データはありません', 'info');
+    return;
+  }
+
+  // UI要素
+  const btn = document.getElementById('classifyMarketWithAIBtn');
+  const progressEl = document.getElementById('marketAiProgress');
+  const progressFill = document.getElementById('marketAiProgressFill');
+  const progressText = document.getElementById('marketAiProgressText');
+
+  if (!btn) {
+    showAlert('AI分類ボタンが見つかりません', 'error');
+    return;
+  }
+
+  // ボタンを無効化
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-icon">⏳</span> 判定中...';
+
+  // プログレス表示
+  if (progressEl) {
+    progressEl.style.display = 'block';
+    if (progressFill) progressFill.style.width = '0%';
+  }
+
+  try {
+    const titles = unknownItems.map(item => item.title);
+    const batchSize = 30;
+    const results = [];
+    let processed = 0;
+
+    // バッチ処理（進捗表示あり）
+    for (let i = 0; i < titles.length; i += batchSize) {
+      const batch = titles.slice(i, i + batchSize);
+      if (progressText) progressText.textContent = `${processed}/${titles.length} 判定中...`;
+
+      // background.jsにAI分類リクエスト
+      const response = await chrome.runtime.sendMessage({
+        action: 'classifyWithAI',
+        titles: batch,
+        apiKey: apiKey
+      });
+
+      if (response.success) {
+        results.push(...response.data);
+      } else {
+        console.error('バッチ失敗:', response.error);
+        // 失敗してもスキップして続行
+        batch.forEach(() => {
+          results.push({ brand: null, category: 'その他' });
+        });
+      }
+
+      processed += batch.length;
+      const progress = (processed / titles.length) * 100;
+      if (progressFill) progressFill.style.width = `${progress}%`;
+
+      // 次のバッチまで少し待つ（レート制限対策）
+      if (i + batchSize < titles.length) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+
+    if (progressText) progressText.textContent = `${titles.length}/${titles.length} 完了`;
+
+    // 結果を市場データに反映
+    let classifiedCount = 0;
+    const brandCounts = {};
+
+    for (let idx = 0; idx < results.length; idx++) {
+      const result = results[idx];
+      if (result && result.brand && unknownItems[idx]) {
+        const item = unknownItems[idx];
+        item.brand = result.brand;
+        if (result.category) item.category = result.category;
+        classifiedCount++;
+
+        brandCounts[result.brand] = (brandCounts[result.brand] || 0) + 1;
+
+        // customBrandRulesに追加
+        if (!analyzer.customBrandRules[result.brand]) {
+          analyzer.customBrandRules[result.brand] = {
+            brand: result.brand,
+            keywords: []
+          };
+        }
+
+        // タイトルから特徴的なキーワードを抽出して追加
+        const titleWords = item.title.split(/[\s,\-\/]+/).filter(w => w.length > 3);
+        const brandKeyword = titleWords.find(w =>
+          w.toLowerCase().includes(result.brand.toLowerCase().split(' ')[0]) ||
+          result.brand.toLowerCase().includes(w.toLowerCase())
+        );
+        if (brandKeyword && !analyzer.customBrandRules[result.brand].keywords.includes(brandKeyword)) {
+          analyzer.customBrandRules[result.brand].keywords.push(brandKeyword);
+        }
+      }
+    }
+
+    // IndexedDBの市場データを更新
+    // 既存データをクリアして新しいデータを追加
+    await BunsekiDB.clearMarketData();
+    await BunsekiDB.addMarketData(marketData);
+
+    // カスタムブランドルールを永続保存
+    await saveCustomBrandRules();
+
+    // 学習済みルール表示を更新
+    updateLearnedRulesDisplay();
+
+    // ボタンを更新
+    btn.innerHTML = '<span class="btn-icon">✅</span> 分類完了';
+    btn.disabled = true;
+
+    showAlert(`${classifiedCount}件の市場データを分類しました`, 'success');
+
+    // 市場データ情報を更新
+    await updateMarketDataInfo();
+
+    // 分析結果を再表示（AI判定後に分類済み/未分類の数が変わるため）
+    await analyzeMarketData();
+
+  } catch (error) {
+    console.error('市場データAI分類エラー:', error);
+    showAlert('市場データAI分類でエラーが発生しました: ' + error.message, 'error');
+
+    // ボタンをリセット
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-icon">🧠</span> 市場データをAI分類';
+    if (progressEl) progressEl.style.display = 'none';
+  }
+}
+
+/**
+ * AI分類結果を考慮したブランド抽出
+ */
+function getClassifiedBrand(title) {
+  // まずAI分類結果をチェック
+  if (window.aiClassificationResults && window.aiClassificationResults[title]) {
+    return window.aiClassificationResults[title].brand;
+  }
+  // 通常のブランド抽出
+  return extractBrandFromTitle(title);
+}
+
+/**
+ * AI分類結果を考慮したカテゴリ抽出
+ */
+function getClassifiedCategory(title) {
+  // まずAI分類結果をチェック
+  if (window.aiClassificationResults && window.aiClassificationResults[title]) {
+    return window.aiClassificationResults[title].category;
+  }
+  // 通常のカテゴリ検出
+  return detectCategoryFromTitle(title);
+}
+
+// =====================================
+// AI学習ルール管理
+// =====================================
+
+/**
+ * カスタムブランドルールを永続保存
+ */
+async function saveCustomBrandRules() {
+  try {
+    await chrome.storage.local.set({
+      customBrandRules: analyzer.customBrandRules
+    });
+    console.log('カスタムブランドルール保存:', Object.keys(analyzer.customBrandRules).length, '件');
+  } catch (error) {
+    console.error('カスタムブランドルール保存エラー:', error);
+  }
+}
+
+/**
+ * 学習済みルールの件数を取得
+ */
+function getLearnedRulesCount() {
+  return Object.keys(analyzer.customBrandRules || {}).length;
+}
+
+/**
+ * 学習済みルールの一覧を取得
+ */
+function getLearnedRulesList() {
+  const rules = analyzer.customBrandRules || {};
+  return Object.entries(rules).map(([brand, rule]) => ({
+    brand: rule.brand || brand,
+    keywords: rule.keywords || [],
+    keywordCount: (rule.keywords || []).length
+  })).sort((a, b) => b.keywordCount - a.keywordCount);
+}
+
+/**
+ * 学習済みルールをクリア
+ */
+async function clearLearnedRules() {
+  if (!confirm('AI学習済みのブランドルールをすべてクリアしますか？\n次回のAI判定から再学習が必要になります。')) {
+    return false;
+  }
+  analyzer.customBrandRules = {};
+  await chrome.storage.local.remove(['customBrandRules']);
+  showAlert('学習済みルールをクリアしました', 'success');
+  return true;
+}
+
+/**
+ * 学習済みルール表示用HTMLを生成
+ */
+function generateLearnedRulesHtml() {
+  const rules = getLearnedRulesList();
+  const totalCount = rules.length;
+  const totalKeywords = rules.reduce((sum, r) => sum + r.keywordCount, 0);
+
+  if (totalCount === 0) {
+    return `
+      <div class="learned-rules-empty">
+        <p>学習済みルールはありません</p>
+        <p class="hint">AI判定を実行すると、新しいブランド・キーワードが自動で学習されます</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="learned-rules-summary">
+      <div class="summary-stat">
+        <span class="stat-value">${totalCount}</span>
+        <span class="stat-label">ブランド</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-value">${totalKeywords}</span>
+        <span class="stat-label">キーワード</span>
+      </div>
+      <button id="clearLearnedRulesBtn" class="action-btn danger small">
+        <span class="btn-icon">🗑️</span> クリア
+      </button>
+    </div>
+    <div class="learned-rules-list">
+      ${rules.slice(0, 20).map(rule => `
+        <div class="learned-rule-item">
+          <span class="rule-brand">${escapeHtml(rule.brand)}</span>
+          <span class="rule-keywords">${rule.keywords.slice(0, 3).map(k => escapeHtml(k)).join(', ')}${rule.keywords.length > 3 ? '...' : ''}</span>
+          <span class="rule-count">${rule.keywordCount}件</span>
+        </div>
+      `).join('')}
+      ${rules.length > 20 ? `<p class="more-hint">他 ${rules.length - 20} ブランド...</p>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * 学習済みルール表示を更新
+ */
+function updateLearnedRulesDisplay() {
+  const section = document.getElementById('learnedRulesSection');
+  const content = document.getElementById('learnedRulesContent');
+
+  if (!section || !content) return;
+
+  const rulesCount = Object.keys(analyzer.customBrandRules || {}).length;
+
+  if (rulesCount > 0) {
+    section.style.display = 'block';
+    content.innerHTML = generateLearnedRulesHtml();
+
+    // クリアボタンのイベントリスナーを追加
+    const clearBtn = document.getElementById('clearLearnedRulesBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        const cleared = await clearLearnedRules();
+        if (cleared) {
+          updateLearnedRulesDisplay();
+        }
+      });
+    }
+  } else {
+    section.style.display = 'none';
+  }
+}
+
+// =====================================
 // グローバルエクスポート（互換性のため）
 // =====================================
 
 window.showLoading = showLoading;
 window.hideLoading = hideLoading;
 window.showAlert = showAlert;
+window.getClassifiedBrand = getClassifiedBrand;
+window.getClassifiedCategory = getClassifiedCategory;
+window.saveCustomBrandRules = saveCustomBrandRules;
+window.clearLearnedRules = clearLearnedRules;

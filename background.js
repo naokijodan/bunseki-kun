@@ -692,14 +692,27 @@ async function classifyItemsWithAI(titles, apiKey) {
     return [];
   }
 
-  // 50件ずつバッチ処理
-  const batchSize = 50;
+  // 30件ずつバッチ処理（レート制限対策）
+  const batchSize = 30;
   const results = [];
 
   for (let i = 0; i < titles.length; i += batchSize) {
     const batch = titles.slice(i, i + batchSize);
-    const batchResults = await classifyBatchWithAI(batch, apiKey);
-    results.push(...batchResults);
+    try {
+      const batchResults = await classifyBatchWithAI(batch, apiKey);
+      results.push(...batchResults);
+    } catch (e) {
+      console.error(`Batch ${i / batchSize + 1} failed:`, e.message);
+      // エラーでも空の結果を追加して続行
+      batch.forEach((_, idx) => {
+        results.push({ index: i + idx, brand: null, category: 'その他' });
+      });
+    }
+
+    // バッチ間に少し遅延を入れる（レート制限対策）
+    if (i + batchSize < titles.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
   }
 
   return results;
@@ -810,37 +823,43 @@ ${titles.map((t, i) => `${i}. ${t}`).join('\n')}
 
 JSON配列形式で回答してください。`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 4000
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `API error: ${response.status}`);
-  }
-
-  const result = await response.json();
-  const content = result.choices[0]?.message?.content;
-
-  if (!content) {
-    throw new Error('AI応答が空です');
-  }
+  // タイムアウト付きfetch（60秒）
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+        max_tokens: 4000
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const content = result.choices[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('AI応答が空です');
+    }
+
     const parsed = JSON.parse(content);
     // 配列形式または { items: [...] } 形式に対応
     const items = Array.isArray(parsed) ? parsed : (parsed.items || parsed.results || []);
@@ -852,9 +871,14 @@ JSON配列形式で回答してください。`;
       category: item.category || 'その他',
       title: titles[item.index] || ''
     }));
+
   } catch (e) {
-    console.error('JSON parse error:', content);
-    throw new Error('AI応答のパースに失敗しました');
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      throw new Error('API呼び出しがタイムアウトしました（60秒）');
+    }
+    console.error('AI分類エラー:', e);
+    throw e;
   }
 }
 
