@@ -1072,23 +1072,41 @@ function generateBrandPerformanceAnalysis() {
   return html;
 }
 
+// Watch数分析のフィルター設定
+let watchFilterSettings = {
+  minWatch: 1,
+  limit: 50
+};
+
 /**
  * Watch数分析を生成
  */
-function generateWatchAnalysis() {
-  const watchRanking = analyzer.results.watchRanking || [];
-  const top20 = watchRanking.slice(0, 20);
+function generateWatchAnalysis(minWatch = null, limit = null) {
+  // パラメータが指定されていれば更新
+  if (minWatch !== null) watchFilterSettings.minWatch = minWatch;
+  if (limit !== null) watchFilterSettings.limit = limit;
+
+  const allItems = analyzer.activeListings || [];
   const summary = analyzer.results.summary || {};
+
+  // フィルタリング
+  const filteredItems = allItems
+    .filter(item => (item.watchers || 0) >= watchFilterSettings.minWatch)
+    .sort((a, b) => (b.watchers || 0) - (a.watchers || 0));
+
+  const displayItems = watchFilterSettings.limit === 'all'
+    ? filteredItems
+    : filteredItems.slice(0, parseInt(watchFilterSettings.limit));
 
   // Watch数の分布を計算
   const watchDistribution = {
-    high: analyzer.activeListings?.filter(i => i.watchers >= 10).length || 0,
-    medium: analyzer.activeListings?.filter(i => i.watchers >= 5 && i.watchers < 10).length || 0,
-    low: analyzer.activeListings?.filter(i => i.watchers >= 1 && i.watchers < 5).length || 0,
-    zero: analyzer.activeListings?.filter(i => !i.watchers || i.watchers === 0).length || 0
+    high: allItems.filter(i => i.watchers >= 10).length,
+    medium: allItems.filter(i => i.watchers >= 5 && i.watchers < 10).length,
+    low: allItems.filter(i => i.watchers >= 1 && i.watchers < 5).length,
+    zero: allItems.filter(i => !i.watchers || i.watchers === 0).length
   };
 
-  if (!top20 || top20.length === 0) {
+  if (!allItems || allItems.length === 0) {
     return `
       <div class="no-data-message">
         <p>Watch数データがありません。</p>
@@ -1098,6 +1116,30 @@ function generateWatchAnalysis() {
   }
 
   let html = `
+    <div class="watch-filter-bar">
+      <div class="filter-group">
+        <label>最低Watch数:</label>
+        <select id="watchMinFilter">
+          <option value="1" ${watchFilterSettings.minWatch == 1 ? 'selected' : ''}>1以上</option>
+          <option value="2" ${watchFilterSettings.minWatch == 2 ? 'selected' : ''}>2以上</option>
+          <option value="3" ${watchFilterSettings.minWatch == 3 ? 'selected' : ''}>3以上</option>
+          <option value="5" ${watchFilterSettings.minWatch == 5 ? 'selected' : ''}>5以上</option>
+          <option value="10" ${watchFilterSettings.minWatch == 10 ? 'selected' : ''}>10以上</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>表示件数:</label>
+        <select id="watchLimitFilter">
+          <option value="10" ${watchFilterSettings.limit == 10 ? 'selected' : ''}>10件</option>
+          <option value="20" ${watchFilterSettings.limit == 20 ? 'selected' : ''}>20件</option>
+          <option value="50" ${watchFilterSettings.limit == 50 ? 'selected' : ''}>50件</option>
+          <option value="100" ${watchFilterSettings.limit == 100 ? 'selected' : ''}>100件</option>
+          <option value="all" ${watchFilterSettings.limit == 'all' ? 'selected' : ''}>全て</option>
+        </select>
+      </div>
+      <span class="filter-result">${filteredItems.length}件該当</span>
+    </div>
+
     <div class="analysis-summary">
       <div class="summary-row">
         <span class="label">総Watch数</span>
@@ -1124,7 +1166,7 @@ function generateWatchAnalysis() {
           <span>Watch数10以上の商品が${watchDistribution.high}件あります。価格見直しを検討してください。</span>
         </div>
       ` : ''}
-      ${watchDistribution.zero > summary.totalActive * 0.7 ? `
+      ${watchDistribution.zero > (summary.totalActive || 0) * 0.7 ? `
         <div class="insight-card info">
           <span class="icon">💡</span>
           <span>Watch数0の商品が多いです。タイトルや価格の最適化を検討してください。</span>
@@ -1133,31 +1175,61 @@ function generateWatchAnalysis() {
     </div>
 
     <div class="analysis-detail">
-      <h4>Watch数ランキング TOP20</h4>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>商品名</th>
-            <th>Watch数</th>
-            <th>価格</th>
-            <th>ブランド</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${top20.map(item => `
+      <h4>Watch数ランキング（${displayItems.length}件表示）</h4>
+      <div class="watch-table-scroll">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td class="title-cell" title="${escapeHtml(item.title)}">${truncateText(item.title, 35)}</td>
-              <td class="watch-count">${item.watchers}</td>
-              <td>$${item.price ? item.price.toFixed(2) : '-'}</td>
-              <td>${item.brand || '-'}</td>
+              <th>商品名</th>
+              <th>Watch数</th>
+              <th>価格</th>
+              <th>ブランド</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${displayItems.map(item => `
+              <tr>
+                <td class="title-cell" title="${escapeHtml(item.title)}">${truncateText(item.title, 35)}</td>
+                <td class="watch-count">${item.watchers || 0}</td>
+                <td>$${item.price ? item.price.toFixed(2) : '-'}</td>
+                <td>${item.brand || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 
+  // フィルター変更時のイベント設定
+  setTimeout(() => {
+    setupWatchFilterEvents();
+  }, 100);
+
   return html;
+}
+
+/**
+ * Watch数フィルターのイベント設定
+ */
+function setupWatchFilterEvents() {
+  const minFilter = document.getElementById('watchMinFilter');
+  const limitFilter = document.getElementById('watchLimitFilter');
+
+  if (minFilter) {
+    minFilter.addEventListener('change', () => {
+      const resultHtml = generateWatchAnalysis(parseInt(minFilter.value), null);
+      displayAnalysisResult('👁️ Watch数分析', resultHtml);
+    });
+  }
+
+  if (limitFilter) {
+    limitFilter.addEventListener('change', () => {
+      const value = limitFilter.value === 'all' ? 'all' : parseInt(limitFilter.value);
+      const resultHtml = generateWatchAnalysis(null, value);
+      displayAnalysisResult('👁️ Watch数分析', resultHtml);
+    });
+  }
 }
 
 /**

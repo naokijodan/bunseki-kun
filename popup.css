@@ -1335,3 +1335,54 @@ body {
   border-left: 3px solid #4caf50;
   color: #2e7d32;
 }
+
+/* Watch Filter Bar */
+.watch-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.filter-group select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.filter-result {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-left: auto;
+}
+
+.watch-table-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+}
