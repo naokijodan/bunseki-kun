@@ -584,16 +584,19 @@ class EbayAnalyzer {
   }
 
   /**
-   * 出品ペース（過去30日間の日別出品数）
+   * 出品・販売ペース（指定日数分の日別データ）
+   * @param {number} days - 分析期間（30, 60, 90）
    */
-  calculateListingPace() {
+  calculateListingPace(days = 30) {
     const pace = [];
     const now = new Date();
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    now.setHours(23, 59, 59, 999); // 今日の終わりに設定
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0); // 開始日の最初に設定
 
-    // 過去30日分の日付を生成
-    for (let i = 29; i >= 0; i--) {
+    // 指定日数分の日付を生成
+    for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
@@ -610,7 +613,7 @@ class EbayAnalyzer {
       if (item.startDate) {
         // Dateオブジェクトに変換（文字列の場合も対応）
         const itemDate = item.startDate instanceof Date ? item.startDate : new Date(item.startDate);
-        if (!isNaN(itemDate.getTime()) && itemDate >= thirtyDaysAgo) {
+        if (!isNaN(itemDate.getTime()) && itemDate >= startDate && itemDate <= now) {
           const dateStr = itemDate.toISOString().split('T')[0];
           const paceItem = pace.find(p => p.date === dateStr);
           if (paceItem) {
@@ -621,21 +624,27 @@ class EbayAnalyzer {
     }
 
     // 販売数をカウント
+    console.log('販売データ件数:', this.soldItems.length);
+    let salesCounted = 0;
     for (const item of this.soldItems) {
       if (item.saleDate) {
         // Dateオブジェクトに変換（文字列の場合も対応）
         const itemDate = item.saleDate instanceof Date ? item.saleDate : new Date(item.saleDate);
-        if (!isNaN(itemDate.getTime()) && itemDate >= thirtyDaysAgo) {
+        if (!isNaN(itemDate.getTime()) && itemDate >= startDate && itemDate <= now) {
           const dateStr = itemDate.toISOString().split('T')[0];
           const paceItem = pace.find(p => p.date === dateStr);
           if (paceItem) {
-            paceItem.sales += item.quantity || 1;
+            const qty = item.quantity || 1;
+            paceItem.sales += qty;
+            salesCounted += qty;
           }
         }
       }
     }
+    console.log('期間内販売数:', salesCounted, '（期間:', days, '日）');
 
     this.results.listingPace = pace;
+    return pace;
   }
 
   /**

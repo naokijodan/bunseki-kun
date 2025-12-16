@@ -882,8 +882,8 @@ async function runAnalysis(type) {
 
     switch (type) {
       case 'listing-pace':
-        title = '📅 出品ペース分析';
-        resultHtml = generateListingPaceAnalysis();
+        title = '📅 出品・販売ペース分析';
+        resultHtml = generateListingPaceAnalysis(30);
         break;
 
       case 'brand-performance':
@@ -925,25 +925,43 @@ async function runAnalysis(type) {
   }
 }
 
+// 現在選択されている出品・販売ペースの期間
+let currentPacePeriod = 30;
+
 /**
- * 出品ペース分析を生成
+ * 出品・販売ペース分析を生成
  */
-function generateListingPaceAnalysis() {
-  const pace = analyzer.results.listingPace || [];
+function generateListingPaceAnalysis(days = 30) {
+  currentPacePeriod = days;
+
+  // 期間に応じたデータを再計算
+  const pace = analyzer.calculateListingPace(days);
   const summary = analyzer.results.summary || {};
 
-  // 過去7日間のデータを取得
-  const last7Days = pace.slice(-7);
+  // 集計
+  const totalListings = pace.reduce((sum, d) => sum + d.listings, 0);
+  const totalSales = pace.reduce((sum, d) => sum + d.sales, 0);
 
   let html = `
+    <div class="period-selector">
+      <span class="period-label">期間:</span>
+      <button class="period-btn ${days === 30 ? 'active' : ''}" data-days="30">30日</button>
+      <button class="period-btn ${days === 60 ? 'active' : ''}" data-days="60">60日</button>
+      <button class="period-btn ${days === 90 ? 'active' : ''}" data-days="90">90日</button>
+    </div>
+
     <div class="analysis-summary">
       <div class="summary-row">
-        <span class="label">出品中</span>
-        <span class="value">${summary.totalActive || 0}</span>
+        <span class="label">期間内出品数</span>
+        <span class="value">${totalListings}</span>
       </div>
       <div class="summary-row">
-        <span class="label">販売済み</span>
-        <span class="value">${summary.totalSold || 0}</span>
+        <span class="label">期間内販売数</span>
+        <span class="value">${totalSales}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">出品中（総数）</span>
+        <span class="value">${summary.totalActive || 0}</span>
       </div>
       <div class="summary-row">
         <span class="label">最終出品からの日数</span>
@@ -951,39 +969,57 @@ function generateListingPaceAnalysis() {
       </div>
     </div>
 
-    <div class="chart-container">
+    <div class="chart-container" style="height: 300px;">
       <canvas id="analysisChart"></canvas>
     </div>
 
     <div class="analysis-detail">
-      <h4>過去7日間の出品・販売</h4>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>日付</th>
-            <th>出品数</th>
-            <th>販売数</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${last7Days.map(day => `
+      <h4>過去${days}日間の出品・販売（日別）</h4>
+      <div class="pace-table-scroll">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td>${formatDate(new Date(day.date))}</td>
-              <td>${day.listings || 0}</td>
-              <td>${day.sales || 0}</td>
+              <th>日付</th>
+              <th>出品数</th>
+              <th>販売数</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${pace.slice().reverse().slice(0, 14).map(day => `
+              <tr>
+                <td>${day.label}</td>
+                <td>${day.listings || 0}</td>
+                <td>${day.sales || 0}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">※最新14日分を表示</p>
     </div>
   `;
 
   // チャート描画を遅延実行
   setTimeout(() => {
-    drawListingPaceChart(last7Days);
+    drawListingPaceChart(pace);
+    setupPeriodButtons();
   }, 100);
 
   return html;
+}
+
+/**
+ * 期間選択ボタンのイベント設定
+ */
+function setupPeriodButtons() {
+  const buttons = document.querySelectorAll('.period-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = parseInt(btn.dataset.days);
+      const resultHtml = generateListingPaceAnalysis(days);
+      displayAnalysisResult('📅 出品・販売ペース分析', resultHtml);
+    });
+  });
 }
 
 /**
@@ -1414,7 +1450,7 @@ function closeAnalysisResult() {
 // =====================================
 
 /**
- * 出品ペースチャート描画
+ * 出品・販売ペースチャート描画（棒グラフ）
  */
 function drawListingPaceChart(data) {
   const canvas = document.getElementById('analysisChart');
@@ -1426,26 +1462,37 @@ function drawListingPaceChart(data) {
     chartInstances.listingPace.destroy();
   }
 
+  // 期間が長い場合はラベルを間引く
+  const labelInterval = data.length > 60 ? 7 : (data.length > 30 ? 3 : 1);
+  const labels = data.map((d, i) => {
+    if (i % labelInterval === 0 || i === data.length - 1) {
+      return d.label;
+    }
+    return '';
+  });
+
   chartInstances.listingPace = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: data.map(d => formatDate(new Date(d.date))),
+      labels: labels,
       datasets: [
         {
           label: '出品数',
           data: data.map(d => d.listings || 0),
+          backgroundColor: COLORS.primary,
           borderColor: COLORS.primary,
-          backgroundColor: COLORS.primary + '20',
-          fill: true,
-          tension: 0.3
+          borderWidth: 1,
+          barPercentage: 0.9,
+          categoryPercentage: 0.8
         },
         {
           label: '販売数',
           data: data.map(d => d.sales || 0),
+          backgroundColor: COLORS.success,
           borderColor: COLORS.success,
-          backgroundColor: COLORS.success + '20',
-          fill: true,
-          tension: 0.3
+          borderWidth: 1,
+          barPercentage: 0.9,
+          categoryPercentage: 0.8
         }
       ]
     },
@@ -1455,11 +1502,33 @@ function drawListingPaceChart(data) {
       plugins: {
         legend: {
           position: 'top'
+        },
+        tooltip: {
+          callbacks: {
+            title: function(context) {
+              // ツールチップでは実際の日付を表示
+              const idx = context[0].dataIndex;
+              return data[idx].label;
+            }
+          }
         }
       },
       scales: {
+        x: {
+          ticks: {
+            maxRotation: 45,
+            minRotation: 0,
+            autoSkip: false
+          },
+          grid: {
+            display: false
+          }
+        },
         y: {
-          beginAtZero: true
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
         }
       }
     }
