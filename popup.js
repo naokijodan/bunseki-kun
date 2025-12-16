@@ -403,12 +403,16 @@ function handleFileUpload(file, type) {
 
     if (type === 'active') {
       activeListingsData = content;
+      // 新しいCSVを読み込んだら、analyzerのデータを更新
       const items = analyzer.parseActiveListingsCsv(content);
+      analyzer.activeListings = items;
       updateDataStatus('activeListingsStatus', items.length, true);
       updateMyDataSummary();
     } else {
       ordersData = content;
+      // 新しいCSVを読み込んだら、analyzerのデータを更新
       const items = analyzer.parseOrdersCsv(content);
+      analyzer.soldItems = items;
       updateDataStatus('ordersStatus', items.length, true);
       updateMyDataSummary();
     }
@@ -448,20 +452,23 @@ function updateMyDataSummary() {
   const summaryEl = document.getElementById('myDataSummary');
   if (!summaryEl) return;
 
-  // CSVデータがあればパース、なければanalyzerの既存データを使用
+  // 既存のanalyzerデータを優先（AI分類結果を保持）
+  // CSVデータがあり、かつanalyzerにデータがない場合のみパース
   let activeItems = [];
   let soldItems = [];
 
-  if (activeListingsData) {
-    activeItems = analyzer.parseActiveListingsCsv(activeListingsData);
-  } else if (analyzer.activeListings && analyzer.activeListings.length > 0) {
+  if (analyzer.activeListings && analyzer.activeListings.length > 0) {
     activeItems = analyzer.activeListings;
+  } else if (activeListingsData) {
+    activeItems = analyzer.parseActiveListingsCsv(activeListingsData);
+    analyzer.activeListings = activeItems;
   }
 
-  if (ordersData) {
-    soldItems = analyzer.parseOrdersCsv(ordersData);
-  } else if (analyzer.soldItems && analyzer.soldItems.length > 0) {
+  if (analyzer.soldItems && analyzer.soldItems.length > 0) {
     soldItems = analyzer.soldItems;
+  } else if (ordersData) {
+    soldItems = analyzer.parseOrdersCsv(ordersData);
+    analyzer.soldItems = soldItems;
   }
 
   const myDataActions = document.getElementById('myDataActions');
@@ -484,22 +491,27 @@ function updateMyDataSummary() {
  * 自分のデータを分析
  */
 async function analyzeMyData() {
-  // CSVデータがあればパース、なければanalyzerの既存データを使用
+  // 既存のanalyzerデータを優先して使用（AI分類結果を保持するため）
+  // CSVデータがあり、かつanalyzerにデータがない場合のみパース
   let activeItems = [];
   let soldItems = [];
 
-  if (activeListingsData) {
+  if (analyzer.activeListings && analyzer.activeListings.length > 0) {
+    // 既存データがあればそれを使用（AI分類済みのブランド情報を保持）
+    activeItems = analyzer.activeListings;
+  } else if (activeListingsData) {
+    // 既存データがない場合のみCSVをパース
     activeItems = analyzer.parseActiveListingsCsv(activeListingsData);
     analyzer.activeListings = activeItems;
-  } else if (analyzer.activeListings && analyzer.activeListings.length > 0) {
-    activeItems = analyzer.activeListings;
   }
 
-  if (ordersData) {
+  if (analyzer.soldItems && analyzer.soldItems.length > 0) {
+    // 既存データがあればそれを使用
+    soldItems = analyzer.soldItems;
+  } else if (ordersData) {
+    // 既存データがない場合のみCSVをパース
     soldItems = analyzer.parseOrdersCsv(ordersData);
     analyzer.soldItems = soldItems;
-  } else if (analyzer.soldItems && analyzer.soldItems.length > 0) {
-    soldItems = analyzer.soldItems;
   }
 
   const allItems = [...activeItems, ...soldItems];
