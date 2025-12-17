@@ -4383,6 +4383,9 @@ function detectCategoryWithSub(title) {
   return { main: 'その他', sub: 'その他' };
 }
 
+// グローバルに公開（analyzer.jsから参照するため）
+window.detectCategoryWithSub = detectCategoryWithSub;
+
 // =====================================
 // AI分類機能
 // =====================================
@@ -5545,7 +5548,7 @@ function renderBrandRanking(ranking) {
 
   let html = `
     <div class="ranking-table-container">
-      <table class="ranking-table">
+      <table class="ranking-table brand-ranking-table">
         <thead>
           <tr>
             <th class="col-bar">件数</th>
@@ -5554,6 +5557,7 @@ function renderBrandRanking(ranking) {
             <th class="col-count">件数</th>
             <th class="col-share">シェア</th>
             <th class="col-price">平均価格</th>
+            <th class="col-price-range">売れ筋価格帯</th>
             <th class="col-categories">カテゴリ内訳（TOP3）</th>
           </tr>
         </thead>
@@ -5563,9 +5567,11 @@ function renderBrandRanking(ranking) {
   ranking.forEach((item, idx) => {
     const barWidth = (item.count / maxCount * 100).toFixed(1);
     const top3Categories = item.topCategories.slice(0, 3);
+    const hasSubcategories = item.subcategories && item.subcategories.length > 0;
+    const hasPriceDistribution = item.priceDistribution && item.priceDistribution.length > 0;
 
     html += `
-      <tr class="${item.rank <= 3 ? 'top-rank' : ''}">
+      <tr class="${item.rank <= 3 ? 'top-rank' : ''} brand-main-row ${hasSubcategories ? 'expandable' : ''}" data-brand="${escapeHtml(item.brand)}">
         <td class="col-bar">
           <div class="table-bar-container">
             <div class="table-bar" style="width: ${barWidth}%"></div>
@@ -5574,10 +5580,16 @@ function renderBrandRanking(ranking) {
         <td class="col-rank">
           <span class="rank-badge ${item.rank <= 3 ? 'gold' : ''}">${item.rank}</span>
         </td>
-        <td class="col-name">${escapeHtml(item.brand)}</td>
+        <td class="col-name">
+          ${hasSubcategories ? '<span class="row-expand-icon">▶</span>' : ''}
+          ${escapeHtml(item.brand)}
+        </td>
         <td class="col-count">${item.count.toLocaleString()}</td>
         <td class="col-share">${item.share}%</td>
         <td class="col-price">$${item.avgPrice.toLocaleString()}</td>
+        <td class="col-price-range">
+          <span class="price-range-badge">${item.topPriceRange || '-'}</span>
+        </td>
         <td class="col-categories">
           ${top3Categories.map(cat =>
             `<span class="cat-mini-tag">${escapeHtml(cat.category)} (${cat.count})</span>`
@@ -5585,14 +5597,83 @@ function renderBrandRanking(ranking) {
         </td>
       </tr>
     `;
+
+    // 細分類カテゴリの展開行（初期は非表示）
+    if (hasSubcategories) {
+      // 細分類カテゴリ一覧
+      const subCats = item.subcategories.slice(0, 10); // 上位10件
+      subCats.forEach(sub => {
+        const subBarWidth = (sub.count / maxCount * 100).toFixed(1);
+        html += `
+          <tr class="brand-subcategory-row" data-parent-brand="${escapeHtml(item.brand)}" style="display: none;">
+            <td class="col-bar">
+              <div class="table-bar-container">
+                <div class="table-bar table-bar-light" style="width: ${subBarWidth}%"></div>
+              </div>
+            </td>
+            <td class="col-rank"></td>
+            <td class="col-name subcategory-name">
+              <span class="subcategory-indent">└</span>
+              ${escapeHtml(sub.category)}
+            </td>
+            <td class="col-count">${sub.count.toLocaleString()}</td>
+            <td class="col-share"></td>
+            <td class="col-price"></td>
+            <td class="col-price-range"></td>
+            <td class="col-categories"></td>
+          </tr>
+        `;
+      });
+
+      // 価格帯分布行
+      if (hasPriceDistribution) {
+        const nonZeroPrices = item.priceDistribution.filter(p => p.count > 0);
+        if (nonZeroPrices.length > 0) {
+          html += `
+            <tr class="brand-subcategory-row brand-price-dist-row" data-parent-brand="${escapeHtml(item.brand)}" style="display: none;">
+              <td colspan="8" class="price-distribution-cell">
+                <div class="price-distribution-container">
+                  <span class="price-dist-label">💰 価格帯分布:</span>
+                  ${nonZeroPrices.map((p, i) => `
+                    <span class="price-dist-item ${i === 0 ? 'top-range' : ''}">
+                      ${p.range}: ${p.count}件
+                    </span>
+                  `).join('')}
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // ブランド行のクリックイベント
+  container.querySelectorAll('.brand-main-row.expandable').forEach(row => {
+    row.addEventListener('click', function() {
+      const brand = row.dataset.brand;
+      const expandIcon = row.querySelector('.row-expand-icon');
+      const subRows = container.querySelectorAll(`.brand-subcategory-row[data-parent-brand="${brand}"]`);
+      const isExpanded = row.classList.contains('expanded');
+
+      if (isExpanded) {
+        row.classList.remove('expanded');
+        if (expandIcon) expandIcon.textContent = '▶';
+        subRows.forEach(sr => sr.style.display = 'none');
+      } else {
+        row.classList.add('expanded');
+        if (expandIcon) expandIcon.textContent = '▼';
+        subRows.forEach(sr => sr.style.display = '');
+      }
+    });
+  });
 }
 
 /**
- * カテゴリランキングを表示（テーブル形式）
+ * カテゴリランキングを表示（テーブル形式 + 細分類展開）
  */
 function renderCategoryRanking(ranking) {
   const container = document.getElementById('categoryRankingList');
@@ -5611,7 +5692,7 @@ function renderCategoryRanking(ranking) {
 
   let html = `
     <div class="ranking-table-container">
-      <table class="ranking-table">
+      <table class="ranking-table category-ranking-table">
         <thead>
           <tr>
             <th class="col-bar">件数</th>
@@ -5620,6 +5701,7 @@ function renderCategoryRanking(ranking) {
             <th class="col-count">件数</th>
             <th class="col-share">シェア</th>
             <th class="col-price">平均価格</th>
+            <th class="col-price-range">売れ筋価格帯</th>
             <th class="col-categories">ブランド内訳（TOP3）</th>
           </tr>
         </thead>
@@ -5629,9 +5711,14 @@ function renderCategoryRanking(ranking) {
   ranking.forEach((item, idx) => {
     const barWidth = (item.count / maxCount * 100).toFixed(1);
     const top3Brands = item.topBrands.slice(0, 3);
+    const hasSubcategories = item.subcategories && item.subcategories.length > 0;
+    const hasPriceDistribution = item.priceDistribution && item.priceDistribution.length > 0;
+    // 「その他」を除いた細分類
+    const filteredSubs = (item.subcategories || []).filter(s => s.subcategory !== 'その他');
+    const otherSub = (item.subcategories || []).find(s => s.subcategory === 'その他');
 
     html += `
-      <tr class="${item.rank <= 3 ? 'top-rank' : ''}">
+      <tr class="${item.rank <= 3 ? 'top-rank' : ''} category-main-row ${hasSubcategories ? 'expandable' : ''}" data-category="${escapeHtml(item.category)}">
         <td class="col-bar">
           <div class="table-bar-container">
             <div class="table-bar table-bar-green" style="width: ${barWidth}%"></div>
@@ -5640,10 +5727,16 @@ function renderCategoryRanking(ranking) {
         <td class="col-rank">
           <span class="rank-badge ${item.rank <= 3 ? 'gold' : ''}">${item.rank}</span>
         </td>
-        <td class="col-name">${escapeHtml(item.category)}</td>
+        <td class="col-name">
+          ${hasSubcategories ? '<span class="row-expand-icon">▶</span>' : ''}
+          ${escapeHtml(item.category)}
+        </td>
         <td class="col-count">${item.count.toLocaleString()}</td>
         <td class="col-share">${item.share}%</td>
         <td class="col-price">$${item.avgPrice.toLocaleString()}</td>
+        <td class="col-price-range">
+          <span class="price-range-badge">${item.topPriceRange || '-'}</span>
+        </td>
         <td class="col-categories">
           ${top3Brands.map(b =>
             `<span class="cat-mini-tag">${escapeHtml(b.brand)} (${b.count})</span>`
@@ -5651,10 +5744,100 @@ function renderCategoryRanking(ranking) {
         </td>
       </tr>
     `;
+
+    // 細分類の行（初期は非表示）
+    if (hasSubcategories) {
+      filteredSubs.forEach(sub => {
+        const subBarWidth = (sub.count / maxCount * 100).toFixed(1);
+        html += `
+          <tr class="subcategory-row" data-parent-category="${escapeHtml(item.category)}" style="display: none;">
+            <td class="col-bar">
+              <div class="table-bar-container">
+                <div class="table-bar table-bar-light" style="width: ${subBarWidth}%"></div>
+              </div>
+            </td>
+            <td class="col-rank"></td>
+            <td class="col-name subcategory-name">
+              <span class="subcategory-indent">└</span>
+              ${escapeHtml(sub.subcategory)}
+            </td>
+            <td class="col-count">${sub.count.toLocaleString()}</td>
+            <td class="col-share"></td>
+            <td class="col-price"></td>
+            <td class="col-price-range"></td>
+            <td class="col-categories"></td>
+          </tr>
+        `;
+      });
+      // 「その他」があれば最後に追加
+      if (otherSub && otherSub.count > 0) {
+        const otherBarWidth = (otherSub.count / maxCount * 100).toFixed(1);
+        html += `
+          <tr class="subcategory-row other-subcategory" data-parent-category="${escapeHtml(item.category)}" style="display: none;">
+            <td class="col-bar">
+              <div class="table-bar-container">
+                <div class="table-bar table-bar-light" style="width: ${otherBarWidth}%"></div>
+              </div>
+            </td>
+            <td class="col-rank"></td>
+            <td class="col-name subcategory-name">
+              <span class="subcategory-indent">└</span>
+              <span class="other-label">その他</span>
+            </td>
+            <td class="col-count">${otherSub.count.toLocaleString()}</td>
+            <td class="col-share"></td>
+            <td class="col-price"></td>
+            <td class="col-price-range"></td>
+            <td class="col-categories"></td>
+          </tr>
+        `;
+      }
+
+      // 価格帯分布行
+      if (hasPriceDistribution) {
+        const nonZeroPrices = item.priceDistribution.filter(p => p.count > 0);
+        if (nonZeroPrices.length > 0) {
+          html += `
+            <tr class="subcategory-row category-price-dist-row" data-parent-category="${escapeHtml(item.category)}" style="display: none;">
+              <td colspan="8" class="price-distribution-cell">
+                <div class="price-distribution-container">
+                  <span class="price-dist-label">💰 価格帯分布:</span>
+                  ${nonZeroPrices.map((p, i) => `
+                    <span class="price-dist-item ${i === 0 ? 'top-range' : ''}">
+                      ${p.range}: ${p.count}件
+                    </span>
+                  `).join('')}
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // 大分類行のクリックイベント
+  container.querySelectorAll('.category-main-row.expandable').forEach(row => {
+    row.addEventListener('click', function() {
+      const category = row.dataset.category;
+      const expandIcon = row.querySelector('.row-expand-icon');
+      const subRows = container.querySelectorAll(`.subcategory-row[data-parent-category="${category}"]`);
+      const isExpanded = row.classList.contains('expanded');
+
+      if (isExpanded) {
+        row.classList.remove('expanded');
+        if (expandIcon) expandIcon.textContent = '▶';
+        subRows.forEach(sr => sr.style.display = 'none');
+      } else {
+        row.classList.add('expanded');
+        if (expandIcon) expandIcon.textContent = '▼';
+        subRows.forEach(sr => sr.style.display = '');
+      }
+    });
+  });
 }
 
 /**

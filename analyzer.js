@@ -1465,18 +1465,31 @@ class EbayAnalyzer {
    * @returns {Array} 正規化済み市場データ
    */
   normalizeMarketData(marketItems, forceReanalyze = false) {
+    // popup.jsのdetectCategoryWithSubを使用（より精度の高い判定）
+    const detectCatWithSub = (typeof window !== 'undefined' && typeof window.detectCategoryWithSub === 'function')
+      ? window.detectCategoryWithSub
+      : null;
+
     return marketItems.map(item => {
       // ブランド判定 - 常にタイトルから再判定（あり得ないブランドが上位に来る問題を防ぐ）
       let brand = this.extractBrand(item.title) || '(不明)';
 
-      // カテゴリ判定 - 常にタイトルから再判定
-      let category = this.extractCategoryFromTitle(item.title);
-      if (!category) {
-        category = this.extractCategoryFromBrand(item.title);
+      // カテゴリ判定 - popup.jsのdetectCategoryWithSubを優先使用
+      let categoryMain, categorySub;
+      if (detectCatWithSub) {
+        const detected = detectCatWithSub(item.title);
+        categoryMain = detected.main;
+        categorySub = detected.sub;
+      } else {
+        // フォールバック: 従来のロジック
+        let category = this.extractCategoryFromTitle(item.title);
+        if (!category) {
+          category = this.extractCategoryFromBrand(item.title);
+        }
+        const normalized = this.normalizeCategory(category || '(不明)');
+        categoryMain = normalized.main;
+        categorySub = normalized.sub;
       }
-      const normalized = this.normalizeCategory(category || '(不明)');
-      const categoryMain = normalized.main;
-      const categorySub = normalized.sub;
 
       return {
         ...item,
@@ -1495,6 +1508,15 @@ class EbayAnalyzer {
    */
   getMarketBrandRanking(marketItems, limit = 50) {
     const brandStats = {};
+    // 価格帯の定義
+    const priceRanges = [
+      { label: '~$50', min: 0, max: 50 },
+      { label: '$50-100', min: 50, max: 100 },
+      { label: '$100-200', min: 100, max: 200 },
+      { label: '$200-500', min: 200, max: 500 },
+      { label: '$500-1000', min: 500, max: 1000 },
+      { label: '$1000+', min: 1000, max: Infinity }
+    ];
     // extractBrandFromTitle関数を取得
     const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
       ? window.extractBrandFromTitle
@@ -1516,8 +1538,14 @@ class EbayAnalyzer {
           priceCount: 0,     // 価格が有効な件数（平均計算用）
           minPrice: Infinity,
           maxPrice: 0,
-          categories: {}
+          categories: {},      // 大分類
+          subcategories: {},   // 細分類
+          priceDistribution: {} // 価格帯分布
         };
+        // 価格帯を初期化
+        priceRanges.forEach(r => {
+          brandStats[brand].priceDistribution[r.label] = 0;
+        });
       }
 
       // 売上数を加算（soldがなければ1として扱う）
@@ -1531,31 +1559,60 @@ class EbayAnalyzer {
         brandStats[brand].priceCount++;
         brandStats[brand].minPrice = Math.min(brandStats[brand].minPrice, price);
         brandStats[brand].maxPrice = Math.max(brandStats[brand].maxPrice, price);
+
+        // 価格帯に振り分け
+        for (const range of priceRanges) {
+          if (price >= range.min && price < range.max) {
+            brandStats[brand].priceDistribution[range.label] += sold;
+            break;
+          }
+        }
       }
 
-      // ブランド内カテゴリ集計（売上数ベース）
-      const cat = item.categoryMain || 'その他';
-      if (!brandStats[brand].categories[cat]) {
-        brandStats[brand].categories[cat] = 0;
+      // ブランド内大分類集計（売上数ベース）
+      const mainCat = item.categoryMain || 'その他';
+      if (!brandStats[brand].categories[mainCat]) {
+        brandStats[brand].categories[mainCat] = 0;
       }
-      brandStats[brand].categories[cat] += sold;
+      brandStats[brand].categories[mainCat] += sold;
+
+      // ブランド内細分類集計（売上数ベース）
+      const subCat = item.categorySub || 'その他';
+      if (!brandStats[brand].subcategories[subCat]) {
+        brandStats[brand].subcategories[subCat] = 0;
+      }
+      brandStats[brand].subcategories[subCat] += sold;
     }
 
     // ランキング生成（売上数順）
     return Object.values(brandStats)
-      .map(stat => ({
-        brand: stat.brand,
-        count: stat.soldCount,           // 売上数
-        listingCount: stat.listingCount, // 出品数
-        avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
-        minPrice: stat.minPrice === Infinity ? 0 : Math.round(stat.minPrice),
-        maxPrice: Math.round(stat.maxPrice),
-        share: 0, // 後で計算
-        topCategories: Object.entries(stat.categories)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([cat, cnt]) => ({ category: cat, count: cnt }))
-      }))
+      .map(stat => {
+        // 価格帯分布を配列に変換し、最も売れている価格帯を特定
+        const priceDistArr = Object.entries(stat.priceDistribution)
+          .map(([range, cnt]) => ({ range, count: cnt }))
+          .sort((a, b) => b.count - a.count);
+        const topPriceRange = priceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+
+        return {
+          brand: stat.brand,
+          count: stat.soldCount,           // 売上数
+          listingCount: stat.listingCount, // 出品数
+          avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
+          minPrice: stat.minPrice === Infinity ? 0 : Math.round(stat.minPrice),
+          maxPrice: Math.round(stat.maxPrice),
+          share: 0, // 後で計算
+          topCategories: Object.entries(stat.categories)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([cat, cnt]) => ({ category: cat, count: cnt })),
+          subcategories: Object.entries(stat.subcategories)
+            .filter(([cat]) => cat !== 'その他')
+            .sort((a, b) => b[1] - a[1])
+            .map(([cat, cnt]) => ({ category: cat, count: cnt })),
+          priceDistribution: priceDistArr,
+          topPriceRange: topPriceRange.range
+        };
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, limit)
       .map((item, idx, arr) => {
@@ -1576,6 +1633,15 @@ class EbayAnalyzer {
    */
   getMarketCategoryRanking(marketItems, limit = 30) {
     const categoryStats = {};
+    // 価格帯の定義
+    const priceRanges = [
+      { label: '~$50', min: 0, max: 50 },
+      { label: '$50-100', min: 50, max: 100 },
+      { label: '$100-200', min: 100, max: 200 },
+      { label: '$200-500', min: 200, max: 500 },
+      { label: '$500-1000', min: 500, max: 1000 },
+      { label: '$1000+', min: 1000, max: Infinity }
+    ];
     // extractBrandFromTitle関数を取得
     const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
       ? window.extractBrandFromTitle
@@ -1594,8 +1660,13 @@ class EbayAnalyzer {
           totalPrice: 0,
           priceCount: 0,
           brands: {},
-          subcategories: {}
+          subcategories: {},
+          priceDistribution: {}
         };
+        // 価格帯を初期化
+        priceRanges.forEach(r => {
+          categoryStats[mainCat].priceDistribution[r.label] = 0;
+        });
       }
 
       // 売上数を加算（soldがなければ1として扱う）
@@ -1607,6 +1678,14 @@ class EbayAnalyzer {
       if (price > 0) {
         categoryStats[mainCat].totalPrice += price;
         categoryStats[mainCat].priceCount++;
+
+        // 価格帯に振り分け
+        for (const range of priceRanges) {
+          if (price >= range.min && price < range.max) {
+            categoryStats[mainCat].priceDistribution[range.label] += sold;
+            break;
+          }
+        }
       }
 
       // カテゴリ内ブランド集計（売上数ベース）- 常にタイトルから再判定
@@ -1631,20 +1710,30 @@ class EbayAnalyzer {
       .filter(stat => stat.category !== 'その他' && stat.category !== '(不明)' && stat.category !== '(未分類)');
     const totalSold = filteredStats.reduce((sum, s) => sum + s.soldCount, 0);
     return filteredStats
-      .map(stat => ({
-        category: stat.category,
-        count: stat.soldCount,           // 売上数
-        listingCount: stat.listingCount, // 出品数
-        avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
-        share: totalSold > 0 ? ((stat.soldCount / totalSold) * 100).toFixed(1) : 0,
-        topBrands: Object.entries(stat.brands)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([brand, cnt]) => ({ brand, count: cnt })),
-        subcategories: Object.entries(stat.subcategories)
-          .sort((a, b) => b[1] - a[1])
-          .map(([sub, cnt]) => ({ subcategory: sub, count: cnt }))
-      }))
+      .map(stat => {
+        // 価格帯分布を配列に変換し、最も売れている価格帯を特定
+        const priceDistArr = Object.entries(stat.priceDistribution)
+          .map(([range, cnt]) => ({ range, count: cnt }))
+          .sort((a, b) => b.count - a.count);
+        const topPriceRange = priceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+
+        return {
+          category: stat.category,
+          count: stat.soldCount,           // 売上数
+          listingCount: stat.listingCount, // 出品数
+          avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
+          share: totalSold > 0 ? ((stat.soldCount / totalSold) * 100).toFixed(1) : 0,
+          topBrands: Object.entries(stat.brands)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([brand, cnt]) => ({ brand, count: cnt })),
+          subcategories: Object.entries(stat.subcategories)
+            .sort((a, b) => b[1] - a[1])
+            .map(([sub, cnt]) => ({ subcategory: sub, count: cnt })),
+          priceDistribution: priceDistArr,
+          topPriceRange: topPriceRange.range
+        };
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, limit)
       .map((item, idx) => ({
@@ -1674,7 +1763,7 @@ class EbayAnalyzer {
       const brand = extractBrand(item.title) || '(不明)';
       if (brand === '(不明)') continue;
 
-      const mainCat = item.categoryMain || 'その他';
+      // 細分類を使用（ブランド×カテゴリは細分類で表示）
       const subCat = item.categorySub || 'その他';
 
       // 売上数を取得（soldがなければ1として扱う）
@@ -1690,21 +1779,14 @@ class EbayAnalyzer {
 
       brandCategoryStats[brand].totalCount += sold;
 
-      // 大分類
-      if (!brandCategoryStats[brand].categories[mainCat]) {
-        brandCategoryStats[brand].categories[mainCat] = {
-          category: mainCat,
-          count: 0,
-          subcategories: {}
+      // 細分類で集計
+      if (!brandCategoryStats[brand].categories[subCat]) {
+        brandCategoryStats[brand].categories[subCat] = {
+          category: subCat,
+          count: 0
         };
       }
-      brandCategoryStats[brand].categories[mainCat].count += sold;
-
-      // 細分類
-      if (!brandCategoryStats[brand].categories[mainCat].subcategories[subCat]) {
-        brandCategoryStats[brand].categories[mainCat].subcategories[subCat] = 0;
-      }
-      brandCategoryStats[brand].categories[mainCat].subcategories[subCat] += sold;
+      brandCategoryStats[brand].categories[subCat].count += sold;
     }
 
     // ランキング生成（売上数順）
@@ -1721,10 +1803,7 @@ class EbayAnalyzer {
             count: cat.count,
             share: brandStat.totalCount > 0
               ? ((cat.count / brandStat.totalCount) * 100).toFixed(1)
-              : 0,
-            subcategories: Object.entries(cat.subcategories)
-              .sort((a, b) => b[1] - a[1])
-              .map(([sub, cnt]) => ({ subcategory: sub, count: cnt }))
+              : 0
           }))
           .sort((a, b) => b.count - a.count)
       }));

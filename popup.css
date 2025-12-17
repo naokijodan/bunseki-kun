@@ -3952,3 +3952,163 @@ body {
   color: var(--text-muted);
   text-align: right;
 }
+
+/* =====================================
+   市場比較カテゴリランキング - 展開可能行
+   ===================================== */
+.category-main-row.expandable {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.category-main-row.expandable:hover {
+  background-color: var(--bg-secondary);
+}
+
+.category-main-row.expanded {
+  background-color: var(--primary-light);
+}
+
+.row-expand-icon {
+  display: inline-block;
+  width: 16px;
+  margin-right: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.category-main-row.expanded .row-expand-icon {
+  color: var(--primary-color);
+}
+
+/* 細分類行 */
+.subcategory-row {
+  background-color: #f8fafc !important;
+  border-left: 3px solid var(--primary-light);
+}
+
+.subcategory-row:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.subcategory-name {
+  padding-left: 8px;
+}
+
+.subcategory-indent {
+  color: var(--text-muted);
+  margin-right: 6px;
+  font-size: 11px;
+}
+
+/* 細分類用の薄いバー */
+.table-bar-light {
+  height: 100%;
+  background: linear-gradient(90deg, #b8d4e8 0%, #d4e8f5 100%);
+  border-radius: 3px;
+  transition: width var(--transition-normal);
+}
+
+/* その他ラベル */
+.other-label {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.other-subcategory {
+  opacity: 0.8;
+}
+
+/* =====================================
+   ブランドランキング - 展開可能行
+   ===================================== */
+.brand-main-row.expandable {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.brand-main-row.expandable:hover {
+  background-color: var(--bg-secondary);
+}
+
+.brand-main-row.expanded {
+  background-color: var(--primary-light);
+}
+
+.brand-main-row.expanded .row-expand-icon {
+  color: var(--primary-color);
+}
+
+/* ブランド細分類行 */
+.brand-subcategory-row {
+  background-color: #f8fafc !important;
+  border-left: 3px solid var(--primary-light);
+}
+
+.brand-subcategory-row:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* =====================================
+   売れ筋価格帯バッジ
+   ===================================== */
+.col-price-range {
+  width: 90px;
+  text-align: center;
+}
+
+.price-range-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+}
+
+/* =====================================
+   価格帯分布表示
+   ===================================== */
+.price-distribution-cell {
+  padding: 8px 12px !important;
+  background-color: #fefce8 !important;
+  border-left: 3px solid #fbbf24;
+}
+
+.price-distribution-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-dist-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.price-dist-item {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+
+.price-dist-item.top-range {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+
+/* 価格帯分布行 */
+.brand-price-dist-row,
+.category-price-dist-row {
+  background-color: #fefce8 !important;
+}
