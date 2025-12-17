@@ -2482,6 +2482,13 @@ async function loadMyAnalysisTabContent(tabId) {
       setupBrandExpandListeners();
     }, 50);
   }
+
+  // カテゴリ別タブの場合、展開イベントリスナーを設定
+  if (tabId === 'category-performance') {
+    setTimeout(() => {
+      setupCategoryExpandListeners();
+    }, 50);
+  }
 }
 
 /**
@@ -3169,160 +3176,196 @@ function generateCategoryPerformanceAnalysis() {
     `;
   }
 
-  // 集計
-  const totalActive = categories.reduce((sum, c) => sum + c.active, 0);
-  const totalSold = categories.reduce((sum, c) => sum + c.sold, 0);
-  const totalRevenue = categories.reduce((sum, c) => sum + (c.revenue || 0), 0);
+  // カテゴリごとのブランド内訳と細分類を計算
+  const categoriesWithDetails = categories.map(cat => {
+    const brandStats = {};
+    const subCategoryStats = {};
 
-  // 大分類テーブルのHTML生成
-  function generateMainCategoryRows(categories) {
-    return categories.slice(0, 20).map(cat => {
-      const total = cat.active + cat.sold;
-      const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
-      return `
-        <tr>
-          <td><strong>${escapeHtml(cat.category)}</strong></td>
-          <td>${cat.active}</td>
-          <td>${cat.sold}</td>
-          <td>${sellRate}%</td>
-          <td>$${(cat.revenue || 0).toFixed(0)}</td>
-        </tr>
-      `;
-    }).join('');
-  }
+    // 出品中アイテムからブランドと細分類を集計
+    analyzer.activeListings.forEach(item => {
+      const itemCatMain = item.categoryMain || item.category || '(不明)';
+      if (itemCatMain === cat.category) {
+        // ブランド内訳
+        const brand = analyzer.extractBrand(item.title) || '(不明)';
+        if (!brandStats[brand]) {
+          brandStats[brand] = { brand, active: 0, sold: 0, totalPrice: 0 };
+        }
+        brandStats[brand].active++;
+        brandStats[brand].totalPrice += item.price || 0;
 
-  // 細分類セクションのHTML生成（展開式）
-  function generateSubcategorySection(categories) {
-    let html = '';
-    let index = 0;
-    for (const cat of categories) {
-      const hasSubcategories = cat.subcategoriesArray && cat.subcategoriesArray.length > 0;
-      if (!hasSubcategories) continue;
+        // 細分類内訳
+        const subCat = item.categorySub || '(不明)';
+        if (!subCategoryStats[subCat]) {
+          subCategoryStats[subCat] = { category: subCat, active: 0, sold: 0, totalPrice: 0, revenue: 0 };
+        }
+        subCategoryStats[subCat].active++;
+        subCategoryStats[subCat].totalPrice += item.price || 0;
+      }
+    });
 
-      // シンプルな連番IDを使用（日本語・特殊文字の問題を回避）
-      const catId = `subcat_${index}`;
-      index++;
-      const total = cat.active + cat.sold;
+    // 販売済みアイテムからブランドと細分類を集計
+    analyzer.soldItems.forEach(item => {
+      const itemCatMain = item.categoryMain || item.category || '(不明)';
+      if (itemCatMain === cat.category) {
+        // ブランド内訳
+        const brand = analyzer.extractBrand(item.title) || '(不明)';
+        if (!brandStats[brand]) {
+          brandStats[brand] = { brand, active: 0, sold: 0, totalPrice: 0 };
+        }
+        brandStats[brand].sold += item.quantity || 1;
+        brandStats[brand].totalPrice += item.soldFor || 0;
 
-      html += `
-        <div class="subcategory-group">
-          <div class="subcategory-header" data-target="${catId}">
-            <span class="expand-icon" id="icon-${catId}">▶</span>
-            <strong>${escapeHtml(cat.category)}</strong>
-            <span class="subcategory-count">(${total}件)</span>
-          </div>
-          <div class="subcategory-content" id="${catId}" style="display: none;">
-            <table class="data-table subcategory-table">
-              <thead>
-                <tr>
-                  <th>細分類</th>
-                  <th>出品中</th>
-                  <th>販売済</th>
-                  <th>売上率</th>
-                  <th>売上</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${cat.subcategoriesArray.map(subCat => {
-                  const subTotal = subCat.active + subCat.sold;
-                  const subSellRate = subTotal > 0 ? Math.round((subCat.sold / subTotal) * 100) : 0;
-                  return `
-                    <tr>
-                      <td>${escapeHtml(subCat.category)}</td>
-                      <td>${subCat.active}</td>
-                      <td>${subCat.sold}</td>
-                      <td>${subSellRate}%</td>
-                      <td>$${(subCat.revenue || 0).toFixed(0)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    }
-    return html;
-  }
+        // 細分類内訳
+        const subCat = item.categorySub || '(不明)';
+        if (!subCategoryStats[subCat]) {
+          subCategoryStats[subCat] = { category: subCat, active: 0, sold: 0, totalPrice: 0, revenue: 0 };
+        }
+        subCategoryStats[subCat].sold += item.quantity || 1;
+        subCategoryStats[subCat].revenue += item.soldFor || 0;
+      }
+    });
+
+    // 配列に変換してソート
+    const topBrands = Object.values(brandStats)
+      .map(b => ({ ...b, count: b.active + b.sold }))
+      .sort((a, b) => b.count - a.count);
+
+    const subcategories = Object.values(subCategoryStats)
+      .map(s => ({
+        ...s,
+        avgPrice: (s.active + s.sold) > 0 ? (s.totalPrice + s.revenue) / (s.active + s.sold) : 0
+      }))
+      .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
+
+    // 平均価格を計算
+    const avgActivePrice = cat.active > 0 ? (cat.totalActivePrice || 0) / cat.active : 0;
+    const avgSoldPrice = cat.sold > 0 ? (cat.revenue || 0) / cat.sold : 0;
+
+    return {
+      ...cat,
+      topBrands,
+      subcategories,
+      avgActivePrice,
+      avgSoldPrice
+    };
+  });
+
+  // 最大値を取得（バーの幅計算用）
+  const maxCount = Math.max(...categoriesWithDetails.map(c => c.active + c.sold), 1);
 
   let html = `
-    <div class="analysis-summary">
-      <div class="summary-row">
-        <span class="label">大分類カテゴリ数</span>
-        <span class="value">${categories.length}</span>
-      </div>
-      <div class="summary-row">
-        <span class="label">総出品数</span>
-        <span class="value">${totalActive}</span>
-      </div>
-      <div class="summary-row">
-        <span class="label">総販売数</span>
-        <span class="value">${totalSold}</span>
-      </div>
-      <div class="summary-row">
-        <span class="label">総売上</span>
-        <span class="value">$${totalRevenue.toFixed(0)}</span>
-      </div>
-    </div>
-
-    <div class="chart-container" style="height: 250px;">
-      <canvas id="analysisChart"></canvas>
-    </div>
-
     <div class="analysis-detail">
-      <h4>📁 大分類カテゴリ</h4>
-      <table class="data-table">
+      <h4>カテゴリ別パフォーマンス（全${categoriesWithDetails.length}件）</h4>
+      <table class="data-table category-expandable-table">
         <thead>
           <tr>
+            <th class="col-bar">件数</th>
             <th>カテゴリ</th>
             <th>出品中</th>
             <th>販売済</th>
             <th>売上率</th>
-            <th>売上</th>
+            <th>出品単価</th>
+            <th>販売単価</th>
+            <th>ブランド内訳</th>
           </tr>
         </thead>
         <tbody>
-          ${generateMainCategoryRows(categories)}
+          ${categoriesWithDetails.map((cat, idx) => {
+            const total = cat.active + cat.sold;
+            const sellRate = total > 0 ? Math.round((cat.sold / total) * 100) : 0;
+            const barWidth = maxCount > 0 ? (total / maxCount * 100).toFixed(1) : 0;
+            const hasSubcategories = cat.subcategories && cat.subcategories.length > 0;
+            const top3Brands = cat.topBrands.slice(0, 3);
+
+            let rowHtml = `
+              <tr class="category-main-row ${hasSubcategories ? 'expandable' : ''}" data-cat-idx="${idx}">
+                <td class="col-bar">
+                  <div class="table-bar-container">
+                    <div class="table-bar table-bar-green" style="width: ${barWidth}%"></div>
+                  </div>
+                </td>
+                <td class="col-name">
+                  ${hasSubcategories ? '<span class="row-expand-icon">▶</span>' : ''}
+                  ${escapeHtml(cat.category)}
+                </td>
+                <td>${cat.active}</td>
+                <td>${cat.sold}</td>
+                <td>${sellRate}%</td>
+                <td>$${cat.avgActivePrice ? cat.avgActivePrice.toFixed(0) : '-'}</td>
+                <td>$${cat.avgSoldPrice ? cat.avgSoldPrice.toFixed(0) : '-'}</td>
+                <td class="col-brands">
+                  ${top3Brands.map(b =>
+                    `<span class="cat-mini-tag">${escapeHtml(b.brand)} (${b.count})</span>`
+                  ).join('')}
+                </td>
+              </tr>
+            `;
+
+            // 細分類内訳行（展開時に表示）
+            if (hasSubcategories) {
+              cat.subcategories.forEach(sub => {
+                const subTotal = sub.active + sub.sold;
+                const subSellRate = subTotal > 0 ? Math.round((sub.sold / subTotal) * 100) : 0;
+                const subBarWidth = maxCount > 0 ? (subTotal / maxCount * 100).toFixed(1) : 0;
+                rowHtml += `
+                  <tr class="category-sub-row" data-parent-cat-idx="${idx}" style="display: none;">
+                    <td class="col-bar">
+                      <div class="table-bar-container">
+                        <div class="table-bar table-bar-light" style="width: ${subBarWidth}%"></div>
+                      </div>
+                    </td>
+                    <td class="col-name subcategory-name">└ ${escapeHtml(sub.category)}</td>
+                    <td>${sub.active}</td>
+                    <td>${sub.sold}</td>
+                    <td>${subSellRate}%</td>
+                    <td colspan="3">$${sub.avgPrice ? sub.avgPrice.toFixed(0) : '-'}</td>
+                  </tr>
+                `;
+              });
+            }
+
+            return rowHtml;
+          }).join('')}
         </tbody>
       </table>
     </div>
-
-    <div class="analysis-detail" style="margin-top: 20px;">
-      <h4>📂 細分類の詳細 <small style="color: #666; font-weight: normal;">（クリックで展開）</small></h4>
-      <div class="subcategory-list">
-        ${generateSubcategorySection(categories)}
-      </div>
-    </div>
   `;
 
+  // 展開イベントリスナーを設定
   setTimeout(() => {
-    drawCategoryChart(categories.slice(0, 10));
-    // 細分類ヘッダーにクリックイベントを追加
-    setupSubcategoryToggle();
-  }, 100);
+    setupCategoryExpandListeners();
+  }, 50);
 
   return html;
 }
 
 /**
- * 細分類ヘッダーのクリックイベントを設定
+ * カテゴリ展開/折りたたみのイベントリスナーを設定
  */
-function setupSubcategoryToggle() {
-  const headers = document.querySelectorAll('.subcategory-header');
-  headers.forEach(header => {
-    header.addEventListener('click', function() {
-      const targetId = this.getAttribute('data-target');
-      const content = document.getElementById(targetId);
-      const icon = document.getElementById(`icon-${targetId}`);
+function setupCategoryExpandListeners() {
+  const mainRows = document.querySelectorAll('.category-expandable-table .category-main-row.expandable');
+  console.log('setupCategoryExpandListeners: 展開可能な行数:', mainRows.length);
 
-      if (content && icon) {
-        if (content.style.display === 'none') {
-          content.style.display = 'block';
-          icon.textContent = '▼';
-        } else {
-          content.style.display = 'none';
-          icon.textContent = '▶';
-        }
+  mainRows.forEach(row => {
+    // イベントリスナーが既に設定されているか確認
+    if (row.dataset.listenerAttached) return;
+    row.dataset.listenerAttached = 'true';
+
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = row.dataset.catIdx;
+      const subRows = document.querySelectorAll(`.category-sub-row[data-parent-cat-idx="${idx}"]`);
+      const icon = row.querySelector('.row-expand-icon');
+      const isExpanded = row.classList.contains('expanded');
+
+      if (isExpanded) {
+        row.classList.remove('expanded');
+        if (icon) icon.textContent = '▶';
+        subRows.forEach(subRow => subRow.style.display = 'none');
+      } else {
+        row.classList.add('expanded');
+        if (icon) icon.textContent = '▼';
+        subRows.forEach(subRow => subRow.style.display = 'table-row');
       }
     });
   });

@@ -4696,3 +4696,76 @@ body {
 .table-bar-warning {
   background: var(--warning-color);
 }
+
+.table-bar-green {
+  background: var(--success-color);
+}
+
+/* ========================================
+   カテゴリ別パフォーマンス展開テーブル
+   ======================================== */
+.category-expandable-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.category-expandable-table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.category-expandable-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.category-expandable-table .col-bar {
+  width: 100px;
+  padding-right: 8px;
+}
+
+.category-expandable-table .col-name {
+  font-weight: 500;
+}
+
+.category-expandable-table .col-brands {
+  max-width: 200px;
+}
+
+.category-expandable-table .category-main-row.expandable {
+  cursor: pointer;
+}
+
+.category-expandable-table .category-main-row.expandable:hover {
+  background: var(--bg-tertiary);
+}
+
+.category-expandable-table .category-main-row.expanded {
+  background: var(--bg-secondary);
+}
+
+.category-expandable-table .category-sub-row {
+  background: var(--bg-tertiary);
+}
+
+.category-expandable-table .category-sub-row td {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cat-mini-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  margin: 1px 2px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
