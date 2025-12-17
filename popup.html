@@ -549,35 +549,19 @@
           </div>
         </div>
 
-        <!-- 分析実行 -->
-        <div class="ai-section">
-          <div class="section-header">
-            <h2><span class="section-icon">🎯</span> AI分析を実行</h2>
+        <!-- 分析実行（コンパクト版） -->
+        <div class="ai-section compact-analysis">
+          <div class="analysis-row">
+            <div class="ai-analysis-options-inline">
+              <label class="checkbox-inline"><input type="checkbox" id="includeStrengths" checked><span>強み弱み</span></label>
+              <label class="checkbox-inline"><input type="checkbox" id="includePurchasing" checked><span>仕入れ</span></label>
+              <label class="checkbox-inline"><input type="checkbox" id="includePricing" checked><span>価格</span></label>
+              <label class="checkbox-inline"><input type="checkbox" id="includeMarketTrends" checked><span>トレンド</span></label>
+            </div>
+            <button id="runAIAnalysisBtn" class="action-btn primary compact-btn">
+              🚀 AI分析
+            </button>
           </div>
-
-          <div class="ai-analysis-options">
-            <label class="checkbox-option">
-              <input type="checkbox" id="includeStrengths" checked>
-              <span>強み・弱み分析</span>
-            </label>
-            <label class="checkbox-option">
-              <input type="checkbox" id="includePurchasing" checked>
-              <span>仕入れ推奨</span>
-            </label>
-            <label class="checkbox-option">
-              <input type="checkbox" id="includePricing" checked>
-              <span>価格戦略</span>
-            </label>
-            <label class="checkbox-option">
-              <input type="checkbox" id="includeMarketTrends" checked>
-              <span>市場トレンド</span>
-            </label>
-          </div>
-
-          <button id="runAIAnalysisBtn" class="action-btn primary full-width large">
-            <span class="btn-icon">🚀</span>
-            総合AI分析を実行
-          </button>
         </div>
 
         <!-- AI分析結果 -->
@@ -590,21 +574,21 @@
           </div>
         </div>
 
-        <!-- AIチャット -->
-        <div class="ai-section">
-          <div class="section-header">
+        <!-- AIチャット（拡大版） -->
+        <div class="ai-section chat-section-large">
+          <div class="section-header compact">
             <h2><span class="section-icon">💬</span> AIに質問</h2>
           </div>
 
-          <div class="chat-container">
-            <div id="chatMessages" class="chat-messages">
+          <div class="chat-container-large">
+            <div id="chatMessages" class="chat-messages-large">
               <div class="chat-placeholder">
-                分析結果について質問できます
+                分析結果について質問できます（例：「RADOの仕入れを増やすべき？」「$100-200の価格帯でおすすめは？」）
               </div>
             </div>
-            <div class="chat-input-area">
-              <textarea id="chatInput" class="chat-input" placeholder="質問を入力..." rows="2"></textarea>
-              <button id="sendChatBtn" class="chat-send-btn">
+            <div class="chat-input-area-large">
+              <textarea id="chatInput" class="chat-input-large" placeholder="質問を入力..." rows="3"></textarea>
+              <button id="sendChatBtn" class="chat-send-btn-large">
                 <span>➤</span>
               </button>
             </div>
