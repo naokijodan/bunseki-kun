@@ -2792,12 +2792,12 @@ function generateBrandPerformanceAnalysis() {
   // 最大値を取得（バーの幅計算用）
   const maxCount = Math.max(...sortedBrands.map(b => b.active + b.sold), 1);
 
-  // ブランドごとのカテゴリ内訳を計算
+  // ブランドごとのカテゴリ内訳を計算（細分類を使用）
   const brandsWithCategories = sortedBrands.map(brand => {
     // カテゴリ別内訳を計算（analyzer.results.brandPerformanceにcategoriesがなければ自前で計算）
     let categories = brand.categories || [];
 
-    // categoriesが空の場合、アイテムから直接計算
+    // categoriesが空の場合、アイテムから直接計算（細分類categorySub を使用）
     if (categories.length === 0) {
       const categoryStats = {};
 
@@ -2805,7 +2805,17 @@ function generateBrandPerformanceAnalysis() {
       analyzer.activeListings.forEach(item => {
         const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
         if (itemBrand === brand.brand) {
-          const cat = item.category || analyzer.extractCategoryFromTitle(item.title) || '(不明)';
+          // 細分類(categorySub)を優先、なければ大分類(categoryMain)、それもなければタイトルから抽出
+          let cat = item.categorySub || item.categoryMain || item.category;
+          if (!cat) {
+            const extracted = analyzer.extractCategoryFromTitle(item.title);
+            if (extracted) {
+              const normalized = analyzer.normalizeCategory(extracted);
+              cat = normalized.sub || normalized.main || '(不明)';
+            } else {
+              cat = '(不明)';
+            }
+          }
           if (!categoryStats[cat]) {
             categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
           }
@@ -2818,7 +2828,17 @@ function generateBrandPerformanceAnalysis() {
       analyzer.soldItems.forEach(item => {
         const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
         if (itemBrand === brand.brand) {
-          const cat = item.category || analyzer.extractCategoryFromTitle(item.title) || '(不明)';
+          // 細分類(categorySub)を優先、なければ大分類(categoryMain)、それもなければタイトルから抽出
+          let cat = item.categorySub || item.categoryMain || item.category;
+          if (!cat) {
+            const extracted = analyzer.extractCategoryFromTitle(item.title);
+            if (extracted) {
+              const normalized = analyzer.normalizeCategory(extracted);
+              cat = normalized.sub || normalized.main || '(不明)';
+            } else {
+              cat = '(不明)';
+            }
+          }
           if (!categoryStats[cat]) {
             categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
           }
