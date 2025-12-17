@@ -1812,12 +1812,52 @@ body {
   background: rgba(229, 57, 53, 0.1);
 }
 
+/* 手動登録セクション */
+.manual-rule-section {
+  margin-bottom: 10px;
+}
+
+.manual-rule-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+  border-bottom: none;
+}
+
+.manual-rule-section .section-header.recommended {
+  background: linear-gradient(135deg, #e8f5e9 0%, #a5d6a7 100%);
+}
+
+.manual-rule-section .section-icon {
+  font-size: 14px;
+}
+
+.manual-rule-section .section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.recommended-badge {
+  background: #43a047;
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
 /* マニュアル入力フォーム */
 .manual-rule-input {
-  padding: 6px 8px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  margin-bottom: 6px;
+  padding: 8px 10px;
+  background: #f1f8e9;
+  border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+  border: 1px solid #c8e6c9;
+  border-top: none;
 }
 
 .manual-input-row {
@@ -1869,6 +1909,92 @@ body {
   font-size: 9px;
   color: var(--text-muted);
   margin: 3px 0 0 0;
+}
+
+/* ルールカテゴリ */
+.rules-category {
+  margin-bottom: 10px;
+}
+
+.rules-category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+  font-size: 11px;
+}
+
+.manual-rules-category .rules-category-header {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
+.ai-rules-category .rules-category-header {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+}
+
+.rules-category-header .category-icon {
+  font-size: 14px;
+}
+
+.rules-category-header .category-title {
+  font-weight: 600;
+}
+
+.manual-rules-category .category-title {
+  color: #1565c0;
+}
+
+.ai-rules-category .category-title {
+  color: #e65100;
+}
+
+.rules-category-header .category-count {
+  background: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.manual-rules-category .category-count {
+  color: #1565c0;
+}
+
+.ai-rules-category .category-count {
+  color: #e65100;
+}
+
+.ai-warning {
+  font-size: 10px;
+  color: #bf360c;
+  margin-left: auto;
+  font-weight: normal;
+}
+
+.rules-category .learned-rules-list {
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+  max-height: 120px;
+}
+
+/* 手動ルールアイテム（青基調） */
+.learned-rule-item.manual-rule {
+  background: #f5f9ff;
+}
+
+.learned-rule-item.manual-rule .rule-brand {
+  color: #1565c0;
+}
+
+/* AIルールアイテム（オレンジ基調） */
+.learned-rule-item.ai-rule {
+  background: #fff8f0;
+}
+
+.learned-rule-item.ai-rule .rule-brand {
+  color: #e65100;
 }
 
 /* ルール編集モーダル */

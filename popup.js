@@ -4194,7 +4194,8 @@ async function classifyUnknownItemsWithAI(inline = false) {
         if (!analyzer.customBrandRules[brand]) {
           analyzer.customBrandRules[brand] = {
             brand: brand,
-            keywords: []
+            keywords: [],
+            source: 'ai'  // AI判定で追加されたルール
           };
         }
         // タイトルから特徴的なキーワードを抽出して追加
@@ -4399,7 +4400,8 @@ async function classifyMarketDataWithAI() {
         if (!analyzer.customBrandRules[result.brand]) {
           analyzer.customBrandRules[result.brand] = {
             brand: result.brand,
-            keywords: []
+            keywords: [],
+            source: 'ai'  // AI判定で追加されたルール
           };
         }
 
@@ -4499,15 +4501,22 @@ function getLearnedRulesCount() {
 }
 
 /**
- * 学習済みルールの一覧を取得（アルファベット順）
+ * 学習済みルールの一覧を取得（アルファベット順、手動/AI別）
  */
 function getLearnedRulesList() {
   const rules = analyzer.customBrandRules || {};
-  return Object.entries(rules).map(([brand, rule]) => ({
+  const allRules = Object.entries(rules).map(([brand, rule]) => ({
     brand: rule.brand || brand,
     keywords: rule.keywords || [],
-    keywordCount: (rule.keywords || []).length
+    keywordCount: (rule.keywords || []).length,
+    source: rule.source || 'manual'  // 古いルールは手動扱い
   })).sort((a, b) => a.brand.localeCompare(b.brand));
+
+  return {
+    manual: allRules.filter(r => r.source === 'manual'),
+    ai: allRules.filter(r => r.source === 'ai'),
+    all: allRules
+  };
 }
 
 /**
@@ -4528,37 +4537,96 @@ async function clearLearnedRules() {
  */
 function generateLearnedRulesHtml() {
   const rules = getLearnedRulesList();
-  const totalCount = rules.length;
-  const totalKeywords = rules.reduce((sum, r) => sum + r.keywordCount, 0);
+  const manualRules = rules.manual;
+  const aiRules = rules.ai;
+  const totalCount = rules.all.length;
+  const totalKeywords = rules.all.reduce((sum, r) => sum + r.keywordCount, 0);
 
-  // マニュアル入力フォーム
+  // マニュアル入力フォーム（推奨）
   const manualInputHtml = `
-    <div class="manual-rule-input">
-      <div class="manual-input-row">
-        <input type="text" class="manual-brand-input" placeholder="ブランド名">
-        <input type="text" class="manual-keyword-input" placeholder="キーワード（カンマ区切り）">
-        <button class="add-rule-btn" title="ルールを追加">＋</button>
+    <div class="manual-rule-section">
+      <div class="section-header recommended">
+        <span class="section-icon">✏️</span>
+        <span class="section-title">手動登録</span>
+        <span class="recommended-badge">おすすめ</span>
       </div>
-      <p class="manual-input-hint">例: ブランド名「TIFFANY」、キーワード「ティファニー, tiffany&co」</p>
+      <div class="manual-rule-input">
+        <div class="manual-input-row">
+          <input type="text" class="manual-brand-input" placeholder="ブランド名">
+          <input type="text" class="manual-keyword-input" placeholder="キーワード（カンマ区切り）">
+          <button class="add-rule-btn" title="ルールを追加">＋</button>
+        </div>
+        <p class="manual-input-hint">例: ブランド名「TIFFANY」、キーワード「ティファニー, tiffany&co」</p>
+      </div>
     </div>
   `;
+
+  // ルール一覧を生成する関数
+  const generateRuleList = (ruleList, isManual) => {
+    if (ruleList.length === 0) return '';
+    const sourceClass = isManual ? 'manual-rule' : 'ai-rule';
+    return ruleList.map(rule => `
+      <div class="learned-rule-item ${sourceClass}" data-brand="${escapeHtml(rule.brand)}">
+        <div class="rule-actions">
+          <button class="edit-rule-btn" title="このルールを編集">✎</button>
+          <button class="delete-rule-btn" title="このルールを削除">×</button>
+        </div>
+        <span class="rule-brand">${escapeHtml(rule.brand)}</span>
+        <span class="rule-keywords">${rule.keywords.map(k => escapeHtml(k)).join(', ')}</span>
+        <span class="rule-count">${rule.keywordCount}件</span>
+      </div>
+    `).join('');
+  };
 
   if (totalCount === 0) {
     return `
       ${manualInputHtml}
       <div class="learned-rules-empty">
-        <p>学習済みルールはありません</p>
-        <p class="hint">AI判定を実行するか、上のフォームから手動でルールを追加してください</p>
+        <p>ルールはありません</p>
+        <p class="hint">上のフォームから手動でルールを追加してください（推奨）</p>
       </div>
     `;
   }
+
+  // 手動ルールセクション
+  const manualRulesSection = manualRules.length > 0 ? `
+    <div class="rules-category manual-rules-category">
+      <div class="rules-category-header">
+        <span class="category-icon">✅</span>
+        <span class="category-title">手動登録ルール</span>
+        <span class="category-count">${manualRules.length}件</span>
+      </div>
+      <div class="learned-rules-list">
+        ${generateRuleList(manualRules, true)}
+      </div>
+    </div>
+  ` : '';
+
+  // AIルールセクション
+  const aiRulesSection = aiRules.length > 0 ? `
+    <div class="rules-category ai-rules-category">
+      <div class="rules-category-header">
+        <span class="category-icon">🤖</span>
+        <span class="category-title">AI判定ルール</span>
+        <span class="category-count">${aiRules.length}件</span>
+        <span class="ai-warning">（精度にばらつきあり）</span>
+      </div>
+      <div class="learned-rules-list">
+        ${generateRuleList(aiRules, false)}
+      </div>
+    </div>
+  ` : '';
 
   return `
     ${manualInputHtml}
     <div class="learned-rules-summary">
       <div class="summary-stat">
-        <span class="stat-value">${totalCount}</span>
-        <span class="stat-label">ブランド</span>
+        <span class="stat-value">${manualRules.length}</span>
+        <span class="stat-label">手動</span>
+      </div>
+      <div class="summary-stat">
+        <span class="stat-value">${aiRules.length}</span>
+        <span class="stat-label">AI</span>
       </div>
       <div class="summary-stat">
         <span class="stat-value">${totalKeywords}</span>
@@ -4568,19 +4636,8 @@ function generateLearnedRulesHtml() {
         <span class="btn-icon">🗑️</span> 全クリア
       </button>
     </div>
-    <div class="learned-rules-list">
-      ${rules.map(rule => `
-        <div class="learned-rule-item" data-brand="${escapeHtml(rule.brand)}">
-          <div class="rule-actions">
-            <button class="edit-rule-btn" title="このルールを編集">✎</button>
-            <button class="delete-rule-btn" title="このルールを削除">×</button>
-          </div>
-          <span class="rule-brand">${escapeHtml(rule.brand)}</span>
-          <span class="rule-keywords">${rule.keywords.map(k => escapeHtml(k)).join(', ')}</span>
-          <span class="rule-count">${rule.keywordCount}件</span>
-        </div>
-      `).join('')}
-    </div>
+    ${manualRulesSection}
+    ${aiRulesSection}
   `;
 }
 
@@ -4605,8 +4662,12 @@ async function addManualBrandRule(brand, keywords) {
   if (!analyzer.customBrandRules[brand]) {
     analyzer.customBrandRules[brand] = {
       brand: brand,
-      keywords: []
+      keywords: [],
+      source: 'manual'  // 手動で追加されたルール
     };
+  } else {
+    // 既存のルールを手動に昇格（AIルールを手動で編集した場合）
+    analyzer.customBrandRules[brand].source = 'manual';
   }
 
   // キーワードを追加（重複除外）
@@ -4729,8 +4790,9 @@ async function saveEditedRule(brand, keywordsText) {
     .map(k => k.trim())
     .filter(k => k.length > 0);
 
-  // ルールを更新
+  // ルールを更新（編集されたルールは手動扱いに変更）
   analyzer.customBrandRules[brand].keywords = keywords;
+  analyzer.customBrandRules[brand].source = 'manual';
 
   // 保存
   await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
