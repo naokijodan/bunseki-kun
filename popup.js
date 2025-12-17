@@ -2388,8 +2388,23 @@ function initAnalysisButtons() {
     });
   });
 
+  // 自分の分析実行ボタン
+  const loadMyBtn = document.getElementById('loadMyAnalysisBtn');
+  if (loadMyBtn) {
+    loadMyBtn.addEventListener('click', loadMyAnalysis);
+  }
+
+  // 自分のデータ再判定ボタン
+  const reanalyzeMyBtn = document.getElementById('reanalyzeMyDataBtn');
+  if (reanalyzeMyBtn) {
+    reanalyzeMyBtn.addEventListener('click', reanalyzeMyData);
+  }
+
   // 初回読み込み時に最初のタブを表示
   initMyAnalysisTabs();
+
+  // 自分のデータ件数表示
+  updateMyDataCount();
 }
 
 /**
@@ -2459,6 +2474,134 @@ async function loadMyAnalysisTabContent(tabId) {
   }
 
   contentEl.innerHTML = html;
+}
+
+/**
+ * 自分のデータ件数を更新
+ */
+async function updateMyDataCount() {
+  try {
+    const activeCount = analyzer.activeListings?.length || 0;
+    const soldCount = analyzer.soldItems?.length || 0;
+    const totalCount = activeCount + soldCount;
+    const countEl = document.getElementById('myDataCount');
+    if (countEl) {
+      countEl.textContent = `自分のデータ: ${totalCount.toLocaleString()}件`;
+    }
+  } catch (error) {
+    console.error('自分のデータ件数取得エラー:', error);
+  }
+}
+
+/**
+ * 自分の分析を実行
+ */
+async function loadMyAnalysis() {
+  showLoading('自分のデータを分析中...');
+
+  try {
+    // 学習済みルールを読み込む
+    await analyzer.loadCustomBrandRules();
+
+    // データ確認
+    if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+      // 保存データの復元を試行
+      await loadSavedData();
+
+      if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+        showAlert('データがありません。「自分のデータ」タブでCSVを読み込んでください。', 'warning');
+        hideLoading();
+        return;
+      }
+    }
+
+    // 現在のアクティブタブを取得
+    const activeTab = document.querySelector('.my-analysis-subtab.active');
+    const tabId = activeTab ? activeTab.dataset.myTab : 'listing-pace';
+
+    // すべてのタブコンテンツを更新
+    await Promise.all([
+      loadMyAnalysisTabContent('listing-pace'),
+      loadMyAnalysisTabContent('brand-performance'),
+      loadMyAnalysisTabContent('watch-analysis'),
+      loadMyAnalysisTabContent('category-performance')
+    ]);
+
+    // データ件数を更新
+    updateMyDataCount();
+
+    hideLoading();
+    showAlert('自分のデータ分析が完了しました', 'success');
+
+  } catch (error) {
+    console.error('分析エラー:', error);
+    hideLoading();
+    showAlert('分析中にエラーが発生しました: ' + error.message, 'error');
+  }
+}
+
+/**
+ * 自分のデータを再判定
+ */
+async function reanalyzeMyData() {
+  showLoading('自分のデータを再判定中...');
+
+  try {
+    // 学習済みルールを読み込む
+    await analyzer.loadCustomBrandRules();
+
+    // データ確認
+    if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+      await loadSavedData();
+      if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+        showAlert('データがありません。「自分のデータ」タブでCSVを読み込んでください。', 'warning');
+        hideLoading();
+        return;
+      }
+    }
+
+    // 出品中データを再判定
+    const activeListings = analyzer.activeListings.map(item => {
+      const detected = analyzer.detectBrand(item.title);
+      return {
+        ...item,
+        brand: detected.brand,
+        detectedType: detected.type
+      };
+    });
+
+    // 販売済みデータを再判定
+    const soldItems = analyzer.soldItems.map(item => {
+      const detected = analyzer.detectBrand(item.title);
+      return {
+        ...item,
+        brand: detected.brand,
+        detectedType: detected.type
+      };
+    });
+
+    // 更新されたデータを再度分析
+    analyzer.analyze(activeListings, soldItems);
+
+    // DBを更新
+    if (activeListings.length > 0) {
+      await BunsekiDB.setActiveListings(activeListings);
+    }
+    if (soldItems.length > 0) {
+      await BunsekiDB.setSoldItems(soldItems);
+    }
+
+    // UIを更新
+    await loadMyAnalysis();
+
+    hideLoading();
+    showAlert('自分のデータの再判定が完了しました', 'success');
+
+  } catch (error) {
+    console.error('再判定エラー:', error);
+    hideLoading();
+    showAlert('再判定中にエラーが発生しました: ' + error.message, 'error');
+  }
 }
 
 /**

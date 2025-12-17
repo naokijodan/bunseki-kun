@@ -4471,6 +4471,60 @@ body {
 }
 
 /* ========================================
+   自分の分析アクションボタン
+   ======================================== */
+.my-analysis-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.my-analysis-actions.top {
+  margin-top: 0;
+  margin-bottom: 8px;
+  padding-top: 0;
+  border-top: none;
+  border-bottom: none;
+  justify-content: flex-end;
+}
+
+.my-analysis-actions .action-btn {
+  flex: 1;
+}
+
+.my-analysis-actions.top .action-btn.compact {
+  flex: 0 0 auto;
+  padding: 10px 20px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.my-analysis-actions.top .action-btn.compact.primary {
+  background: var(--info-color);
+  color: white;
+}
+
+.my-analysis-actions.top .action-btn.compact.primary:hover {
+  background: #1976d2;
+}
+
+.my-analysis-actions.top .action-btn.compact.secondary {
+  background: #e0e0e0;
+  color: var(--text-secondary);
+}
+
+.my-analysis-actions.top .action-btn.compact.secondary:hover {
+  background: #d0d0d0;
+}
+
+.my-analysis-actions.top .action-btn.compact .btn-icon {
+  font-size: 14px;
+}
+
+/* ========================================
    自分の分析サブタブ（市場比較と同じスタイル）
    ======================================== */
 .my-analysis-subtabs {
