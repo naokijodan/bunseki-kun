@@ -24,9 +24,13 @@
 
     <!-- メインタブ -->
     <nav class="main-tabs">
-      <button class="main-tab active" data-tab="data-input">
-        <span class="tab-icon">📥</span>
-        <span class="tab-label">データ入力</span>
+      <button class="main-tab active" data-tab="my-data">
+        <span class="tab-icon">📦</span>
+        <span class="tab-label">自分のデータ</span>
+      </button>
+      <button class="main-tab" data-tab="market-data">
+        <span class="tab-icon">🌐</span>
+        <span class="tab-label">市場データ</span>
       </button>
       <button class="main-tab" data-tab="my-analysis">
         <span class="tab-icon">📈</span>
@@ -46,16 +50,10 @@
     <main class="main-content">
 
       <!-- ===================== -->
-      <!-- データ入力タブ -->
+      <!-- 自分のデータタブ -->
       <!-- ===================== -->
-      <section id="data-input-tab" class="tab-content active">
-
-        <!-- 自分のデータセクション -->
+      <section id="my-data-tab" class="tab-content active">
         <div class="data-section">
-          <div class="section-header">
-            <h2><span class="section-icon">📦</span> 自分のデータ</h2>
-          </div>
-
           <div class="data-cards">
             <!-- Active Listings -->
             <div class="data-card">
@@ -223,13 +221,13 @@
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- 市場データセクション -->
+      <!-- ===================== -->
+      <!-- 市場データタブ -->
+      <!-- ===================== -->
+      <section id="market-data-tab" class="tab-content">
         <div class="data-section">
-          <div class="section-header">
-            <h2><span class="section-icon">🌐</span> 市場データ</h2>
-          </div>
-
           <!-- URL入力 -->
           <div class="url-input-group">
             <input type="text" id="ebayUrlInput" class="url-input" placeholder="https://www.ebay.com/sch/... のURLを入力">
@@ -375,15 +373,6 @@
 
           <!-- 市場データCSVインポート（hidden） -->
           <input type="file" id="marketCsvFile" accept=".csv" hidden>
-        </div>
-
-        <!-- データ保存アクション -->
-        <div class="data-actions">
-          <button id="saveAllDataBtn" class="action-btn primary full-width">
-            <span class="btn-icon">💾</span>
-            現在のデータを保存
-          </button>
-          <p class="action-hint" id="lastSavedInfo">保存済みデータなし</p>
         </div>
       </section>
 
