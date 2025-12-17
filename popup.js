@@ -2376,23 +2376,89 @@ async function updateLastSavedInfo() {
 // =====================================
 
 /**
- * 分析ボタンの初期化
+ * 分析ボタンの初期化（サブタブ形式）
  */
 function initAnalysisButtons() {
-  const analysisButtons = document.querySelectorAll('.analysis-btn');
-
-  analysisButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const analysisType = btn.dataset.analysis;
-      runAnalysis(analysisType);
+  // 自分の分析サブタブの切り替え
+  const mySubtabs = document.querySelectorAll('.my-analysis-subtab');
+  mySubtabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabId = tab.dataset.myTab;
+      switchMyAnalysisTab(tabId);
     });
   });
 
-  // 分析結果を閉じるボタン
-  const closeBtn = document.getElementById('closeAnalysisResult');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', closeAnalysisResult);
+  // 初回読み込み時に最初のタブを表示
+  initMyAnalysisTabs();
+}
+
+/**
+ * 自分の分析サブタブを切り替え
+ */
+function switchMyAnalysisTab(tabId) {
+  // タブのアクティブ状態を切り替え
+  document.querySelectorAll('.my-analysis-subtab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.myTab === tabId);
+  });
+
+  // コンテンツの表示を切り替え
+  document.querySelectorAll('.my-tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === `my-${tabId}`);
+  });
+
+  // タブに応じたデータを読み込む
+  loadMyAnalysisTabContent(tabId);
+}
+
+/**
+ * 自分の分析タブの初期化
+ */
+async function initMyAnalysisTabs() {
+  // 最初のタブ（出品・販売ペース）のコンテンツを読み込む
+  await loadMyAnalysisTabContent('listing-pace');
+}
+
+/**
+ * 自分の分析タブのコンテンツを読み込む
+ */
+async function loadMyAnalysisTabContent(tabId) {
+  const contentEl = document.getElementById(`my-${tabId}`);
+  if (!contentEl) return;
+
+  // データ確認
+  if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+    contentEl.innerHTML = `
+      <div class="my-analysis-placeholder">
+        <p>データがありません。「自分のデータ」タブでCSVを読み込んでください。</p>
+      </div>
+    `;
+    return;
   }
+
+  // 学習済みルールを読み込む
+  try {
+    await analyzer.loadCustomBrandRules();
+  } catch (e) {
+    // スキップ
+  }
+
+  let html = '';
+  switch (tabId) {
+    case 'listing-pace':
+      html = generateListingPaceAnalysis(30);
+      break;
+    case 'brand-performance':
+      html = generateBrandPerformanceAnalysis();
+      break;
+    case 'watch-analysis':
+      html = generateWatchAnalysis();
+      break;
+    case 'category-performance':
+      html = generateCategoryPerformanceAnalysis();
+      break;
+  }
+
+  contentEl.innerHTML = html;
 }
 
 /**

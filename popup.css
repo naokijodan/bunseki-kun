@@ -4469,3 +4469,65 @@ body {
   color: #fff;
   font-weight: 600;
 }
+
+/* ========================================
+   自分の分析サブタブ（市場比較と同じスタイル）
+   ======================================== */
+.my-analysis-subtabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 16px;
+}
+
+.my-analysis-subtab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.my-analysis-subtab:hover {
+  background: var(--bg-tertiary);
+}
+
+.my-analysis-subtab.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* 自分の分析コンテンツ */
+.my-analysis-content {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.my-tab-content {
+  display: none;
+  padding: 16px;
+}
+
+.my-tab-content.active {
+  display: block;
+}
+
+.my-analysis-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}

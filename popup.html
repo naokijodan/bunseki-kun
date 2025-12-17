@@ -381,38 +381,51 @@
       <!-- ===================== -->
       <section id="my-analysis-tab" class="tab-content">
         <div class="analysis-section">
-          <div class="analysis-buttons">
-            <button class="analysis-btn" data-analysis="listing-pace">
-              <span class="btn-icon">📅</span>
-              <span class="btn-label">出品・販売ペース</span>
-              <span class="btn-desc">30/60/90日の推移</span>
+          <!-- 自分の分析サブタブ -->
+          <div class="my-analysis-subtabs">
+            <button class="my-analysis-subtab active" data-my-tab="listing-pace">
+              <span>📅 出品・販売ペース</span>
             </button>
-            <button class="analysis-btn" data-analysis="brand-performance">
-              <span class="btn-icon">🏷️</span>
-              <span class="btn-label">ブランド別</span>
-              <span class="btn-desc">ブランド毎の成績</span>
+            <button class="my-analysis-subtab" data-my-tab="brand-performance">
+              <span>🏷️ ブランド別</span>
             </button>
-            <button class="analysis-btn" data-analysis="watch-analysis">
-              <span class="btn-icon">👁️</span>
-              <span class="btn-label">Watch数分析</span>
-              <span class="btn-desc">注目度の高い商品</span>
+            <button class="my-analysis-subtab" data-my-tab="watch-analysis">
+              <span>👁️ Watch数分析</span>
             </button>
-            <button class="analysis-btn" data-analysis="category-performance">
-              <span class="btn-icon">📂</span>
-              <span class="btn-label">カテゴリ別</span>
-              <span class="btn-desc">カテゴリ毎の成績</span>
+            <button class="my-analysis-subtab" data-my-tab="category-performance">
+              <span>📂 カテゴリ別</span>
             </button>
           </div>
-        </div>
 
-        <!-- 分析結果表示エリア -->
-        <div id="analysisResultArea" class="analysis-result-area" style="display: none;">
-          <div class="result-header">
-            <h3 id="analysisResultTitle">分析結果</h3>
-            <button id="closeAnalysisResult" class="close-btn">✕</button>
-          </div>
-          <div id="analysisResultContent" class="result-content">
-            <!-- 動的に生成 -->
+          <!-- 自分の分析コンテンツエリア -->
+          <div id="myAnalysisContent" class="my-analysis-content">
+            <!-- 出品・販売ペース -->
+            <div id="my-listing-pace" class="my-tab-content active">
+              <div class="my-analysis-placeholder">
+                <p>データを読み込み中...</p>
+              </div>
+            </div>
+
+            <!-- ブランド別 -->
+            <div id="my-brand-performance" class="my-tab-content">
+              <div class="my-analysis-placeholder">
+                <p>ブランド別の分析結果</p>
+              </div>
+            </div>
+
+            <!-- Watch数分析 -->
+            <div id="my-watch-analysis" class="my-tab-content">
+              <div class="my-analysis-placeholder">
+                <p>Watch数分析の結果</p>
+              </div>
+            </div>
+
+            <!-- カテゴリ別 -->
+            <div id="my-category-performance" class="my-tab-content">
+              <div class="my-analysis-placeholder">
+                <p>カテゴリ別の分析結果</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
