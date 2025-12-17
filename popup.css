@@ -2538,9 +2538,10 @@ body {
 
 .market-analysis-actions.top .action-btn.compact {
   flex: 0 0 auto;
-  padding: 8px 16px;
-  font-size: 12px;
+  padding: 10px 20px;
+  font-size: 13px;
   border-radius: 6px;
+  font-weight: 600;
 }
 
 .market-analysis-actions.top .action-btn.compact.primary {
@@ -2562,7 +2563,7 @@ body {
 }
 
 .market-analysis-actions.top .action-btn.compact .btn-icon {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* ランキングヘッダー */
@@ -2594,7 +2595,7 @@ body {
 
 .ranking-list.compact {
   min-height: auto;
-  max-height: 300px;
+  max-height: 500px;
   overflow-y: auto;
 }
 
