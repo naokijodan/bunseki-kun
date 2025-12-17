@@ -6147,7 +6147,7 @@ function renderComparison(comparison) {
         margin-bottom: 16px;
       }
       .trend-score-value {
-        font-size: 48px;
+        font-size: 32px;
         font-weight: 700;
         line-height: 1;
         color: #ffd700;
