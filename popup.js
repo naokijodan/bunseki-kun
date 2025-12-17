@@ -3670,8 +3670,10 @@ function extractBrandFromTitle(title) {
       if (rule.keywords && rule.keywords.length > 0) {
         for (const keyword of rule.keywords) {
           if (keyword && !isExcludedWord(keyword)) {
+            // 単語境界マッチと部分一致の両方を試行
             const keywordRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-            if (keywordRegex.test(title)) {
+            const partialRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            if (keywordRegex.test(title) || partialRegex.test(title)) {
               return brandName;
             }
           }
@@ -4324,7 +4326,7 @@ async function addManualBrandRule(brand, keywords) {
 
   brand = brand.trim().toUpperCase();
   const keywordList = keywords
-    ? keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k)
+    ? keywords.split(',').map(k => k.trim()).filter(k => k)
     : [];
 
   if (!analyzer.customBrandRules) {
@@ -4353,6 +4355,10 @@ async function addManualBrandRule(brand, keywords) {
 
   await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
   showAlert(`「${brand}」を追加しました`, 'success');
+
+  // ルール追加後に分析結果を自動更新
+  await restoreAnalysisResults();
+
   return true;
 }
 
@@ -4366,6 +4372,10 @@ async function deleteLearnedRule(brand) {
 
   delete analyzer.customBrandRules[brand];
   await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+
+  // 分析結果も自動更新
+  await restoreAnalysisResults();
+
   return true;
 }
 
@@ -4447,7 +4457,7 @@ async function saveEditedRule(brand, keywordsText) {
   // キーワードをパース
   const keywords = keywordsText
     .split(',')
-    .map(k => k.trim().toLowerCase())
+    .map(k => k.trim())
     .filter(k => k.length > 0);
 
   // ルールを更新
@@ -4459,6 +4469,10 @@ async function saveEditedRule(brand, keywordsText) {
 
   // 表示を更新
   updateLearnedRulesDisplay();
+
+  // 分析結果も自動更新
+  await restoreAnalysisResults();
+
   return true;
 }
 
