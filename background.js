@@ -836,9 +836,20 @@ JSON配列で回答してください。各要素は:
 }
 
 【重要なルール】
+- ブランド名は実在する企業・ブランド名のみ
 - ブランド名は正式名称で（例: "ROLEX", "OMEGA", "SEIKO", "HERMES", "LOUIS VUITTON"）
 - 時計ブランド例: ROLEX, OMEGA, CARTIER, TAG HEUER, SEIKO, CITIZEN, CASIO, TISSOT, LONGINES, BREITLING, IWC, PATEK PHILIPPE, AUDEMARS PIGUET
 - ジュエリーブランド例: TIFFANY, CARTIER, BVLGARI, VAN CLEEF & ARPELS, HARRY WINSTON, MIKIMOTO
+
+【以下はブランド名ではない（必ず除外）】
+Vintage, Antique, Rare, Limited, Auth, Authentic, Genuine, Original,
+Japan, Japanese, USA, American, Italy, Italian, France, French, Swiss,
+Gold, Silver, Platinum, Diamond, Pearl, Crystal,
+Men's, Women's, Ladies, Unisex, Boys, Girls,
+New, Used, Mint, Excellent, Good, Fair, Pre-owned,
+Watch, Watches, Jewelry, Necklace, Bracelet, Ring, Bag, Wallet,
+Size, Color, Style, Type, Set, Lot, Bundle
+
 - ノーブランド・不明な場合はbrandをnullに
 - カテゴリは必ず上記一覧から選択（詳細カテゴリを優先）
 - 判断できない場合は "その他" を使用`;

@@ -3455,19 +3455,50 @@ function extractBrandFromTitle(title) {
   const titleLower = title.toLowerCase();
   const titleUpper = title.toUpperCase();
 
+  // 除外ワードリスト（これらはブランド名ではない）
+  const EXCLUDED_WORDS = new Set([
+    'vintage', 'antique', 'rare', 'limited', 'auth', 'authentic', 'genuine', 'original',
+    'japan', 'japanese', 'usa', 'american', 'italy', 'italian', 'france', 'french', 'swiss',
+    'gold', 'silver', 'platinum', 'diamond', 'pearl', 'crystal',
+    'men', 'mens', "men's", 'women', 'womens', "women's", 'ladies', 'unisex', 'boys', 'girls',
+    'new', 'used', 'mint', 'excellent', 'good', 'fair', 'pre-owned', 'preowned',
+    'watch', 'watches', 'jewelry', 'jewellery', 'necklace', 'bracelet', 'ring', 'bag', 'wallet',
+    'size', 'color', 'style', 'type', 'set', 'lot', 'bundle',
+    'box', 'case', 'strap', 'band', 'chain', 'pendant', 'earring', 'brooch',
+    'free', 'shipping', 'fast', 'sale', 'deal', 'offer'
+  ]);
+
+  // ブランド名自体が除外ワードかチェック
+  const isExcludedWord = (word) => {
+    if (!word) return true;
+    return EXCLUDED_WORDS.has(word.toLowerCase().trim());
+  };
+
   // まずAI学習済みルール（customBrandRules）をチェック
   if (analyzer.customBrandRules && Object.keys(analyzer.customBrandRules).length > 0) {
     for (const [brandKey, rule] of Object.entries(analyzer.customBrandRules)) {
       const brandName = rule.brand || brandKey;
-      // ブランド名自体がタイトルに含まれているか
-      if (titleLower.includes(brandName.toLowerCase())) {
+
+      // ブランド名自体が除外ワードの場合はスキップ
+      if (isExcludedWord(brandName)) {
+        continue;
+      }
+
+      // ブランド名自体がタイトルに含まれているか（単語境界でマッチ）
+      const brandRegex = new RegExp(`\\b${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (brandRegex.test(title)) {
         return brandName;
       }
+
       // 学習済みキーワードがタイトルに含まれているか
+      // ただし、キーワードが除外ワードの場合はスキップ
       if (rule.keywords && rule.keywords.length > 0) {
         for (const keyword of rule.keywords) {
-          if (keyword && titleLower.includes(keyword.toLowerCase())) {
-            return brandName;
+          if (keyword && !isExcludedWord(keyword)) {
+            const keywordRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            if (keywordRegex.test(title)) {
+              return brandName;
+            }
           }
         }
       }
