@@ -201,7 +201,7 @@
         </div>
 
         <!-- AI学習済みルール表示 -->
-        <div class="data-section" id="learnedRulesSection" style="display: none;">
+        <div class="data-section" id="learnedRulesSection">
           <div class="section-header">
             <h2><span class="section-icon">🧠</span> AI学習済みルール</h2>
           </div>
@@ -264,6 +264,16 @@
             </button>
           </div>
 
+          <!-- AI学習済みルール表示（市場データ用）- 常に表示 -->
+          <div class="data-section" id="marketLearnedRulesSection">
+            <div class="section-header">
+              <h4><span class="section-icon">🧠</span> AI学習済みルール</h4>
+            </div>
+            <div id="marketLearnedRulesContent">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
           <!-- 市場データ分析結果 -->
           <div id="marketDataAnalysisResult" class="data-analysis-result" style="display: none;">
             <div class="analysis-result-header">
@@ -318,16 +328,6 @@
                   <div class="progress-fill" id="marketAiProgressFill"></div>
                 </div>
                 <span id="marketAiProgressText">0/0 判定中...</span>
-              </div>
-            </div>
-
-            <!-- AI学習済みルール表示（市場データ用） -->
-            <div class="data-section" id="marketLearnedRulesSection" style="display: none;">
-              <div class="section-header">
-                <h4><span class="section-icon">🧠</span> AI学習済みルール</h4>
-              </div>
-              <div id="marketLearnedRulesContent">
-                <!-- 動的に生成 -->
               </div>
             </div>
 
