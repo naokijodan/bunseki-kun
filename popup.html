@@ -28,9 +28,13 @@
         <span class="tab-icon">📥</span>
         <span class="tab-label">データ入力</span>
       </button>
-      <button class="main-tab" data-tab="analysis">
-        <span class="tab-icon">📊</span>
-        <span class="tab-label">分析</span>
+      <button class="main-tab" data-tab="my-analysis">
+        <span class="tab-icon">📈</span>
+        <span class="tab-label">自分の分析</span>
+      </button>
+      <button class="main-tab" data-tab="market-analysis">
+        <span class="tab-icon">🔄</span>
+        <span class="tab-label">市場比較</span>
       </button>
       <button class="main-tab" data-tab="ai-suggestions">
         <span class="tab-icon">🤖</span>
@@ -384,16 +388,10 @@
       </section>
 
       <!-- ===================== -->
-      <!-- 分析タブ -->
+      <!-- 自分のデータ分析タブ -->
       <!-- ===================== -->
-      <section id="analysis-tab" class="tab-content">
-
-        <!-- 自分のデータ分析 -->
+      <section id="my-analysis-tab" class="tab-content">
         <div class="analysis-section">
-          <div class="section-header">
-            <h2><span class="section-icon">📈</span> 自分のデータ分析</h2>
-          </div>
-
           <div class="analysis-buttons">
             <button class="analysis-btn" data-analysis="listing-pace">
               <span class="btn-icon">📅</span>
@@ -418,23 +416,36 @@
           </div>
         </div>
 
-        <!-- 市場比較分析 -->
-        <div class="analysis-section">
-          <div class="section-header">
-            <h2><span class="section-icon">🔄</span> 市場比較分析</h2>
-            <span id="marketDataCount" class="data-count-badge">市場データ: 0件</span>
+        <!-- 分析結果表示エリア -->
+        <div id="analysisResultArea" class="analysis-result-area" style="display: none;">
+          <div class="result-header">
+            <h3 id="analysisResultTitle">分析結果</h3>
+            <button id="closeAnalysisResult" class="close-btn">✕</button>
           </div>
+          <div id="analysisResultContent" class="result-content">
+            <!-- 動的に生成 -->
+          </div>
+        </div>
+      </section>
 
-          <!-- 市場分析アクションボタン -->
-          <div class="market-analysis-actions top">
-            <button id="loadMarketAnalysisBtn" class="action-btn primary compact">
-              <span class="btn-icon">🔍</span>
-              分析を実行
-            </button>
-            <button id="reanalyzeMarketDataBtn" class="action-btn secondary compact">
-              <span class="btn-icon">🔄</span>
-              再判定
-            </button>
+      <!-- ===================== -->
+      <!-- 市場比較分析タブ -->
+      <!-- ===================== -->
+      <section id="market-analysis-tab" class="tab-content">
+        <div class="analysis-section">
+          <div class="section-header-inline">
+            <span id="marketDataCount" class="data-count-badge">市場データ: 0件</span>
+            <!-- 市場分析アクションボタン -->
+            <div class="market-analysis-actions top">
+              <button id="loadMarketAnalysisBtn" class="action-btn primary compact">
+                <span class="btn-icon">🔍</span>
+                分析を実行
+              </button>
+              <button id="reanalyzeMarketDataBtn" class="action-btn secondary compact">
+                <span class="btn-icon">🔄</span>
+                再判定
+              </button>
+            </div>
           </div>
 
           <!-- 市場分析サブタブ -->
@@ -482,17 +493,6 @@
                 <!-- 動的に生成 -->
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- 分析結果表示エリア -->
-        <div id="analysisResultArea" class="analysis-result-area" style="display: none;">
-          <div class="result-header">
-            <h3 id="analysisResultTitle">分析結果</h3>
-            <button id="closeAnalysisResult" class="close-btn">✕</button>
-          </div>
-          <div id="analysisResultContent" class="result-content">
-            <!-- 動的に生成 -->
           </div>
         </div>
       </section>

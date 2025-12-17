@@ -220,6 +220,13 @@ body {
   gap: 5px;
 }
 
+.section-header-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
 .section-icon {
   font-size: 14px;
 }
