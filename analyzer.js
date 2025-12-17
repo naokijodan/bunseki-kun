@@ -1576,12 +1576,31 @@ class EbayAnalyzer {
       }
       brandStats[brand].categories[mainCat] += sold;
 
-      // ブランド内細分類集計（売上数ベース）
+      // ブランド内細分類集計（売上数・価格・価格帯分布）
       const subCat = item.categorySub || 'その他';
       if (!brandStats[brand].subcategories[subCat]) {
-        brandStats[brand].subcategories[subCat] = 0;
+        brandStats[brand].subcategories[subCat] = {
+          count: 0,
+          totalPrice: 0,
+          priceCount: 0,
+          priceDistribution: {}
+        };
+        priceRanges.forEach(r => {
+          brandStats[brand].subcategories[subCat].priceDistribution[r.label] = 0;
+        });
       }
-      brandStats[brand].subcategories[subCat] += sold;
+      brandStats[brand].subcategories[subCat].count += sold;
+      if (price > 0) {
+        brandStats[brand].subcategories[subCat].totalPrice += price;
+        brandStats[brand].subcategories[subCat].priceCount++;
+        // 細分類の価格帯分布
+        for (const range of priceRanges) {
+          if (price >= range.min && price < range.max) {
+            brandStats[brand].subcategories[subCat].priceDistribution[range.label] += sold;
+            break;
+          }
+        }
+      }
     }
 
     // ランキング生成（売上数順）
@@ -1592,6 +1611,24 @@ class EbayAnalyzer {
           .map(([range, cnt]) => ({ range, count: cnt }))
           .sort((a, b) => b.count - a.count);
         const topPriceRange = priceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+
+        // 細分類データを整形（シェア、平均価格、売れ筋価格帯を含む）
+        const subcategoriesArr = Object.entries(stat.subcategories)
+          .filter(([cat]) => cat !== 'その他')
+          .map(([cat, data]) => {
+            const subPriceDistArr = Object.entries(data.priceDistribution)
+              .map(([range, cnt]) => ({ range, count: cnt }))
+              .sort((a, b) => b.count - a.count);
+            const subTopPriceRange = subPriceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+            return {
+              category: cat,
+              count: data.count,
+              share: stat.soldCount > 0 ? ((data.count / stat.soldCount) * 100).toFixed(1) : 0,
+              avgPrice: data.priceCount > 0 ? Math.round(data.totalPrice / data.priceCount) : 0,
+              topPriceRange: subTopPriceRange.range
+            };
+          })
+          .sort((a, b) => b.count - a.count);
 
         return {
           brand: stat.brand,
@@ -1605,10 +1642,7 @@ class EbayAnalyzer {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
             .map(([cat, cnt]) => ({ category: cat, count: cnt })),
-          subcategories: Object.entries(stat.subcategories)
-            .filter(([cat]) => cat !== 'その他')
-            .sort((a, b) => b[1] - a[1])
-            .map(([cat, cnt]) => ({ category: cat, count: cnt })),
+          subcategories: subcategoriesArr,
           priceDistribution: priceDistArr,
           topPriceRange: topPriceRange.range
         };

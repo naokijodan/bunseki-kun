@@ -5617,9 +5617,11 @@ function renderBrandRanking(ranking) {
               ${escapeHtml(sub.category)}
             </td>
             <td class="col-count">${sub.count.toLocaleString()}</td>
-            <td class="col-share"></td>
-            <td class="col-price"></td>
-            <td class="col-price-range"></td>
+            <td class="col-share">${sub.share || 0}%</td>
+            <td class="col-price">$${(sub.avgPrice || 0).toLocaleString()}</td>
+            <td class="col-price-range">
+              <span class="price-range-badge sub-badge">${sub.topPriceRange || '-'}</span>
+            </td>
             <td class="col-categories"></td>
           </tr>
         `;
