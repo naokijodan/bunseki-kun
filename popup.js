@@ -634,10 +634,11 @@ async function analyzeMyData() {
       }
     }
 
-    // ブランド内訳を表示（クリックで展開可能）
+    // ブランド内訳を表示（クリックで展開可能）- 未分類を除外
     const breakdownEl = document.getElementById('myBrandBreakdown');
     if (breakdownEl) {
       const sortedBrands = Object.entries(brands)
+        .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
 
@@ -1818,11 +1819,13 @@ async function restoreAnalysisResults() {
         myCategories[category] = (myCategories[category] || 0) + 1;
       });
 
-      // ブランド内訳を表示
+      // ブランド内訳を表示 - 未分類を除外
       const myBreakdownEl = document.getElementById('myBrandBreakdown');
       const myBrandToggle = document.getElementById('myBrandToggle');
       if (myBreakdownEl) {
-        const sortedBrands = Object.entries(myBrands).sort((a, b) => b[1] - a[1]);
+        const sortedBrands = Object.entries(myBrands)
+          .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
+          .sort((a, b) => b[1] - a[1]);
         const totalBrandCount = sortedBrands.length;
 
         // 表示用関数
@@ -1881,11 +1884,13 @@ async function restoreAnalysisResults() {
         }
       }
 
-      // カテゴリ内訳を表示
+      // カテゴリ内訳を表示 - 未分類を除外
       const myCategoryBreakdownEl = document.getElementById('myCategoryBreakdown');
       const myCategoryToggle = document.getElementById('myCategoryToggle');
       if (myCategoryBreakdownEl) {
-        const sortedCategories = Object.entries(myCategories).sort((a, b) => b[1] - a[1]);
+        const sortedCategories = Object.entries(myCategories)
+          .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他')
+          .sort((a, b) => b[1] - a[1]);
         const totalCategoryCount = sortedCategories.length;
 
         const renderMyCategories = (showAll) => {
@@ -1983,11 +1988,13 @@ async function restoreAnalysisResults() {
         marketCategories[category] = (marketCategories[category] || 0) + 1;
       });
 
-      // ブランド内訳を表示
+      // ブランド内訳を表示 - 未分類を除外
       const marketBreakdownEl = document.getElementById('marketBrandBreakdown');
       const marketBrandToggle = document.getElementById('marketBrandToggle');
       if (marketBreakdownEl) {
-        const sortedBrands = Object.entries(marketBrands).sort((a, b) => b[1] - a[1]);
+        const sortedBrands = Object.entries(marketBrands)
+          .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
+          .sort((a, b) => b[1] - a[1]);
         const totalBrandCount = sortedBrands.length;
 
         const renderMarketBrands = (showAll) => {
@@ -2043,11 +2050,13 @@ async function restoreAnalysisResults() {
         }
       }
 
-      // カテゴリ内訳を表示
+      // カテゴリ内訳を表示 - 未分類を除外
       const marketCategoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
       const marketCategoryToggle = document.getElementById('marketCategoryToggle');
       if (marketCategoryBreakdownEl) {
-        const sortedCategories = Object.entries(marketCategories).sort((a, b) => b[1] - a[1]);
+        const sortedCategories = Object.entries(marketCategories)
+          .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他')
+          .sort((a, b) => b[1] - a[1]);
         const totalCategoryCount = sortedCategories.length;
 
         const renderMarketCategories = (showAll) => {

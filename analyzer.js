@@ -1626,9 +1626,11 @@ class EbayAnalyzer {
       categoryStats[mainCat].subcategories[subCat] += sold;
     }
 
-    // ランキング生成（売上数順）
-    const totalSold = Object.values(categoryStats).reduce((sum, s) => sum + s.soldCount, 0);
-    return Object.values(categoryStats)
+    // ランキング生成（売上数順）- 未分類/その他を除外
+    const filteredStats = Object.values(categoryStats)
+      .filter(stat => stat.category !== 'その他' && stat.category !== '(不明)' && stat.category !== '(未分類)');
+    const totalSold = filteredStats.reduce((sum, s) => sum + s.soldCount, 0);
+    return filteredStats
       .map(stat => ({
         category: stat.category,
         count: stat.soldCount,           // 売上数
