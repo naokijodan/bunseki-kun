@@ -1879,14 +1879,15 @@ class EbayAnalyzer {
         categoryStats[mainCat].brands[brand] += sold;
       }
 
-      // 細分類集計（売上数・価格・価格帯分布）
+      // 細分類集計（売上数・価格・価格帯分布・ブランド）
       const subCat = item.categorySub || 'その他';
       if (!categoryStats[mainCat].subcategories[subCat]) {
         categoryStats[mainCat].subcategories[subCat] = {
           count: 0,
           totalPrice: 0,
           priceCount: 0,
-          priceDistribution: {}
+          priceDistribution: {},
+          brands: {}  // 細分類内ブランド集計を追加
         };
         priceRanges.forEach(r => {
           categoryStats[mainCat].subcategories[subCat].priceDistribution[r.label] = 0;
@@ -1904,6 +1905,13 @@ class EbayAnalyzer {
           }
         }
       }
+      // 細分類内ブランド集計（売上数ベース）
+      if (brand !== '(不明)') {
+        if (!categoryStats[mainCat].subcategories[subCat].brands[brand]) {
+          categoryStats[mainCat].subcategories[subCat].brands[brand] = 0;
+        }
+        categoryStats[mainCat].subcategories[subCat].brands[brand] += sold;
+      }
     }
 
     // ランキング生成（売上数順）- 未分類/その他を除外
@@ -1918,19 +1926,25 @@ class EbayAnalyzer {
           .sort((a, b) => b.count - a.count);
         const topPriceRange = priceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
 
-        // 細分類データを整形（シェア、平均価格、売れ筋価格帯を含む）
+        // 細分類データを整形（シェア、平均価格、売れ筋価格帯、ブランド内訳を含む）
         const subcategoriesArr = Object.entries(stat.subcategories)
           .map(([sub, data]) => {
             const subPriceDistArr = Object.entries(data.priceDistribution)
               .map(([range, cnt]) => ({ range, count: cnt }))
               .sort((a, b) => b.count - a.count);
             const subTopPriceRange = subPriceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+            // 細分類内のトップブランドを取得
+            const subTopBrands = Object.entries(data.brands || {})
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([brand, cnt]) => ({ brand, count: cnt }));
             return {
               subcategory: sub,
               count: data.count,
               share: stat.soldCount > 0 ? ((data.count / stat.soldCount) * 100).toFixed(1) : 0,
               avgPrice: data.priceCount > 0 ? Math.round(data.totalPrice / data.priceCount) : 0,
-              topPriceRange: subTopPriceRange.range
+              topPriceRange: subTopPriceRange.range,
+              topBrands: subTopBrands  // ブランド内訳を追加
             };
           })
           .sort((a, b) => b.count - a.count);

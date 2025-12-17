@@ -235,6 +235,30 @@ function initTabs() {
           content.classList.add('active');
         }
       });
+
+      // 「自分の分析」タブに戻った場合、保存されたサブタブ状態を復元
+      if (targetId === 'my-analysis') {
+        const savedSubtab = localStorage.getItem('myAnalysisActiveSubtab') || 'listing-pace';
+
+        // サブタブのアクティブ状態を設定
+        document.querySelectorAll('.my-analysis-subtab').forEach(subtab => {
+          subtab.classList.toggle('active', subtab.dataset.myTab === savedSubtab);
+        });
+
+        // コンテンツの表示を設定
+        document.querySelectorAll('.my-tab-content').forEach(content => {
+          content.classList.toggle('active', content.id === `my-${savedSubtab}`);
+        });
+
+        // 展開リスナーを再設定（DOMが描画されてから）
+        setTimeout(() => {
+          if (savedSubtab === 'brand-performance') {
+            setupBrandExpandListeners();
+          } else if (savedSubtab === 'category-performance') {
+            setupCategoryExpandListeners();
+          }
+        }, 150);
+      }
     });
   });
 }
@@ -2421,6 +2445,9 @@ function switchMyAnalysisTab(tabId) {
     content.classList.toggle('active', content.id === `my-${tabId}`);
   });
 
+  // 現在のサブタブをlocalStorageに保存（状態保持用）
+  localStorage.setItem('myAnalysisActiveSubtab', tabId);
+
   // タブに応じたデータを読み込む
   loadMyAnalysisTabContent(tabId);
 }
@@ -2429,8 +2456,30 @@ function switchMyAnalysisTab(tabId) {
  * 自分の分析タブの初期化
  */
 async function initMyAnalysisTabs() {
-  // 最初のタブ（出品・販売ペース）のコンテンツを読み込む
-  await loadMyAnalysisTabContent('listing-pace');
+  // 保存されたサブタブを復元、なければデフォルト（listing-pace）
+  const savedSubtab = localStorage.getItem('myAnalysisActiveSubtab') || 'listing-pace';
+
+  // タブのアクティブ状態を設定
+  document.querySelectorAll('.my-analysis-subtab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.myTab === savedSubtab);
+  });
+
+  // コンテンツの表示を設定
+  document.querySelectorAll('.my-tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === `my-${savedSubtab}`);
+  });
+
+  // 保存されたサブタブのコンテンツを読み込む
+  await loadMyAnalysisTabContent(savedSubtab);
+
+  // 展開リスナーを設定（DOMが描画されてから）
+  setTimeout(() => {
+    if (savedSubtab === 'brand-performance') {
+      setupBrandExpandListeners();
+    } else if (savedSubtab === 'category-performance') {
+      setupCategoryExpandListeners();
+    }
+  }, 200);
 }
 
 /**
@@ -2440,14 +2489,24 @@ async function loadMyAnalysisTabContent(tabId) {
   const contentEl = document.getElementById(`my-${tabId}`);
   if (!contentEl) return;
 
-  // データ確認
+  // データ確認 - なければIndexedDBから読み込み試行
   if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
-    contentEl.innerHTML = `
-      <div class="my-analysis-placeholder">
-        <p>データがありません。「自分のデータ」タブでCSVを読み込んでください。</p>
-      </div>
-    `;
-    return;
+    // IndexedDBからデータを読み込む
+    try {
+      await loadSavedData();
+    } catch (e) {
+      console.error('データ読み込みエラー:', e);
+    }
+
+    // それでもデータがなければメッセージ表示
+    if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
+      contentEl.innerHTML = `
+        <div class="my-analysis-placeholder">
+          <p>データがありません。「自分のデータ」タブでCSVを読み込んでください。</p>
+        </div>
+      `;
+      return;
+    }
   }
 
   // 学習済みルールを読み込む
@@ -2787,6 +2846,13 @@ function setupPeriodButtons() {
  * ブランド別パフォーマンス分析を生成
  */
 function generateBrandPerformanceAnalysis() {
+  // brandPerformanceがない場合は分析を実行
+  if (!analyzer.results.brandPerformance || analyzer.results.brandPerformance.length === 0) {
+    if (analyzer.activeListings.length > 0 || analyzer.soldItems.length > 0) {
+      analyzer.analyze();
+    }
+  }
+
   const brands = analyzer.results.brandPerformance || [];
 
   // 未分類を除外したリスト（最後に追加するため）
@@ -2799,68 +2865,112 @@ function generateBrandPerformanceAnalysis() {
   // 最大値を取得（バーの幅計算用）
   const maxCount = Math.max(...sortedBrands.map(b => b.active + b.sold), 1);
 
+  // AI分類結果を取得
+  const aiClassifications = window.aiClassificationResults || {};
+
   // ブランドごとのカテゴリ内訳を計算（細分類を使用）
   const brandsWithCategories = sortedBrands.map(brand => {
-    // カテゴリ別内訳を計算（analyzer.results.brandPerformanceにcategoriesがなければ自前で計算）
-    let categories = brand.categories || [];
+    // 常にアイテムから直接カテゴリを再計算（細分類を使うため）
+    const categoryStats = {};
+    const brandNameLower = (brand.brand || '').toLowerCase().trim();
+    // スペースを除去したバージョンも用意
+    const brandNameNoSpace = brandNameLower.replace(/\s+/g, '');
+    let matchCount = 0;
 
-    // categoriesが空の場合、アイテムから直接計算（細分類categorySub を使用）
-    if (categories.length === 0) {
-      const categoryStats = {};
+    // ブランド判定関数（AI分類を優先）
+    const getItemBrand = (item) => {
+      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+        return aiClassifications[item.title].brand;
+      }
+      return analyzer.extractBrand(item.title) || '(不明)';
+    };
 
-      // 出品中アイテムからカテゴリを集計
-      analyzer.activeListings.forEach(item => {
-        const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
-        if (itemBrand === brand.brand) {
-          // 細分類(categorySub)を優先、なければ大分類(categoryMain)、それもなければタイトルから抽出
-          let cat = item.categorySub || item.categoryMain || item.category;
-          if (!cat) {
-            const extracted = analyzer.extractCategoryFromTitle(item.title);
-            if (extracted) {
-              const normalized = analyzer.normalizeCategory(extracted);
-              cat = normalized.sub || normalized.main || '(不明)';
-            } else {
-              cat = '(不明)';
-            }
+    // 出品中アイテムからカテゴリを集計
+    (analyzer.activeListings || []).forEach(item => {
+      const itemBrand = getItemBrand(item);
+      const itemBrandLower = itemBrand.toLowerCase().trim();
+      const itemBrandNoSpace = itemBrandLower.replace(/\s+/g, '');
+      const titleLower = (item.title || '').toLowerCase();
+
+      // ブランド名の比較（大文字小文字を無視、部分一致も許容、スペース揺れも対応、タイトル内検索も追加）
+      const isMatch = itemBrandLower === brandNameLower ||
+                      itemBrandNoSpace === brandNameNoSpace ||
+                      itemBrand === brand.brand ||
+                      (brandNameLower.length >= 4 && itemBrandLower.includes(brandNameLower)) ||
+                      (itemBrandLower.length >= 4 && brandNameLower.includes(itemBrandLower)) ||
+                      (brandNameNoSpace.length >= 4 && itemBrandNoSpace.includes(brandNameNoSpace)) ||
+                      (itemBrandNoSpace.length >= 4 && brandNameNoSpace.includes(itemBrandNoSpace)) ||
+                      // タイトルにブランド名が含まれているかチェック（最終手段）
+                      (brandNameLower.length >= 4 && titleLower.includes(brandNameLower)) ||
+                      (brandNameNoSpace.length >= 4 && titleLower.replace(/\s+/g, '').includes(brandNameNoSpace));
+
+      if (isMatch) {
+        matchCount++;
+        // 細分類(categorySub)を優先、なければ大分類(categoryMain)
+        let cat = item.categorySub || item.categoryMain || item.category;
+        if (!cat) {
+          const extracted = analyzer.extractCategoryFromTitle ? analyzer.extractCategoryFromTitle(item.title) : null;
+          if (extracted && analyzer.normalizeCategory) {
+            const normalized = analyzer.normalizeCategory(extracted);
+            cat = normalized.sub || normalized.main || '(不明)';
+          } else {
+            cat = '(不明)';
           }
-          if (!categoryStats[cat]) {
-            categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
-          }
-          categoryStats[cat].active++;
-          categoryStats[cat].totalPrice += item.price || 0;
         }
-      });
-
-      // 販売済みアイテムからカテゴリを集計
-      analyzer.soldItems.forEach(item => {
-        const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
-        if (itemBrand === brand.brand) {
-          // 細分類(categorySub)を優先、なければ大分類(categoryMain)、それもなければタイトルから抽出
-          let cat = item.categorySub || item.categoryMain || item.category;
-          if (!cat) {
-            const extracted = analyzer.extractCategoryFromTitle(item.title);
-            if (extracted) {
-              const normalized = analyzer.normalizeCategory(extracted);
-              cat = normalized.sub || normalized.main || '(不明)';
-            } else {
-              cat = '(不明)';
-            }
-          }
-          if (!categoryStats[cat]) {
-            categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
-          }
-          categoryStats[cat].sold += item.quantity || 1;
-          categoryStats[cat].totalPrice += item.soldFor || 0;
+        if (!categoryStats[cat]) {
+          categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
         }
-      });
+        categoryStats[cat].active++;
+        categoryStats[cat].totalPrice += item.price || 0;
+      }
+    });
 
-      categories = Object.values(categoryStats)
-        .map(cat => ({
-          ...cat,
-          avgPrice: (cat.active + cat.sold) > 0 ? cat.totalPrice / (cat.active + cat.sold) : 0
-        }))
-        .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
-    }
+    // 販売済みアイテムからカテゴリを集計
+    (analyzer.soldItems || []).forEach(item => {
+      const itemBrand = getItemBrand(item);
+      const itemBrandLower = itemBrand.toLowerCase().trim();
+      const itemBrandNoSpace = itemBrandLower.replace(/\s+/g, '');
+      const titleLower = (item.title || '').toLowerCase();
+
+      // ブランド名の比較（大文字小文字を無視、部分一致も許容、スペース揺れも対応、タイトル内検索も追加）
+      const isMatch = itemBrandLower === brandNameLower ||
+                      itemBrandNoSpace === brandNameNoSpace ||
+                      itemBrand === brand.brand ||
+                      (brandNameLower.length >= 4 && itemBrandLower.includes(brandNameLower)) ||
+                      (itemBrandLower.length >= 4 && brandNameLower.includes(itemBrandLower)) ||
+                      (brandNameNoSpace.length >= 4 && itemBrandNoSpace.includes(brandNameNoSpace)) ||
+                      (itemBrandNoSpace.length >= 4 && brandNameNoSpace.includes(itemBrandNoSpace)) ||
+                      // タイトルにブランド名が含まれているかチェック（最終手段）
+                      (brandNameLower.length >= 4 && titleLower.includes(brandNameLower)) ||
+                      (brandNameNoSpace.length >= 4 && titleLower.replace(/\s+/g, '').includes(brandNameNoSpace));
+
+      if (isMatch) {
+        matchCount++;
+        // 細分類(categorySub)を優先、なければ大分類(categoryMain)
+        let cat = item.categorySub || item.categoryMain || item.category;
+        if (!cat) {
+          const extracted = analyzer.extractCategoryFromTitle ? analyzer.extractCategoryFromTitle(item.title) : null;
+          if (extracted && analyzer.normalizeCategory) {
+            const normalized = analyzer.normalizeCategory(extracted);
+            cat = normalized.sub || normalized.main || '(不明)';
+          } else {
+            cat = '(不明)';
+          }
+        }
+        if (!categoryStats[cat]) {
+          categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
+        }
+        categoryStats[cat].sold += item.quantity || 1;
+        categoryStats[cat].totalPrice += item.soldFor || 0;
+      }
+    });
+
+    const categories = Object.values(categoryStats)
+      .map(cat => ({
+        ...cat,
+        avgPrice: (cat.active + cat.sold) > 0 ? cat.totalPrice / (cat.active + cat.sold) : 0
+      }))
+      .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
 
     return { ...brand, categories };
   });
@@ -2936,9 +3046,11 @@ function generateBrandPerformanceAnalysis() {
   `;
 
   // グラフは即座に描画予約（setTimeoutで）- 既存のチャートを破棄
+  // 展開リスナーも設定
   setTimeout(() => {
     destroyExistingChart('analysisChart');
     drawBrandChart(sortedBrands.slice(0, 20));
+    setupBrandExpandListeners();
   }, 100);
 
   return html;
@@ -3165,6 +3277,14 @@ function setupWatchFilterEvents() {
  * 大分類と細分類を別々のセクションで表示
  */
 function generateCategoryPerformanceAnalysis() {
+  // categoryStatsがない場合は分析を実行
+  if ((!analyzer.results.categoryStats || analyzer.results.categoryStats.length === 0) &&
+      (!analyzer.results.byCategory || Object.keys(analyzer.results.byCategory).length === 0)) {
+    if (analyzer.activeListings.length > 0 || analyzer.soldItems.length > 0) {
+      analyzer.analyze();
+    }
+  }
+
   const categories = analyzer.results.categoryStats || Object.values(analyzer.results.byCategory || {});
 
   if (!categories || categories.length === 0) {
@@ -3180,26 +3300,47 @@ function generateCategoryPerformanceAnalysis() {
   const categoriesWithDetails = categories.map(cat => {
     const brandStats = {};
     const subCategoryStats = {};
+    let totalActivePrice = 0;
+    let totalSoldPrice = 0;
+    let activeCount = 0;
+    let soldCount = 0;
 
     // 出品中アイテムからブランドと細分類を集計
     analyzer.activeListings.forEach(item => {
       const itemCatMain = item.categoryMain || item.category || '(不明)';
       if (itemCatMain === cat.category) {
+        // カテゴリ全体の出品価格
+        totalActivePrice += item.price || 0;
+        activeCount++;
+
         // ブランド内訳
         const brand = analyzer.extractBrand(item.title) || '(不明)';
         if (!brandStats[brand]) {
-          brandStats[brand] = { brand, active: 0, sold: 0, totalPrice: 0 };
+          brandStats[brand] = { brand, active: 0, sold: 0, totalActivePrice: 0, totalSoldPrice: 0 };
         }
         brandStats[brand].active++;
-        brandStats[brand].totalPrice += item.price || 0;
+        brandStats[brand].totalActivePrice += item.price || 0;
 
         // 細分類内訳
         const subCat = item.categorySub || '(不明)';
         if (!subCategoryStats[subCat]) {
-          subCategoryStats[subCat] = { category: subCat, active: 0, sold: 0, totalPrice: 0, revenue: 0 };
+          subCategoryStats[subCat] = {
+            category: subCat,
+            active: 0,
+            sold: 0,
+            totalActivePrice: 0,
+            totalSoldPrice: 0,
+            brands: {}
+          };
         }
         subCategoryStats[subCat].active++;
-        subCategoryStats[subCat].totalPrice += item.price || 0;
+        subCategoryStats[subCat].totalActivePrice += item.price || 0;
+
+        // 細分類内のブランド
+        if (!subCategoryStats[subCat].brands[brand]) {
+          subCategoryStats[subCat].brands[brand] = { brand, count: 0 };
+        }
+        subCategoryStats[subCat].brands[brand].count++;
       }
     });
 
@@ -3207,21 +3348,39 @@ function generateCategoryPerformanceAnalysis() {
     analyzer.soldItems.forEach(item => {
       const itemCatMain = item.categoryMain || item.category || '(不明)';
       if (itemCatMain === cat.category) {
+        // カテゴリ全体の販売価格
+        const qty = item.quantity || 1;
+        totalSoldPrice += item.soldFor || 0;
+        soldCount += qty;
+
         // ブランド内訳
         const brand = analyzer.extractBrand(item.title) || '(不明)';
         if (!brandStats[brand]) {
-          brandStats[brand] = { brand, active: 0, sold: 0, totalPrice: 0 };
+          brandStats[brand] = { brand, active: 0, sold: 0, totalActivePrice: 0, totalSoldPrice: 0 };
         }
-        brandStats[brand].sold += item.quantity || 1;
-        brandStats[brand].totalPrice += item.soldFor || 0;
+        brandStats[brand].sold += qty;
+        brandStats[brand].totalSoldPrice += item.soldFor || 0;
 
         // 細分類内訳
         const subCat = item.categorySub || '(不明)';
         if (!subCategoryStats[subCat]) {
-          subCategoryStats[subCat] = { category: subCat, active: 0, sold: 0, totalPrice: 0, revenue: 0 };
+          subCategoryStats[subCat] = {
+            category: subCat,
+            active: 0,
+            sold: 0,
+            totalActivePrice: 0,
+            totalSoldPrice: 0,
+            brands: {}
+          };
         }
-        subCategoryStats[subCat].sold += item.quantity || 1;
-        subCategoryStats[subCat].revenue += item.soldFor || 0;
+        subCategoryStats[subCat].sold += qty;
+        subCategoryStats[subCat].totalSoldPrice += item.soldFor || 0;
+
+        // 細分類内のブランド
+        if (!subCategoryStats[subCat].brands[brand]) {
+          subCategoryStats[subCat].brands[brand] = { brand, count: 0 };
+        }
+        subCategoryStats[subCat].brands[brand].count += qty;
       }
     });
 
@@ -3233,13 +3392,15 @@ function generateCategoryPerformanceAnalysis() {
     const subcategories = Object.values(subCategoryStats)
       .map(s => ({
         ...s,
-        avgPrice: (s.active + s.sold) > 0 ? (s.totalPrice + s.revenue) / (s.active + s.sold) : 0
+        avgActivePrice: s.active > 0 ? s.totalActivePrice / s.active : 0,
+        avgSoldPrice: s.sold > 0 ? s.totalSoldPrice / s.sold : 0,
+        topBrands: Object.values(s.brands).sort((a, b) => b.count - a.count).slice(0, 3)
       }))
       .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
 
-    // 平均価格を計算
-    const avgActivePrice = cat.active > 0 ? (cat.totalActivePrice || 0) / cat.active : 0;
-    const avgSoldPrice = cat.sold > 0 ? (cat.revenue || 0) / cat.sold : 0;
+    // 平均価格を計算（直接計算した値を使用）
+    const avgActivePrice = activeCount > 0 ? totalActivePrice / activeCount : 0;
+    const avgSoldPrice = soldCount > 0 ? totalSoldPrice / soldCount : 0;
 
     return {
       ...cat,
@@ -3264,8 +3425,8 @@ function generateCategoryPerformanceAnalysis() {
             <th>出品中</th>
             <th>販売済</th>
             <th>売上率</th>
-            <th>出品単価</th>
-            <th>販売単価</th>
+            <th>平均出品単価</th>
+            <th>平均販売単価</th>
             <th>ブランド内訳</th>
           </tr>
         </thead>
@@ -3318,7 +3479,13 @@ function generateCategoryPerformanceAnalysis() {
                     <td>${sub.active}</td>
                     <td>${sub.sold}</td>
                     <td>${subSellRate}%</td>
-                    <td colspan="3">$${sub.avgPrice ? sub.avgPrice.toFixed(0) : '-'}</td>
+                    <td>$${sub.avgActivePrice ? sub.avgActivePrice.toFixed(0) : '-'}</td>
+                    <td>$${sub.avgSoldPrice ? sub.avgSoldPrice.toFixed(0) : '-'}</td>
+                    <td class="col-brands">
+                      ${sub.topBrands.map(b =>
+                        `<span class="cat-mini-tag">${escapeHtml(b.brand)} (${b.count})</span>`
+                      ).join('')}
+                    </td>
                   </tr>
                 `;
               });
@@ -6243,6 +6410,7 @@ function renderCategoryRanking(ranking) {
     if (hasSubcategories) {
       filteredSubs.forEach(sub => {
         const subBarWidth = (sub.count / maxCount * 100).toFixed(1);
+        const subTopBrands = (sub.topBrands || []).slice(0, 3);
         html += `
           <tr class="subcategory-row" data-parent-category="${escapeHtml(item.category)}" style="display: none;">
             <td class="col-bar">
@@ -6261,13 +6429,18 @@ function renderCategoryRanking(ranking) {
             <td class="col-price-range">
               <span class="price-range-badge sub-badge">${sub.topPriceRange || '-'}</span>
             </td>
-            <td class="col-categories"></td>
+            <td class="col-categories">
+              ${subTopBrands.map(b =>
+                `<span class="cat-mini-tag">${escapeHtml(b.brand)} (${b.count})</span>`
+              ).join('')}
+            </td>
           </tr>
         `;
       });
       // 「その他」があれば最後に追加
       if (otherSub && otherSub.count > 0) {
         const otherBarWidth = (otherSub.count / maxCount * 100).toFixed(1);
+        const otherTopBrands = (otherSub.topBrands || []).slice(0, 3);
         html += `
           <tr class="subcategory-row other-subcategory" data-parent-category="${escapeHtml(item.category)}" style="display: none;">
             <td class="col-bar">
@@ -6286,7 +6459,11 @@ function renderCategoryRanking(ranking) {
             <td class="col-price-range">
               <span class="price-range-badge sub-badge">${otherSub.topPriceRange || '-'}</span>
             </td>
-            <td class="col-categories"></td>
+            <td class="col-categories">
+              ${otherTopBrands.map(b =>
+                `<span class="cat-mini-tag">${escapeHtml(b.brand)} (${b.count})</span>`
+              ).join('')}
+            </td>
           </tr>
         `;
       }
