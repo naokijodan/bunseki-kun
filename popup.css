@@ -4121,3 +4121,132 @@ body {
 .category-price-dist-row {
   background-color: #fefce8 !important;
 }
+
+/* =====================================
+   ブランド×カテゴリ マトリクスセル
+   ===================================== */
+.matrix-cell.clickable {
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.matrix-cell.clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+  position: relative;
+}
+
+/* =====================================
+   マトリクスセル ポップアップ
+   ===================================== */
+.matrix-cell-popup {
+  position: absolute;
+  min-width: 200px;
+  max-width: 280px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.matrix-cell-popup .popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.matrix-cell-popup .popup-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.matrix-cell-popup .popup-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.matrix-cell-popup .popup-close:hover {
+  opacity: 1;
+}
+
+.matrix-cell-popup .popup-content {
+  padding: 12px;
+}
+
+.matrix-cell-popup .popup-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.matrix-cell-popup .popup-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matrix-cell-popup .stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.matrix-cell-popup .stat-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.matrix-cell-popup .stat-value.price-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.matrix-cell-popup .popup-price-dist {
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.matrix-cell-popup .price-dist-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.matrix-cell-popup .price-dist-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.matrix-cell-popup .popup-price-item {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.matrix-cell-popup .popup-price-item.top {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
+}

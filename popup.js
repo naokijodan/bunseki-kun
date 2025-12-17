@@ -5858,6 +5858,9 @@ function renderBrandCategoryRanking(ranking) {
     return;
   }
 
+  // ランキングデータをグローバルに保存（ポップアップ用）
+  window.brandCategoryRankingData = ranking;
+
   // 全カテゴリを収集（上位カテゴリのみ、最大8つ）
   const allCategories = new Map();
   ranking.forEach(brand => {
@@ -5881,12 +5884,12 @@ function renderBrandCategoryRanking(ranking) {
     });
   });
 
-  // ブランドごとのカテゴリ別件数をマップ化
+  // ブランドごとのカテゴリ別詳細データをマップ化
   const brandCategoryMap = {};
   ranking.forEach(brand => {
     brandCategoryMap[brand.brand] = {};
     brand.categoryRanking.forEach(cat => {
-      brandCategoryMap[brand.brand][cat.category] = cat.count;
+      brandCategoryMap[brand.brand][cat.category] = cat;
     });
   });
 
@@ -5922,7 +5925,7 @@ function renderBrandCategoryRanking(ranking) {
 
   // 各ブランドの行を生成（上位15ブランド）
   ranking.slice(0, 15).forEach(brand => {
-    const catCounts = brandCategoryMap[brand.brand] || {};
+    const catData = brandCategoryMap[brand.brand] || {};
 
     html += `
       <tr>
@@ -5932,9 +5935,14 @@ function renderBrandCategoryRanking(ranking) {
         </td>`;
 
     topCategories.forEach(cat => {
-      const count = catCounts[cat] || 0;
+      const data = catData[cat] || { count: 0 };
+      const count = data.count || 0;
       const bgColor = getHeatColor(count);
-      html += `<td class="matrix-cell" style="background: ${bgColor};" title="${escapeHtml(brand.brand)} × ${escapeHtml(cat)}: ${count}件">
+      html += `<td class="matrix-cell ${count > 0 ? 'clickable' : ''}"
+        style="background: ${bgColor};"
+        data-brand="${escapeHtml(brand.brand)}"
+        data-category="${escapeHtml(cat)}"
+        title="${escapeHtml(brand.brand)} × ${escapeHtml(cat)}: ${count}件">
         ${count > 0 ? count : '-'}
       </td>`;
     });
@@ -5944,7 +5952,115 @@ function renderBrandCategoryRanking(ranking) {
 
   html += '</tbody></table></div></div>';
 
+  // ポップアップHTML追加
+  html += `
+    <div id="matrixCellPopup" class="matrix-cell-popup" style="display: none;">
+      <div class="popup-header">
+        <span class="popup-title"></span>
+        <button class="popup-close">&times;</button>
+      </div>
+      <div class="popup-content"></div>
+    </div>
+  `;
+
   container.innerHTML = html;
+
+  // セルクリックイベント
+  container.querySelectorAll('.matrix-cell.clickable').forEach(cell => {
+    cell.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const brand = cell.dataset.brand;
+      const category = cell.dataset.category;
+      showMatrixCellPopup(brand, category, brandCategoryMap, cell);
+    });
+  });
+
+  // ポップアップ閉じるボタン
+  const popup = document.getElementById('matrixCellPopup');
+  if (popup) {
+    const closeBtn = popup.querySelector('.popup-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        popup.style.display = 'none';
+      });
+    }
+  }
+
+  // 外部クリックでポップアップを閉じる
+  document.addEventListener('click', function(e) {
+    const popup = document.getElementById('matrixCellPopup');
+    if (popup && !popup.contains(e.target) && !e.target.classList.contains('matrix-cell')) {
+      popup.style.display = 'none';
+    }
+  });
+}
+
+/**
+ * マトリクスセルのポップアップを表示
+ */
+function showMatrixCellPopup(brand, category, brandCategoryMap, cellElement) {
+  const popup = document.getElementById('matrixCellPopup');
+  if (!popup) return;
+
+  const data = brandCategoryMap[brand]?.[category];
+  if (!data || data.count === 0) {
+    popup.style.display = 'none';
+    return;
+  }
+
+  // タイトル設定
+  popup.querySelector('.popup-title').textContent = `${brand} × ${category}`;
+
+  // コンテンツ生成
+  const priceDistHtml = data.priceDistribution
+    ? data.priceDistribution
+        .filter(p => p.count > 0)
+        .map((p, i) => `<span class="popup-price-item ${i === 0 ? 'top' : ''}">${p.range}: ${p.count}件</span>`)
+        .join('')
+    : '';
+
+  popup.querySelector('.popup-content').innerHTML = `
+    <div class="popup-stats">
+      <div class="popup-stat-item">
+        <span class="stat-label">件数</span>
+        <span class="stat-value">${data.count.toLocaleString()}件</span>
+      </div>
+      <div class="popup-stat-item">
+        <span class="stat-label">シェア</span>
+        <span class="stat-value">${data.share}%</span>
+      </div>
+      <div class="popup-stat-item">
+        <span class="stat-label">平均価格</span>
+        <span class="stat-value">$${(data.avgPrice || 0).toLocaleString()}</span>
+      </div>
+      <div class="popup-stat-item">
+        <span class="stat-label">売れ筋価格帯</span>
+        <span class="stat-value price-badge">${data.topPriceRange || '-'}</span>
+      </div>
+    </div>
+    ${priceDistHtml ? `
+      <div class="popup-price-dist">
+        <div class="price-dist-title">💰 価格帯分布</div>
+        <div class="price-dist-items">${priceDistHtml}</div>
+      </div>
+    ` : ''}
+  `;
+
+  // ポップアップ位置を設定（セルの近くに表示）
+  const cellRect = cellElement.getBoundingClientRect();
+  const containerRect = document.getElementById('brandCategoryList').getBoundingClientRect();
+
+  let left = cellRect.left - containerRect.left + cellRect.width / 2;
+  let top = cellRect.bottom - containerRect.top + 5;
+
+  // 右端に近い場合は左寄せ
+  if (left + 200 > containerRect.width) {
+    left = containerRect.width - 220;
+  }
+
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+  popup.style.display = 'block';
 }
 
 /**

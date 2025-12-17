@@ -1819,6 +1819,15 @@ class EbayAnalyzer {
    */
   getMarketBrandCategoryRanking(marketItems, brandLimit = 20) {
     const brandCategoryStats = {};
+    // 価格帯の定義
+    const priceRanges = [
+      { label: '~$50', min: 0, max: 50 },
+      { label: '$50-100', min: 50, max: 100 },
+      { label: '$100-200', min: 100, max: 200 },
+      { label: '$200-500', min: 200, max: 500 },
+      { label: '$500-1000', min: 500, max: 1000 },
+      { label: '$1000+', min: 1000, max: Infinity }
+    ];
     // extractBrandFromTitle関数を取得
     const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
       ? window.extractBrandFromTitle
@@ -1836,6 +1845,7 @@ class EbayAnalyzer {
 
       // 売上数を取得（soldがなければ1として扱う）
       const sold = parseInt(item.sold) || 1;
+      const price = parseFloat(item.price) || 0;
 
       if (!brandCategoryStats[brand]) {
         brandCategoryStats[brand] = {
@@ -1847,14 +1857,31 @@ class EbayAnalyzer {
 
       brandCategoryStats[brand].totalCount += sold;
 
-      // 細分類で集計
+      // 細分類で集計（価格・価格帯分布も含む）
       if (!brandCategoryStats[brand].categories[subCat]) {
         brandCategoryStats[brand].categories[subCat] = {
           category: subCat,
-          count: 0
+          count: 0,
+          totalPrice: 0,
+          priceCount: 0,
+          priceDistribution: {}
         };
+        priceRanges.forEach(r => {
+          brandCategoryStats[brand].categories[subCat].priceDistribution[r.label] = 0;
+        });
       }
       brandCategoryStats[brand].categories[subCat].count += sold;
+      if (price > 0) {
+        brandCategoryStats[brand].categories[subCat].totalPrice += price;
+        brandCategoryStats[brand].categories[subCat].priceCount++;
+        // 価格帯に振り分け
+        for (const range of priceRanges) {
+          if (price >= range.min && price < range.max) {
+            brandCategoryStats[brand].categories[subCat].priceDistribution[range.label] += sold;
+            break;
+          }
+        }
+      }
     }
 
     // ランキング生成（売上数順）
@@ -1866,13 +1893,24 @@ class EbayAnalyzer {
         brand: brandStat.brand,
         totalCount: brandStat.totalCount,
         categoryRanking: Object.values(brandStat.categories)
-          .map(cat => ({
-            category: cat.category,
-            count: cat.count,
-            share: brandStat.totalCount > 0
-              ? ((cat.count / brandStat.totalCount) * 100).toFixed(1)
-              : 0
-          }))
+          .map(cat => {
+            // 価格帯分布を配列に変換し、最も売れている価格帯を特定
+            const priceDistArr = Object.entries(cat.priceDistribution)
+              .map(([range, cnt]) => ({ range, count: cnt }))
+              .sort((a, b) => b.count - a.count);
+            const topPriceRange = priceDistArr.find(p => p.count > 0) || { range: '-', count: 0 };
+
+            return {
+              category: cat.category,
+              count: cat.count,
+              share: brandStat.totalCount > 0
+                ? ((cat.count / brandStat.totalCount) * 100).toFixed(1)
+                : 0,
+              avgPrice: cat.priceCount > 0 ? Math.round(cat.totalPrice / cat.priceCount) : 0,
+              topPriceRange: topPriceRange.range,
+              priceDistribution: priceDistArr
+            };
+          })
           .sort((a, b) => b.count - a.count)
       }));
   }
