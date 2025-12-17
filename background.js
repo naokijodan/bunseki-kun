@@ -292,28 +292,41 @@ async function analyzeWithClaude(data, apiKey) {
   const systemPrompt = getAnalysisSystemPrompt();
   const userPrompt = buildUserPrompt(data);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2000,
-      messages: [
-        { role: 'user', content: `${systemPrompt}\n\n${userPrompt}\n\nJSON形式で回答してください。` }
-      ]
-    })
-  });
+  console.log('[Claude] Starting analysis request...');
+
+  let response;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [
+          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}\n\nJSON形式で回答してください。` }
+        ]
+      })
+    });
+  } catch (fetchError) {
+    console.error('[Claude] Fetch error:', fetchError);
+    throw new Error(`ネットワークエラー: ${fetchError.message}`);
+  }
+
+  console.log('[Claude] Response status:', response.status);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.error('[Claude] Error response:', errorData);
     throw new Error(errorData.error?.message || `API error: ${response.status}`);
   }
 
   const result = await response.json();
+  console.log('[Claude] Response received');
   const content = result.content?.[0]?.text;
 
   if (!content) {
@@ -351,10 +364,11 @@ async function chatWithClaude(message, history, analysisData, apiKey) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 500,
       system: systemPrompt,
       messages
@@ -385,28 +399,40 @@ async function analyzeWithGemini(data, apiKey) {
 
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}\n\nJSON形式で回答してください。余計な説明は不要です。`;
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: fullPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2000
-      }
-    })
-  });
+  console.log('[Gemini] Starting analysis request...');
+
+  let response;
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: fullPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2000
+        }
+      })
+    });
+  } catch (fetchError) {
+    console.error('[Gemini] Fetch error:', fetchError);
+    throw new Error(`ネットワークエラー: ${fetchError.message}`);
+  }
+
+  console.log('[Gemini] Response status:', response.status);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.error('[Gemini] Error response:', errorData);
     throw new Error(errorData.error?.message || `API error: ${response.status}`);
   }
 
   const result = await response.json();
+  console.log('[Gemini] Response received');
   const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!content) {
@@ -458,7 +484,7 @@ async function chatWithGemini(message, history, analysisData, apiKey) {
     parts: [{ text: message }]
   });
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

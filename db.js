@@ -466,6 +466,21 @@ const BunsekiDB = {
     });
   },
 
+  /**
+   * 分析結果をクリア
+   */
+  async clearAnalysisCache() {
+    await this.init();
+
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('analysisCache', 'readwrite');
+      const store = tx.objectStore('analysisCache');
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
   // ========================================
   // ユーティリティ
   // ========================================

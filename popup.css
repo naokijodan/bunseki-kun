@@ -206,6 +206,9 @@ body {
    ===================================== */
 .section-header {
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .section-header h2 {
@@ -2112,18 +2115,47 @@ body {
 }
 
 .breakdown-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
   background: var(--bg-primary);
   border-radius: var(--border-radius-sm);
   font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.breakdown-item.expandable {
+  cursor: pointer;
+}
+
+.breakdown-item .breakdown-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+}
+
+.breakdown-item .breakdown-header:hover {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+}
+
+.breakdown-item.expanded .breakdown-header {
+  background: var(--primary-light);
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+}
+
+.breakdown-item .expand-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-right: 8px;
+  width: 12px;
+}
+
+.breakdown-item.expanded .expand-icon {
+  color: var(--primary-color);
 }
 
 .breakdown-item .brand-name {
   font-weight: 500;
   color: var(--text-primary);
+  flex: 1;
 }
 
 .breakdown-item .brand-count {
@@ -2137,6 +2169,14 @@ body {
 
 .breakdown-item.unknown .brand-name {
   color: #f57c00;
+}
+
+.breakdown-item .breakdown-items {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 /* データ操作ボタン */
@@ -2154,4 +2194,1269 @@ body {
 
 .summary-value.small {
   font-size: 14px;
+}
+
+/* ========================================
+   市場分析セクション
+   ======================================== */
+
+/* データカウントバッジ */
+.data-count-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-left: auto;
+}
+
+/* 市場データカウント */
+.market-data-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* 市場分析サブタブ */
+.market-subtabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 16px;
+}
+
+.market-subtab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.market-subtab:hover {
+  background: var(--bg-tertiary);
+}
+
+.market-subtab.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* 市場分析コンテンツ */
+.market-analysis-content {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.market-tab-content {
+  padding: 16px;
+}
+
+/* 市場分析アクションボタン */
+.market-analysis-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.market-analysis-actions .action-btn {
+  flex: 1;
+}
+
+/* ランキングヘッダー */
+.ranking-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.ranking-header .ranking-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ランキングリスト */
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ランキングアイテム */
+.ranking-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.ranking-item:hover {
+  background: var(--primary-light);
+}
+
+.ranking-item.top-3 {
+  background: linear-gradient(135deg, #fff8e1 0%, #fffde7 100%);
+  border-left: 3px solid var(--primary-color);
+}
+
+/* ランキング番号 */
+.ranking-number {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-radius: 50%;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.ranking-item.top-3 .ranking-number {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* ランキングコンテンツ */
+.ranking-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ranking-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranking-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ranking-stat {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ranking-stat strong {
+  color: var(--text-primary);
+}
+
+/* ランキング詳細（ブランド内カテゴリなど） */
+.ranking-details {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.ranking-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.ranking-detail-row .detail-name {
+  color: var(--text-secondary);
+}
+
+.ranking-detail-row .detail-value {
+  color: var(--text-muted);
+}
+
+/* ========================================
+   テーブル形式ランキング（横棒グラフ付き）
+======================================== */
+.ranking-table-container {
+  overflow-x: auto;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ranking-table th {
+  background: var(--bg-secondary);
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.ranking-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.ranking-table tr:hover {
+  background: var(--bg-secondary);
+}
+
+.ranking-table tr.top-rank {
+  background: linear-gradient(135deg, #fff8e1 0%, #fffde7 100%);
+}
+
+.ranking-table tr.top-rank:hover {
+  background: linear-gradient(135deg, #ffecb3 0%, #fff8e1 100%);
+}
+
+/* 列幅の調整 */
+.ranking-table .col-bar {
+  width: 150px;
+  min-width: 120px;
+}
+
+.ranking-table .col-rank {
+  width: 40px;
+  text-align: center;
+}
+
+.ranking-table .col-name {
+  min-width: 100px;
+  font-weight: 600;
+}
+
+.ranking-table .col-count,
+.ranking-table .col-share,
+.ranking-table .col-price {
+  width: 70px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ranking-table .col-categories {
+  min-width: 180px;
+}
+
+.ranking-table .col-action {
+  width: 50px;
+  text-align: center;
+}
+
+/* テーブル内の横棒グラフ */
+.table-bar-container {
+  width: 100%;
+  height: 20px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.table-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+.table-bar-green {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+/* 順位バッジ */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rank-badge.gold {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
+  color: #5d4e00;
+}
+
+/* ミニカテゴリタグ */
+.cat-mini-tag {
+  display: inline-block;
+  font-size: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin: 1px 2px;
+  white-space: nowrap;
+}
+
+/* 詳細ボタン */
+.detail-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.detail-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+/* 展開可能な行 */
+.brand-row.expandable {
+  cursor: pointer;
+}
+
+.brand-row.expandable:hover {
+  background: var(--bg-secondary);
+}
+
+.brand-row.expanded {
+  background: var(--primary-light);
+}
+
+.expand-icon {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.brand-row.expanded .expand-icon {
+  color: var(--primary-color);
+}
+
+/* ブランド商品一覧行 */
+.brand-items-row {
+  background: var(--bg-secondary);
+}
+
+.brand-items-row td {
+  padding: 0 !important;
+}
+
+.brand-items-container {
+  padding: 12px 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.brand-items-list .items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand-items-list .items-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.items-table th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.items-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+.items-table tr:hover {
+  background: rgba(245, 166, 35, 0.1);
+}
+
+.items-table .item-title {
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.items-table .item-price,
+.items-table .item-sold {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.loading-items {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+}
+
+.no-items,
+.brand-items-container .error {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ========================================
+   詳細ポップアップ
+======================================== */
+.ranking-detail-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ranking-detail-popup .popup-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.ranking-detail-popup .popup-content {
+  position: relative;
+  background: white;
+  border-radius: var(--border-radius);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.ranking-detail-popup .popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.ranking-detail-popup .popup-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ranking-detail-popup .popup-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.ranking-detail-popup .popup-close:hover {
+  opacity: 1;
+}
+
+.ranking-detail-popup .popup-summary {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-detail-popup .popup-stat {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ranking-detail-popup .popup-stat strong {
+  color: var(--primary-color);
+}
+
+.ranking-detail-popup .popup-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ranking-detail-popup .popup-body h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ranking-detail-popup .popup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ranking-detail-popup .popup-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+}
+
+.ranking-detail-popup .popup-item-rank {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ranking-detail-popup .popup-item-name {
+  width: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.ranking-detail-popup .popup-item-bar-container {
+  flex: 1;
+  height: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ranking-detail-popup .popup-item-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+}
+
+.ranking-detail-popup .popup-item-count {
+  width: 50px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   横棒グラフ付きランキングアイテム（旧スタイル・互換用）
+======================================== */
+.ranking-item-bar {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-color);
+}
+
+.ranking-item-bar:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.ranking-item-bar.top-3 {
+  background: linear-gradient(135deg, #fff8e1 0%, #fffde7 100%);
+  border-left: 4px solid var(--primary-color);
+}
+
+.ranking-item-bar .ranking-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ranking-item-bar .ranking-number {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 0;
+}
+
+.ranking-item-bar.top-3 .ranking-number {
+  background: var(--primary-color);
+  color: white;
+}
+
+.ranking-item-bar .ranking-brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 棒グラフセクション */
+.ranking-bar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar-label {
+  width: 60px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.bar-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  padding: 0 4px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 16px;
+  border-radius: 8px;
+  min-width: 4px;
+  transition: width 0.5s ease;
+}
+
+.bar-count {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bar-share {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.bar-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+.bar-value.price-value {
+  color: #e91e63;
+  font-weight: 700;
+}
+
+/* カテゴリ/ブランド内訳 */
+.category-breakdown {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.breakdown-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.breakdown-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown-name {
+  width: 100px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.breakdown-bar-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  background: var(--bg-tertiary);
+  border-radius: 9px;
+  padding: 0 4px;
+  overflow: hidden;
+}
+
+.breakdown-bar {
+  height: 12px;
+  border-radius: 6px;
+  min-width: 4px;
+  transition: width 0.5s ease;
+}
+
+.breakdown-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-right: 6px;
+}
+
+/* カテゴリカラー */
+.cat-color-0 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.cat-color-1 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.cat-color-2 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.cat-color-3 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.cat-color-4 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+/* ステータスアイコン */
+.status-icon-cell {
+  width: 30px;
+  text-align: center;
+  font-size: 16px;
+}
+
+/* 比較セクション */
+.comparison-content {
+  padding: 0;
+}
+
+/* トレンドスコア */
+.trend-score-card {
+  background: linear-gradient(135deg, var(--primary-light) 0%, #fff 100%);
+  border: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.trend-score-value {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.trend-score-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.trend-score-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* 比較テーブル */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.comparison-table th {
+  background: var(--bg-secondary);
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.comparison-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.comparison-table tr:hover {
+  background: var(--primary-light);
+}
+
+/* ステータスバッジ（比較用） */
+.status-badge-comparison {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.status-badge-comparison.adequate {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge-comparison.shortage {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.status-badge-comparison.missing {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.status-badge-comparison.excess {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+/* 推奨リスト */
+.recommendation-list {
+  margin-top: 16px;
+}
+
+.recommendation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 8px;
+}
+
+.recommendation-item.high {
+  border-left: 3px solid #f44336;
+  background: #ffebee;
+}
+
+.recommendation-item.medium {
+  border-left: 3px solid #ff9800;
+  background: #fff3e0;
+}
+
+.recommendation-priority {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.recommendation-priority.high {
+  background: #f44336;
+  color: white;
+}
+
+.recommendation-priority.medium {
+  background: #ff9800;
+  color: white;
+}
+
+.recommendation-content {
+  flex: 1;
+}
+
+.recommendation-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.recommendation-reason {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.recommendation-action {
+  font-size: 11px;
+  color: var(--primary-color);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* 推奨カテゴリタグ */
+.recommendation-categories {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-cat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.rec-cat-tag {
+  display: inline-block;
+  font-size: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* 市場アクションボタン */
+.market-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* サマリーカード（比較用） */
+.comparison-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.comparison-summary-card {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+}
+
+.comparison-summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.comparison-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ========================================
+   ブランド×カテゴリ マトリクス（ヒートマップ）
+======================================== */
+.matrix-container {
+  padding: 8px 0;
+}
+
+.matrix-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-right: 8px;
+}
+
+.legend-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.legend-gradient {
+  width: 100px;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(102, 126, 234, 0.4) 25%,
+    rgba(102, 126, 234, 0.7) 50%,
+    rgba(102, 80, 200, 0.9) 75%,
+    rgba(102, 46, 180, 1) 100%
+  );
+  border: 1px solid var(--border-color);
+}
+
+.matrix-scroll {
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 500px;
+}
+
+.matrix-table th,
+.matrix-table td {
+  padding: 8px 6px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+}
+
+.matrix-corner {
+  background: var(--bg-secondary);
+  width: 140px;
+  min-width: 140px;
+}
+
+.matrix-category-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 10px;
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.matrix-total-header {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.matrix-brand-cell {
+  background: var(--bg-secondary);
+  text-align: left !important;
+  white-space: nowrap;
+  padding-left: 10px !important;
+}
+
+.matrix-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.matrix-brand-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.matrix-cell {
+  font-weight: 500;
+  color: var(--text-primary);
+  min-width: 50px;
+  transition: all var(--transition-fast);
+  cursor: default;
+}
+
+.matrix-cell:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  position: relative;
+}
+
+.matrix-total-cell {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.matrix-footer-row {
+  background: var(--bg-secondary);
+}
+
+.matrix-footer-row td {
+  border-top: 2px solid var(--primary-color);
+}
+
+.matrix-grand-total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+}
+
+.matrix-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+/* ブランド×カテゴリ展開（旧スタイル・互換用） */
+.brand-category-item {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.brand-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.brand-category-header:hover {
+  background: var(--primary-light);
+}
+
+.brand-category-header .brand-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-category-header .brand-rank {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.brand-category-header .brand-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.brand-category-header .brand-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.brand-category-header .expand-icon {
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.brand-category-item.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
+.brand-category-content {
+  display: none;
+  padding: 0 12px 12px 52px;
+}
+
+.brand-category-item.expanded .brand-category-content {
+  display: block;
+}
+
+.category-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.category-bar-name {
+  width: 100px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.category-bar-track {
+  flex: 1;
+  height: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.category-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 8px;
+  transition: width var(--transition-normal);
+}
+
+.category-bar-value {
+  width: 50px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
 }

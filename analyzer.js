@@ -788,25 +788,33 @@ class EbayAnalyzer {
     if (!marketData || !marketData.items) return;
 
     const marketBrands = {};
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
 
     // 市場データを集計
     for (const item of marketData.items) {
-      if (!item.brand) continue;
+      // 常にタイトルから再判定（item.brandは信頼しない）
+      const brand = extractBrand(item.title);
+      if (!brand || brand === '(不明)') continue;
 
-      if (!marketBrands[item.brand]) {
-        marketBrands[item.brand] = {
+      if (!marketBrands[brand]) {
+        marketBrands[brand] = {
           count: 0,
           totalPrice: 0,
           sold: 0
         };
       }
 
-      marketBrands[item.brand].count++;
+      marketBrands[brand].count++;
       if (item.price) {
-        marketBrands[item.brand].totalPrice += item.price;
+        marketBrands[brand].totalPrice += item.price;
       }
       if (item.sold) {
-        marketBrands[item.brand].sold += item.sold;
+        marketBrands[brand].sold += item.sold;
       }
     }
 
@@ -858,9 +866,18 @@ class EbayAnalyzer {
    * ブランドの平均価格を計算
    */
   calculateAveragePrice(brand) {
-    const items = this.activeListings.filter(item =>
-      item.brand === brand && item.price > 0
-    );
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
+    const items = this.activeListings.filter(item => {
+      // 常にタイトルから再判定（item.brandは信頼しない）
+      const itemBrand = extractBrand(item.title);
+      return itemBrand === brand && item.price > 0;
+    });
 
     if (items.length === 0) return null;
 
@@ -1031,13 +1048,21 @@ class EbayAnalyzer {
     const brandStats = {};
     // AI分類結果を参照（popup.jsから設定される）
     const aiClassifications = window.aiClassificationResults || {};
+    // extractBrandFromTitle関数を取得（popup.jsで定義してwindowに公開、なければthis.extractBrandを使用）
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
 
     // 出品中のブランド集計
     for (const item of this.activeListings) {
-      // AI分類結果があればそれを優先
-      let brand = item.brand || '(不明)';
+      // 既存のbrand値を信頼せず、常にタイトルから再判定
+      let brand;
       if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
         brand = aiClassifications[item.title].brand;
+      } else {
+        brand = extractBrand(item.title);
       }
       if (!brandStats[brand]) {
         brandStats[brand] = {
@@ -1058,10 +1083,12 @@ class EbayAnalyzer {
 
     // 売れたブランド集計
     for (const item of this.soldItems) {
-      // AI分類結果があればそれを優先
-      let brand = item.brand || '(不明)';
+      // 既存のbrand値を信頼せず、常にタイトルから再判定
+      let brand;
       if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
         brand = aiClassifications[item.title].brand;
+      } else {
+        brand = extractBrand(item.title);
       }
       if (!brandStats[brand]) {
         brandStats[brand] = {
@@ -1231,6 +1258,13 @@ class EbayAnalyzer {
    * Watch数ランキング TOP10
    */
   calculateWatchRanking() {
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
     const ranking = this.activeListings
       .filter(item => item.watchers > 0)
       .sort((a, b) => b.watchers - a.watchers)
@@ -1240,7 +1274,8 @@ class EbayAnalyzer {
         title: item.title,
         watchers: item.watchers,
         price: item.price,
-        brand: item.brand
+        // 常にタイトルから再判定（item.brandは信頼しない）
+        brand: extractBrand(item.title)
       }));
 
     this.results.watchRanking = ranking;
@@ -1377,6 +1412,598 @@ class EbayAnalyzer {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  // ========================================
+  // 市場データ分析機能
+  // ========================================
+
+  /**
+   * IndexedDBから市場データを取得
+   * @returns {Promise<Array>} 市場データ配列
+   */
+  async getMarketDataFromDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('BunsekiKunDB', 1);
+
+      request.onerror = () => reject(new Error('IndexedDB接続エラー'));
+
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('marketData')) {
+          const store = db.createObjectStore('marketData', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('title', 'title', { unique: false });
+          store.createIndex('titleLower', 'titleLower', { unique: true });
+          store.createIndex('brand', 'brand', { unique: false });
+          store.createIndex('capturedAt', 'capturedAt', { unique: false });
+        }
+      };
+
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+        const tx = db.transaction(['marketData'], 'readonly');
+        const store = tx.objectStore('marketData');
+        const getAllRequest = store.getAll();
+
+        getAllRequest.onsuccess = () => {
+          db.close();
+          resolve(getAllRequest.result || []);
+        };
+
+        getAllRequest.onerror = () => {
+          db.close();
+          reject(new Error('市場データ取得エラー'));
+        };
+      };
+    });
+  }
+
+  /**
+   * 市場データにブランド・カテゴリを正規化して付与
+   * @param {Array} marketItems - 市場データ配列
+   * @param {boolean} forceReanalyze - trueの場合、既存のブランド・カテゴリを無視して再判定
+   * @returns {Array} 正規化済み市場データ
+   */
+  normalizeMarketData(marketItems, forceReanalyze = false) {
+    return marketItems.map(item => {
+      // ブランド判定 - 常にタイトルから再判定（あり得ないブランドが上位に来る問題を防ぐ）
+      let brand = this.extractBrand(item.title) || '(不明)';
+
+      // カテゴリ判定 - 常にタイトルから再判定
+      let category = this.extractCategoryFromTitle(item.title);
+      if (!category) {
+        category = this.extractCategoryFromBrand(item.title);
+      }
+      const normalized = this.normalizeCategory(category || '(不明)');
+      const categoryMain = normalized.main;
+      const categorySub = normalized.sub;
+
+      return {
+        ...item,
+        brand,
+        categoryMain,
+        categorySub
+      };
+    });
+  }
+
+  /**
+   * 市場データのブランドランキングを取得
+   * @param {Array} marketItems - 市場データ配列（正規化済み）
+   * @param {number} limit - 取得件数上限
+   * @returns {Array} ブランドランキング
+   */
+  getMarketBrandRanking(marketItems, limit = 50) {
+    const brandStats = {};
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
+    for (const item of marketItems) {
+      // 常にタイトルから再判定（item.brandは信頼しない）
+      const brand = extractBrand(item.title) || '(不明)';
+      if (brand === '(不明)') continue;
+
+      if (!brandStats[brand]) {
+        brandStats[brand] = {
+          brand,
+          soldCount: 0,      // 売上数（sold）の合計
+          listingCount: 0,   // 出品数（商品件数）
+          totalPrice: 0,
+          priceCount: 0,     // 価格が有効な件数（平均計算用）
+          minPrice: Infinity,
+          maxPrice: 0,
+          categories: {}
+        };
+      }
+
+      // 売上数を加算（soldがなければ1として扱う）
+      const sold = parseInt(item.sold) || 1;
+      brandStats[brand].soldCount += sold;
+      brandStats[brand].listingCount++;
+
+      const price = parseFloat(item.price) || 0;
+      if (price > 0) {
+        brandStats[brand].totalPrice += price;
+        brandStats[brand].priceCount++;
+        brandStats[brand].minPrice = Math.min(brandStats[brand].minPrice, price);
+        brandStats[brand].maxPrice = Math.max(brandStats[brand].maxPrice, price);
+      }
+
+      // ブランド内カテゴリ集計（売上数ベース）
+      const cat = item.categoryMain || 'その他';
+      if (!brandStats[brand].categories[cat]) {
+        brandStats[brand].categories[cat] = 0;
+      }
+      brandStats[brand].categories[cat] += sold;
+    }
+
+    // ランキング生成（売上数順）
+    return Object.values(brandStats)
+      .map(stat => ({
+        brand: stat.brand,
+        count: stat.soldCount,           // 売上数
+        listingCount: stat.listingCount, // 出品数
+        avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
+        minPrice: stat.minPrice === Infinity ? 0 : Math.round(stat.minPrice),
+        maxPrice: Math.round(stat.maxPrice),
+        share: 0, // 後で計算
+        topCategories: Object.entries(stat.categories)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([cat, cnt]) => ({ category: cat, count: cnt }))
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+      .map((item, idx, arr) => {
+        const totalCount = arr.reduce((sum, i) => sum + i.count, 0);
+        return {
+          ...item,
+          rank: idx + 1,
+          share: totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : 0
+        };
+      });
+  }
+
+  /**
+   * 市場データのカテゴリランキングを取得
+   * @param {Array} marketItems - 市場データ配列（正規化済み）
+   * @param {number} limit - 取得件数上限
+   * @returns {Array} カテゴリランキング
+   */
+  getMarketCategoryRanking(marketItems, limit = 30) {
+    const categoryStats = {};
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
+    for (const item of marketItems) {
+      const mainCat = item.categoryMain || 'その他';
+
+      if (!categoryStats[mainCat]) {
+        categoryStats[mainCat] = {
+          category: mainCat,
+          soldCount: 0,      // 売上数の合計
+          listingCount: 0,   // 出品数
+          totalPrice: 0,
+          priceCount: 0,
+          brands: {},
+          subcategories: {}
+        };
+      }
+
+      // 売上数を加算（soldがなければ1として扱う）
+      const sold = parseInt(item.sold) || 1;
+      categoryStats[mainCat].soldCount += sold;
+      categoryStats[mainCat].listingCount++;
+
+      const price = parseFloat(item.price) || 0;
+      if (price > 0) {
+        categoryStats[mainCat].totalPrice += price;
+        categoryStats[mainCat].priceCount++;
+      }
+
+      // カテゴリ内ブランド集計（売上数ベース）- 常にタイトルから再判定
+      const brand = extractBrand(item.title) || '(不明)';
+      if (brand !== '(不明)') {
+        if (!categoryStats[mainCat].brands[brand]) {
+          categoryStats[mainCat].brands[brand] = 0;
+        }
+        categoryStats[mainCat].brands[brand] += sold;
+      }
+
+      // 細分類集計（売上数ベース）
+      const subCat = item.categorySub || 'その他';
+      if (!categoryStats[mainCat].subcategories[subCat]) {
+        categoryStats[mainCat].subcategories[subCat] = 0;
+      }
+      categoryStats[mainCat].subcategories[subCat] += sold;
+    }
+
+    // ランキング生成（売上数順）
+    const totalSold = Object.values(categoryStats).reduce((sum, s) => sum + s.soldCount, 0);
+    return Object.values(categoryStats)
+      .map(stat => ({
+        category: stat.category,
+        count: stat.soldCount,           // 売上数
+        listingCount: stat.listingCount, // 出品数
+        avgPrice: stat.priceCount > 0 ? Math.round(stat.totalPrice / stat.priceCount) : 0,
+        share: totalSold > 0 ? ((stat.soldCount / totalSold) * 100).toFixed(1) : 0,
+        topBrands: Object.entries(stat.brands)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([brand, cnt]) => ({ brand, count: cnt })),
+        subcategories: Object.entries(stat.subcategories)
+          .sort((a, b) => b[1] - a[1])
+          .map(([sub, cnt]) => ({ subcategory: sub, count: cnt }))
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+      .map((item, idx) => ({
+        ...item,
+        rank: idx + 1
+      }));
+  }
+
+  /**
+   * ブランド別カテゴリランキングを取得
+   * （各ブランド内で売れているカテゴリの順位）
+   * @param {Array} marketItems - 市場データ配列（正規化済み）
+   * @param {number} brandLimit - ブランド数上限
+   * @returns {Array} ブランド別カテゴリランキング
+   */
+  getMarketBrandCategoryRanking(marketItems, brandLimit = 20) {
+    const brandCategoryStats = {};
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
+    for (const item of marketItems) {
+      // 常にタイトルから再判定（item.brandは信頼しない）
+      const brand = extractBrand(item.title) || '(不明)';
+      if (brand === '(不明)') continue;
+
+      const mainCat = item.categoryMain || 'その他';
+      const subCat = item.categorySub || 'その他';
+
+      // 売上数を取得（soldがなければ1として扱う）
+      const sold = parseInt(item.sold) || 1;
+
+      if (!brandCategoryStats[brand]) {
+        brandCategoryStats[brand] = {
+          brand,
+          totalCount: 0,
+          categories: {}
+        };
+      }
+
+      brandCategoryStats[brand].totalCount += sold;
+
+      // 大分類
+      if (!brandCategoryStats[brand].categories[mainCat]) {
+        brandCategoryStats[brand].categories[mainCat] = {
+          category: mainCat,
+          count: 0,
+          subcategories: {}
+        };
+      }
+      brandCategoryStats[brand].categories[mainCat].count += sold;
+
+      // 細分類
+      if (!brandCategoryStats[brand].categories[mainCat].subcategories[subCat]) {
+        brandCategoryStats[brand].categories[mainCat].subcategories[subCat] = 0;
+      }
+      brandCategoryStats[brand].categories[mainCat].subcategories[subCat] += sold;
+    }
+
+    // ランキング生成（売上数順）
+    return Object.values(brandCategoryStats)
+      .sort((a, b) => b.totalCount - a.totalCount)
+      .slice(0, brandLimit)
+      .map((brandStat, idx) => ({
+        rank: idx + 1,
+        brand: brandStat.brand,
+        totalCount: brandStat.totalCount,
+        categoryRanking: Object.values(brandStat.categories)
+          .map(cat => ({
+            category: cat.category,
+            count: cat.count,
+            share: brandStat.totalCount > 0
+              ? ((cat.count / brandStat.totalCount) * 100).toFixed(1)
+              : 0,
+            subcategories: Object.entries(cat.subcategories)
+              .sort((a, b) => b[1] - a[1])
+              .map(([sub, cnt]) => ({ subcategory: sub, count: cnt }))
+          }))
+          .sort((a, b) => b.count - a.count)
+      }));
+  }
+
+  /**
+   * 自分の出品と市場データを比較
+   * @param {Array} marketItems - 市場データ配列（正規化済み）
+   * @returns {Object} 比較結果
+   */
+  compareWithMyListings(marketItems) {
+    // 市場のブランドランキング
+    const marketBrandRanking = this.getMarketBrandRanking(marketItems, 100);
+    // 市場のカテゴリランキング
+    const marketCategoryRanking = this.getMarketCategoryRanking(marketItems, 50);
+
+    // 自分のブランド別データ
+    const myBrandStats = this.results.byBrand || {};
+    // 自分のカテゴリ別データ
+    const myCategoryStats = this.results.byCategory || {};
+
+    // ブランド比較
+    const brandComparison = marketBrandRanking.map(marketBrand => {
+      const myBrand = myBrandStats[marketBrand.brand] || { active: 0, sold: 0 };
+      const myTotal = myBrand.active + (myBrand.sold || 0);
+
+      // 充足度: 市場シェアに対して自分がどれだけ出品しているか
+      // 市場で1%のシェア → 自分も1%程度あれば適正
+      const myActiveTotal = this.activeListings?.length || 0;
+      const myShare = myActiveTotal > 0 ? (myBrand.active / myActiveTotal) * 100 : 0;
+      const marketShare = parseFloat(marketBrand.share) || 0;
+
+      let status = 'adequate'; // 適正
+      let statusIcon = '✅';
+      if (myBrand.active === 0) {
+        status = 'missing'; // 未出品
+        statusIcon = '❌';
+      } else if (myShare < marketShare * 0.5) {
+        status = 'shortage'; // 不足
+        statusIcon = '⚠️';
+      } else if (myShare > marketShare * 2) {
+        status = 'excess'; // 過剰
+        statusIcon = '📈';
+      }
+
+      return {
+        brand: marketBrand.brand,
+        marketRank: marketBrand.rank,
+        marketCount: marketBrand.count,
+        marketShare: marketBrand.share,
+        marketAvgPrice: marketBrand.avgPrice,
+        myActive: myBrand.active,
+        mySold: myBrand.sold || 0,
+        myShare: myShare.toFixed(1),
+        status,
+        statusIcon,
+        recommendation: this.getBrandRecommendation(status, marketBrand, myBrand)
+      };
+    });
+
+    // カテゴリ比較
+    const categoryComparison = marketCategoryRanking.map(marketCat => {
+      const myCat = myCategoryStats[marketCat.category] || { active: 0, sold: 0 };
+      const myActiveTotal = this.activeListings?.length || 0;
+      const myShare = myActiveTotal > 0 ? (myCat.active / myActiveTotal) * 100 : 0;
+      const marketShare = parseFloat(marketCat.share) || 0;
+
+      let status = 'adequate';
+      let statusIcon = '✅';
+      if (myCat.active === 0) {
+        status = 'missing';
+        statusIcon = '❌';
+      } else if (myShare < marketShare * 0.5) {
+        status = 'shortage';
+        statusIcon = '⚠️';
+      } else if (myShare > marketShare * 2) {
+        status = 'excess';
+        statusIcon = '📈';
+      }
+
+      return {
+        category: marketCat.category,
+        marketRank: marketCat.rank,
+        marketCount: marketCat.count,
+        marketShare: marketCat.share,
+        myActive: myCat.active || 0,
+        mySold: myCat.sold || 0,
+        myShare: myShare.toFixed(1),
+        status,
+        statusIcon
+      };
+    });
+
+    // トレンド適合度スコア（0-100）
+    const trendScore = this.calculateTrendScore(brandComparison, categoryComparison);
+
+    // 仕入れ推奨
+    const purchaseRecommendations = this.generatePurchaseRecommendations(
+      brandComparison,
+      categoryComparison,
+      marketItems
+    );
+
+    return {
+      brandComparison,
+      categoryComparison,
+      trendScore,
+      purchaseRecommendations,
+      summary: {
+        totalMarketItems: marketItems.length,
+        myActiveItems: this.activeListings?.length || 0,
+        missingBrands: brandComparison.filter(b => b.status === 'missing').length,
+        shortageBrands: brandComparison.filter(b => b.status === 'shortage').length,
+        adequateBrands: brandComparison.filter(b => b.status === 'adequate').length
+      }
+    };
+  }
+
+  /**
+   * ブランドの推奨アクションを生成
+   */
+  getBrandRecommendation(status, marketBrand, myBrand) {
+    switch (status) {
+      case 'missing':
+        return `市場で${marketBrand.count}件売れている人気ブランド。仕入れを検討してください。`;
+      case 'shortage':
+        return `市場シェア${marketBrand.share}%に対し出品が少なめ。追加仕入れ推奨。`;
+      case 'excess':
+        return `市場シェア以上に出品中。価格競争力を確認してください。`;
+      case 'adequate':
+        return `適正な出品数です。継続して仕入れてください。`;
+      default:
+        return '';
+    }
+  }
+
+  /**
+   * トレンド適合度スコアを計算
+   */
+  calculateTrendScore(brandComparison, categoryComparison) {
+    let score = 0;
+    let weight = 0;
+
+    // ブランド適合度（上位20ブランドで計算）
+    const topBrands = brandComparison.slice(0, 20);
+    for (const brand of topBrands) {
+      const brandWeight = 21 - brand.marketRank; // 上位ほど重要
+      weight += brandWeight;
+
+      if (brand.status === 'adequate') {
+        score += brandWeight * 1.0;
+      } else if (brand.status === 'excess') {
+        score += brandWeight * 0.8;
+      } else if (brand.status === 'shortage') {
+        score += brandWeight * 0.5;
+      } else {
+        score += brandWeight * 0.1;
+      }
+    }
+
+    return weight > 0 ? Math.round((score / weight) * 100) : 0;
+  }
+
+  /**
+   * 仕入れ推奨リストを生成
+   */
+  generatePurchaseRecommendations(brandComparison, categoryComparison, marketItems) {
+    const recommendations = [];
+    // extractBrandFromTitle関数を取得
+    const extractBrand = (typeof window !== 'undefined' && typeof window.extractBrandFromTitle === 'function')
+      ? window.extractBrandFromTitle
+      : (typeof extractBrandFromTitle === 'function')
+        ? extractBrandFromTitle
+        : (title) => this.extractBrand(title) || '(不明)';
+
+    // ブランド×カテゴリのマッピングを作成
+    const brandCategoryMap = {};
+    for (const item of marketItems) {
+      // 常にタイトルから再判定（item.brandは信頼しない）
+      const brand = extractBrand(item.title);
+      if (!brand || brand === 'Unknown' || brand === '(不明)') continue;
+      if (!brandCategoryMap[brand]) {
+        brandCategoryMap[brand] = {};
+      }
+      const cat = item.category?.main || item.category || 'Other';
+      brandCategoryMap[brand][cat] = (brandCategoryMap[brand][cat] || 0) + 1;
+    }
+
+    // ブランドのトップカテゴリを取得する関数
+    const getTopCategories = (brandName) => {
+      const catData = brandCategoryMap[brandName];
+      if (!catData) return [];
+      return Object.entries(catData)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([category, count]) => ({ category, count }));
+    };
+
+    // 未出品の人気ブランドTOP5
+    const missingBrands = brandComparison
+      .filter(b => b.status === 'missing')
+      .slice(0, 5);
+
+    for (const brand of missingBrands) {
+      const topCategories = getTopCategories(brand.brand);
+      recommendations.push({
+        type: 'brand',
+        priority: 'high',
+        name: brand.brand,
+        reason: `市場ランキング${brand.marketRank}位、${brand.marketCount}件販売中`,
+        avgPrice: brand.marketAvgPrice,
+        action: '仕入れ開始推奨',
+        topCategories: topCategories
+      });
+    }
+
+    // 出品不足ブランドTOP5
+    const shortageBrands = brandComparison
+      .filter(b => b.status === 'shortage')
+      .slice(0, 5);
+
+    for (const brand of shortageBrands) {
+      const topCategories = getTopCategories(brand.brand);
+      recommendations.push({
+        type: 'brand',
+        priority: 'medium',
+        name: brand.brand,
+        reason: `市場シェア${brand.marketShare}%に対し、自分は${brand.myShare}%`,
+        avgPrice: brand.marketAvgPrice,
+        action: '追加仕入れ推奨',
+        topCategories: topCategories
+      });
+    }
+
+    // 未出品の人気カテゴリ
+    const missingCategories = categoryComparison
+      .filter(c => c.status === 'missing' && c.marketRank <= 10)
+      .slice(0, 3);
+
+    for (const cat of missingCategories) {
+      recommendations.push({
+        type: 'category',
+        priority: 'medium',
+        name: cat.category,
+        reason: `市場ランキング${cat.marketRank}位、${cat.marketCount}件販売中`,
+        action: 'カテゴリ参入検討',
+        topCategories: []
+      });
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * 市場データ分析のサマリーを取得（AI分析用）
+   */
+  async getMarketAnalysisSummary() {
+    try {
+      const marketItems = await this.getMarketDataFromDB();
+      if (!marketItems || marketItems.length === 0) {
+        return null;
+      }
+
+      const normalizedItems = this.normalizeMarketData(marketItems);
+      const brandRanking = this.getMarketBrandRanking(normalizedItems, 20);
+      const categoryRanking = this.getMarketCategoryRanking(normalizedItems, 15);
+      const brandCategoryRanking = this.getMarketBrandCategoryRanking(normalizedItems, 10);
+      const comparison = this.compareWithMyListings(normalizedItems);
+
+      return {
+        totalMarketItems: normalizedItems.length,
+        brandRanking,
+        categoryRanking,
+        brandCategoryRanking,
+        comparison,
+        lastUpdated: marketItems[0]?.capturedAt || null
+      };
+    } catch (error) {
+      console.error('市場データ分析エラー:', error);
+      return null;
+    }
   }
 }
 

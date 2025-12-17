@@ -118,6 +118,10 @@
               <span class="btn-icon">🗑️</span>
               クリア
             </button>
+            <button id="clearMyAnalysisBtn" class="action-btn secondary small">
+              <span class="btn-icon">🔄</span>
+              分析結果クリア
+            </button>
           </div>
 
           <!-- 自分のデータ分析結果 -->
@@ -254,6 +258,10 @@
               <span class="btn-icon">🗑️</span>
               クリア
             </button>
+            <button id="clearMarketAnalysisBtn" class="action-btn secondary small">
+              <span class="btn-icon">🔄</span>
+              分析結果クリア
+            </button>
           </div>
 
           <!-- 市場データ分析結果 -->
@@ -384,18 +392,81 @@
         <div class="analysis-section">
           <div class="section-header">
             <h2><span class="section-icon">🔄</span> 市場比較分析</h2>
+            <span id="marketDataCount" class="data-count-badge">市場データ: 0件</span>
           </div>
 
-          <div class="analysis-buttons">
-            <button class="analysis-btn featured" data-analysis="category-comparison">
-              <span class="btn-icon">📊</span>
-              <span class="btn-label">カテゴリ分析</span>
-              <span class="btn-desc">市場とのカテゴリ比較</span>
+          <!-- 市場分析サブタブ -->
+          <div class="market-subtabs">
+            <button class="market-subtab active" data-market-tab="brand-ranking">
+              <span>🏆 ブランド</span>
             </button>
-            <button class="analysis-btn featured" data-analysis="brand-category-matrix">
-              <span class="btn-icon">🎯</span>
-              <span class="btn-label">ブランド×カテゴリ</span>
-              <span class="btn-desc">強み・弱みの発見</span>
+            <button class="market-subtab" data-market-tab="category-ranking">
+              <span>📁 カテゴリ</span>
+            </button>
+            <button class="market-subtab" data-market-tab="brand-category">
+              <span>🎯 ブランド×カテゴリ</span>
+            </button>
+            <button class="market-subtab" data-market-tab="comparison">
+              <span>⚖️ 自分と比較</span>
+            </button>
+          </div>
+
+          <!-- 市場分析コンテンツエリア -->
+          <div id="marketAnalysisContent" class="market-analysis-content">
+            <!-- ブランドランキング -->
+            <div id="market-brand-ranking" class="market-tab-content active">
+              <div class="ranking-header">
+                <h3>🏆 市場ブランドランキング</h3>
+                <p class="ranking-desc">市場で売れているブランドTOP30</p>
+              </div>
+              <div id="brandRankingList" class="ranking-list">
+                <p class="no-data-message">市場データを取り込んでください</p>
+              </div>
+            </div>
+
+            <!-- カテゴリランキング -->
+            <div id="market-category-ranking" class="market-tab-content" style="display: none;">
+              <div class="ranking-header">
+                <h3>📁 市場カテゴリランキング</h3>
+                <p class="ranking-desc">市場で売れているカテゴリTOP20</p>
+              </div>
+              <div id="categoryRankingList" class="ranking-list">
+                <p class="no-data-message">市場データを取り込んでください</p>
+              </div>
+            </div>
+
+            <!-- ブランド×カテゴリ -->
+            <div id="market-brand-category" class="market-tab-content" style="display: none;">
+              <div class="ranking-header">
+                <h3>🎯 ブランド×カテゴリ マトリクス</h3>
+                <p class="ranking-desc">ブランドごとのカテゴリ構成</p>
+              </div>
+              <div id="brandCategoryList" class="ranking-list">
+                <p class="no-data-message">市場データを取り込んでください</p>
+              </div>
+            </div>
+
+            <!-- 自分と比較 -->
+            <div id="market-comparison" class="market-tab-content" style="display: none;">
+              <div class="ranking-header">
+                <h3>⚖️ 市場との比較分析</h3>
+                <p class="ranking-desc">自分の出品と市場トレンドを比較</p>
+              </div>
+              <div id="comparisonContent" class="ranking-list">
+                <p class="no-data-message">自分のデータと市場データを両方取り込んでください</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 市場分析アクションボタン -->
+          <div class="market-analysis-actions">
+            <button id="loadMarketAnalysisBtn" class="action-btn primary">
+              <span class="btn-icon">🔍</span>
+              分析を実行
+            </button>
+            <button id="reanalyzeMarketDataBtn" class="action-btn secondary">
+              <span class="btn-icon">🔄</span>
+              再判定
             </button>
           </div>
         </div>
