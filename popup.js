@@ -4885,6 +4885,9 @@ function initMarketAnalysis() {
 
   // 初期データ件数表示
   updateMarketDataCount();
+
+  // 初期表示（データがあれば表示）
+  restoreMarketAnalysis();
 }
 
 /**
@@ -4965,6 +4968,77 @@ async function loadMarketAnalysis() {
     console.error('市場分析エラー:', error);
     hideLoading();
     showAlert('市場分析中にエラーが発生しました: ' + error.message, 'error');
+  }
+}
+
+/**
+ * 市場分析の初期表示を復元（ページ読み込み時）
+ */
+async function restoreMarketAnalysis() {
+  try {
+    const marketItems = await analyzer.getMarketDataFromDB();
+
+    if (marketItems && marketItems.length > 0) {
+      // 市場データを正規化
+      const normalizedItems = analyzer.normalizeMarketData(marketItems);
+
+      // 各種ランキングを取得
+      const brandRanking = analyzer.getMarketBrandRanking(normalizedItems, 30);
+      const categoryRanking = analyzer.getMarketCategoryRanking(normalizedItems, 20);
+      const brandCategoryRanking = analyzer.getMarketBrandCategoryRanking(normalizedItems, 20);
+
+      // 各タブにレンダリング
+      renderBrandRanking(brandRanking);
+      renderCategoryRanking(categoryRanking);
+      renderBrandCategoryRanking(brandCategoryRanking);
+
+      // 自分のデータとの比較
+      const activeListings = await BunsekiDB.getActiveListings();
+      const soldItems = await BunsekiDB.getSoldItems();
+      if (activeListings && activeListings.length > 0) {
+        analyzer.analyze(activeListings, soldItems || []);
+        const comparison = analyzer.compareWithMyListings(normalizedItems);
+        renderComparison(comparison);
+      } else {
+        renderEmptyComparison();
+      }
+    } else {
+      // データがない場合は空の状態を表示
+      renderEmptyRankings();
+    }
+  } catch (error) {
+    console.error('市場分析の復元エラー:', error);
+    renderEmptyRankings();
+  }
+}
+
+/**
+ * 空のランキング表示
+ */
+function renderEmptyRankings() {
+  const brandList = document.getElementById('brandRankingList');
+  const categoryList = document.getElementById('categoryRankingList');
+  const brandCategoryList = document.getElementById('brandCategoryList');
+
+  if (brandList) {
+    brandList.innerHTML = '<p class="empty-message">データなし（0件）</p>';
+  }
+  if (categoryList) {
+    categoryList.innerHTML = '<p class="empty-message">データなし（0件）</p>';
+  }
+  if (brandCategoryList) {
+    brandCategoryList.innerHTML = '<p class="empty-message">データなし（0件）</p>';
+  }
+  renderEmptyComparison();
+}
+
+/**
+ * 空の比較表示
+ */
+function renderEmptyComparison() {
+  const comparisonContent = document.getElementById('comparisonContent');
+  if (comparisonContent) {
+    comparisonContent.innerHTML = '<p class="empty-message">自分のデータと市場データが必要です</p>';
   }
 }
 
