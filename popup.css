@@ -489,6 +489,17 @@ body {
   color: white;
 }
 
+.action-btn.info {
+  background: var(--info-color);
+  color: white;
+  border: 1px solid var(--info-color);
+}
+
+.action-btn.info:hover {
+  background: #1976d2;
+  border-color: #1976d2;
+}
+
 .action-btn.full-width {
   width: 100%;
 }
