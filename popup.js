@@ -187,6 +187,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 学習済みルールを常に表示（手動入力用）
   updateLearnedRulesDisplay();
+
+  // 前回の分析結果を表示
+  await restoreAnalysisResults();
 });
 
 /**
@@ -1675,6 +1678,172 @@ async function loadSavedData() {
 
   } catch (error) {
     console.error('保存データの読み込みに失敗:', error);
+  }
+}
+
+/**
+ * 前回の分析結果を復元して表示
+ */
+async function restoreAnalysisResults() {
+  try {
+    // 自分のデータの分析結果を復元
+    const activeListings = analyzer.activeListings || [];
+    const soldItems = analyzer.soldItems || [];
+    const allMyItems = [...activeListings, ...soldItems];
+
+    if (allMyItems.length > 0) {
+      // ブランド分類を再計算
+      const myBrands = {};
+      let myClassified = 0;
+      let myUnclassified = 0;
+
+      allMyItems.forEach(item => {
+        const brand = extractBrandFromTitle(item.title);
+        if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== null) {
+          myBrands[brand] = (myBrands[brand] || 0) + 1;
+          myClassified++;
+        } else {
+          myBrands['(未分類)'] = (myBrands['(未分類)'] || 0) + 1;
+          myUnclassified++;
+        }
+      });
+
+      // 統計値を更新
+      const myClassifiedEl = document.getElementById('myClassifiedCount');
+      const myUnclassifiedEl = document.getElementById('myUnclassifiedCount');
+      const myBrandCountEl = document.getElementById('myBrandCount');
+
+      if (myClassifiedEl) myClassifiedEl.textContent = myClassified.toLocaleString();
+      if (myUnclassifiedEl) myUnclassifiedEl.textContent = myUnclassified.toLocaleString();
+      if (myBrandCountEl) myBrandCountEl.textContent = (Object.keys(myBrands).length - (myBrands['(未分類)'] ? 1 : 0)).toLocaleString();
+
+      // ブランド内訳を表示
+      const myBreakdownEl = document.getElementById('myBrandBreakdown');
+      if (myBreakdownEl) {
+        const sortedBrands = Object.entries(myBrands)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+
+        myBreakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
+          <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(brand)}</span>
+              <span class="brand-count">${count}件</span>
+            </div>
+            <div class="breakdown-items" style="display: none;">
+              <div class="loading-items">読み込み中...</div>
+            </div>
+          </div>
+        `).join('');
+
+        // 展開クリックイベント
+        myBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const brand = item.dataset.brand;
+            const itemsDiv = item.querySelector('.breakdown-items');
+            const expandIcon = item.querySelector('.expand-icon');
+
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMyBrandItems(brand, itemsDiv, allMyItems);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
+        });
+      }
+
+      // AI再判定セクション
+      const myAiSection = document.getElementById('myDataAiSection');
+      if (myAiSection) {
+        myAiSection.style.display = myUnclassified > 0 ? 'block' : 'none';
+      }
+    }
+
+    // 市場データの分析結果を復元
+    const marketItems = await BunsekiDB.getMarketData();
+
+    if (marketItems && marketItems.length > 0) {
+      const marketBrands = {};
+      let marketClassified = 0;
+      let marketUnclassified = 0;
+
+      marketItems.forEach(item => {
+        const brand = extractBrandFromTitle(item.title);
+        if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== null) {
+          marketBrands[brand] = (marketBrands[brand] || 0) + 1;
+          marketClassified++;
+        } else {
+          marketBrands['(未分類)'] = (marketBrands['(未分類)'] || 0) + 1;
+          marketUnclassified++;
+        }
+      });
+
+      // 統計値を更新
+      const marketClassifiedEl = document.getElementById('marketClassifiedCount');
+      const marketUnclassifiedEl = document.getElementById('marketUnclassifiedCount');
+      const marketBrandCountEl = document.getElementById('marketBrandCount');
+
+      if (marketClassifiedEl) marketClassifiedEl.textContent = marketClassified.toLocaleString();
+      if (marketUnclassifiedEl) marketUnclassifiedEl.textContent = marketUnclassified.toLocaleString();
+      if (marketBrandCountEl) marketBrandCountEl.textContent = (Object.keys(marketBrands).length - (marketBrands['(未分類)'] ? 1 : 0)).toLocaleString();
+
+      // ブランド内訳を表示
+      const marketBreakdownEl = document.getElementById('marketBrandBreakdown');
+      if (marketBreakdownEl) {
+        const sortedBrands = Object.entries(marketBrands)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+
+        marketBreakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
+          <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(brand)}</span>
+              <span class="brand-count">${count}件</span>
+            </div>
+            <div class="breakdown-items" style="display: none;">
+              <div class="loading-items">読み込み中...</div>
+            </div>
+          </div>
+        `).join('');
+
+        // 展開クリックイベント
+        marketBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const brand = item.dataset.brand;
+            const itemsDiv = item.querySelector('.breakdown-items');
+            const expandIcon = item.querySelector('.expand-icon');
+
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMarketBrandItems(brand, itemsDiv, marketItems);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
+        });
+      }
+
+      // AI再判定セクション
+      const marketAiSection = document.getElementById('marketAiSection');
+      if (marketAiSection) {
+        marketAiSection.style.display = marketUnclassified > 0 ? 'block' : 'none';
+      }
+    }
+
+    console.log('分析結果を復元しました');
+  } catch (error) {
+    console.error('分析結果の復元に失敗:', error);
   }
 }
 
