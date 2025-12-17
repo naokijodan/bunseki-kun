@@ -1727,6 +1727,9 @@ async function runAnalysis(type) {
   showLoading('分析中...');
 
   try {
+    // 学習済みルールを読み込む
+    await analyzer.loadCustomBrandRules();
+
     // データ確認
     if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
       // 保存データの復元を試行
@@ -4361,6 +4364,9 @@ async function loadMarketAnalysis() {
   showLoading('市場データを分析中...');
 
   try {
+    // 学習済みルールを読み込む
+    await analyzer.loadCustomBrandRules();
+
     const marketItems = await analyzer.getMarketDataFromDB();
 
     if (!marketItems || marketItems.length === 0) {
@@ -4413,6 +4419,9 @@ async function reanalyzeMarketData() {
   showLoading('市場データを再判定中...');
 
   try {
+    // 学習済みルールを読み込む
+    await analyzer.loadCustomBrandRules();
+
     const marketItems = await analyzer.getMarketDataFromDB();
 
     if (!marketItems || marketItems.length === 0) {
@@ -4421,9 +4430,9 @@ async function reanalyzeMarketData() {
       return;
     }
 
-    // 各アイテムのブランド・カテゴリを再判定
+    // 各アイテムのブランド・カテゴリを再判定（extractBrandFromTitleを使用）
     const reclassifiedItems = marketItems.map(item => {
-      const brand = analyzer.extractBrand(item.title || '');
+      const brand = extractBrandFromTitle(item.title || '');
       const category = analyzer.extractCategoryFromTitle(item.title || '');
       return {
         ...item,
