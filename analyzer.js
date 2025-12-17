@@ -1572,7 +1572,7 @@ class EbayAnalyzer {
    */
   async getMarketDataFromDB() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('BunsekiKunDB', 3);
+      const request = indexedDB.open('BunsekiKunDB', 4);
 
       request.onerror = () => reject(new Error('IndexedDB接続エラー'));
 

@@ -5,7 +5,7 @@
 
 const BunsekiDB = {
   dbName: 'BunsekiKunDB',
-  dbVersion: 3,  // バージョン3のDBに対応
+  dbVersion: 4,  // バージョン4のDBに対応（互換性維持）
   db: null,
 
   /**
