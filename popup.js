@@ -766,19 +766,14 @@ async function toggleUnclassifiedList(type) {
     if (unclassifiedItems.length === 0) {
       itemsEl.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類のアイテムはありません</p>';
     } else {
-      // リストを生成（最大100件表示）
-      const displayItems = unclassifiedItems.slice(0, 100);
-      itemsEl.innerHTML = displayItems.map((item, idx) => `
+      // リストを生成（全件表示）
+      itemsEl.innerHTML = unclassifiedItems.map((item, idx) => `
         <div class="unclassified-item">
           <span class="item-index">${idx + 1}.</span>
           <span class="item-title">${escapeHtml(item.title || '(タイトルなし)')}</span>
           <span class="item-price">${item.price ? '$' + Number(item.price).toLocaleString() : ''}</span>
         </div>
       `).join('');
-
-      if (unclassifiedItems.length > 100) {
-        itemsEl.innerHTML += `<p style="text-align: center; color: #999; padding: 10px; font-size: 11px;">他 ${unclassifiedItems.length - 100} 件...</p>`;
-      }
     }
 
     listEl.style.display = 'flex';
