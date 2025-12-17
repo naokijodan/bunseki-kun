@@ -46,7 +46,7 @@ const COLORS = {
   ]
 };
 
-// 分析用カテゴリ定義
+// 分析用カテゴリ定義（細分類付き）
 const ANALYSIS_CATEGORIES = {
   clothing_shoes: {
     name: 'Clothing, Shoes & Accessories',
@@ -60,7 +60,18 @@ const ANALYSIS_CATEGORIES = {
       'louis vuitton', 'lv', 'gucci', 'chanel', 'hermes', 'prada', 'burberry', 'fendi', 'dior', 'celine', 'balenciaga', 'bottega', 'loewe', 'saint laurent', 'ysl', 'givenchy', 'valentino', 'miu miu', 'coach', 'michael kors', 'kate spade', 'tory burch', 'marc jacobs', 'versace', 'dolce', 'armani', 'moschino', 'mcm', 'salvatore ferragamo', 'ferragamo', 'jimmy choo', 'manolo', 'christian louboutin', 'louboutin',
       'nike', 'adidas', 'new balance', 'puma', 'reebok', 'converse', 'vans', 'supreme', 'north face', 'patagonia', 'levis', 'ralph lauren', 'polo', 'tommy hilfiger', 'calvin klein', 'gap', 'zara', 'h&m', 'uniqlo',
       'bag', 'handbag', 'shoulder', 'tote', 'backpack', 'clutch', 'crossbody', 'wallet', 'purse', 'pouch'
-    ]
+    ],
+    subcategories: {
+      bags: { nameJa: 'バッグ', keywords: ['bag', 'handbag', 'shoulder', 'tote', 'backpack', 'clutch', 'crossbody', 'satchel', 'hobo', 'bucket bag', 'messenger'] },
+      wallets: { nameJa: '財布・小物', keywords: ['wallet', 'purse', 'pouch', 'card case', 'card holder', 'coin', 'key case', 'key ring'] },
+      shoes: { nameJa: '靴', keywords: ['shoes', 'sneakers', 'boots', 'heels', 'pumps', 'sandals', 'loafers', 'flats', 'oxford', 'mules', 'slides', 'espadrilles', 'moccasin'] },
+      tops: { nameJa: 'トップス', keywords: ['shirt', 'blouse', 'top', 'sweater', 'cardigan', 'hoodie', 't-shirt', 'tee', 'tank', 'polo shirt', 'knit'] },
+      outerwear: { nameJa: 'アウター', keywords: ['jacket', 'coat', 'blazer', 'parka', 'down', 'trench', 'bomber', 'leather jacket', 'denim jacket'] },
+      bottoms: { nameJa: 'ボトムス', keywords: ['pants', 'jeans', 'skirt', 'shorts', 'trousers', 'leggings', 'culottes'] },
+      dresses: { nameJa: 'ドレス・ワンピース', keywords: ['dress', 'gown', 'maxi', 'midi', 'mini dress', 'cocktail'] },
+      accessories: { nameJa: 'アクセサリー', keywords: ['scarf', 'belt', 'tie', 'hat', 'cap', 'gloves', 'sunglasses', 'beanie', 'headband', 'hair'] },
+      other_clothing: { nameJa: 'その他衣類', keywords: [] }
+    }
   },
   jewelry_watches: {
     name: 'Jewelry & Watches',
@@ -73,7 +84,17 @@ const ANALYSIS_CATEGORIES = {
       'watch', 'watches', 'wristwatch', 'timepiece', 'chronograph',
       'tiffany', 'cartier', 'bvlgari', 'bulgari', 'van cleef', 'harry winston', 'david yurman', 'mikimoto', 'pandora', 'swarovski', 'chopard', 'piaget', 'boucheron', 'graff',
       'rolex', 'omega', 'tag heuer', 'breitling', 'patek philippe', 'audemars piguet', 'iwc', 'longines', 'tissot', 'seiko', 'citizen', 'casio', 'g-shock', 'tudor', 'hamilton', 'orient', 'movado', 'fossil', 'michael kors watch'
-    ]
+    ],
+    subcategories: {
+      watches: { nameJa: '時計', keywords: ['watch', 'watches', 'wristwatch', 'timepiece', 'chronograph', 'rolex', 'omega', 'tag heuer', 'breitling', 'patek', 'audemars', 'iwc', 'longines', 'tissot', 'seiko', 'citizen', 'casio', 'g-shock', 'tudor', 'hamilton', 'orient', 'movado', 'fossil'] },
+      necklaces: { nameJa: 'ネックレス・ペンダント', keywords: ['necklace', 'pendant', 'chain', 'choker', 'lariat'] },
+      bracelets: { nameJa: 'ブレスレット・バングル', keywords: ['bracelet', 'bangle', 'cuff', 'tennis bracelet', 'charm bracelet'] },
+      rings: { nameJa: 'リング・指輪', keywords: ['ring', 'band', 'engagement', 'wedding ring', 'cocktail ring', 'signet'] },
+      earrings: { nameJa: 'ピアス・イヤリング', keywords: ['earring', 'stud', 'hoop', 'drop earring', 'dangle', 'clip-on'] },
+      brooches: { nameJa: 'ブローチ・ピン', keywords: ['brooch', 'pin', 'lapel'] },
+      fine_jewelry: { nameJa: 'ファインジュエリー', keywords: ['diamond', 'gold', 'platinum', 'pearl', 'ruby', 'sapphire', 'emerald', '18k', '14k', 'sterling', '925', 'tiffany', 'cartier', 'bvlgari', 'van cleef', 'harry winston'] },
+      other_jewelry: { nameJa: 'その他ジュエリー', keywords: ['anklet', 'charm', 'body jewelry'] }
+    }
   },
   health_beauty: {
     name: 'Health & Beauty',
@@ -767,6 +788,91 @@ function loadMyCategoryItems(category, container, allItems) {
       <tr>
         <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
         <td class="item-price">${price}</td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+/**
+ * 自分のデータのカテゴリ→細分類別アイテム一覧を読み込む
+ */
+function loadMyCategorySubItems(mainCategory, subCategory, container, allItems) {
+  const categoryItems = allItems.filter(item => {
+    const { main, sub } = detectCategoryWithSub(item.title);
+    return main === mainCategory && sub === subCategory;
+  });
+
+  if (categoryItems.length === 0) {
+    container.innerHTML = '<p class="no-items">商品が見つかりません</p>';
+    return;
+  }
+
+  let html = `
+    <div class="brand-items-list">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>タイトル</th>
+            <th>価格</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  categoryItems.forEach(item => {
+    const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+    const title = item.title || '(タイトルなし)';
+    html += `
+      <tr>
+        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
+        <td class="item-price">${price}</td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+/**
+ * 市場データのカテゴリ→細分類別アイテム一覧を読み込む
+ */
+function loadMarketCategorySubItems(mainCategory, subCategory, container, allItems) {
+  const categoryItems = allItems.filter(item => {
+    const { main, sub } = detectCategoryWithSub(item.title);
+    return main === mainCategory && sub === subCategory;
+  });
+
+  if (categoryItems.length === 0) {
+    container.innerHTML = '<p class="no-items">商品が見つかりません</p>';
+    return;
+  }
+
+  let html = `
+    <div class="brand-items-list">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>タイトル</th>
+            <th>価格</th>
+            <th>売上</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  categoryItems.forEach(item => {
+    const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+    const title = item.title || '(タイトルなし)';
+    const sold = item.sold || '-';
+    html += `
+      <tr>
+        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 50))}${title.length > 50 ? '...' : ''}</td>
+        <td class="item-price">${price}</td>
+        <td class="item-sold">${sold}</td>
       </tr>
     `;
   });
@@ -1812,11 +1918,18 @@ async function restoreAnalysisResults() {
       if (myUnclassifiedEl) myUnclassifiedEl.textContent = myUnclassified.toLocaleString();
       if (myBrandCountEl) myBrandCountEl.textContent = (Object.keys(myBrands).length - (myBrands['(未分類)'] ? 1 : 0)).toLocaleString();
 
-      // カテゴリ分類も計算
-      const myCategories = {};
+      // カテゴリ分類も計算（階層構造）
+      const myCategories = {};  // { main: { count, subs: { sub: count } } }
       allMyItems.forEach(item => {
-        const category = detectCategoryFromTitle(item.title) || '(未分類)';
-        myCategories[category] = (myCategories[category] || 0) + 1;
+        const { main, sub } = detectCategoryWithSub(item.title);
+        if (!myCategories[main]) {
+          myCategories[main] = { count: 0, subs: {} };
+        }
+        myCategories[main].count++;
+        if (!myCategories[main].subs[sub]) {
+          myCategories[main].subs[sub] = 0;
+        }
+        myCategories[main].subs[sub]++;
       });
 
       // ブランド内訳を表示 - 未分類を除外
@@ -1884,42 +1997,96 @@ async function restoreAnalysisResults() {
         }
       }
 
-      // カテゴリ内訳を表示 - 未分類を除外
+      // カテゴリ内訳を表示（階層構造） - 未分類を除外
       const myCategoryBreakdownEl = document.getElementById('myCategoryBreakdown');
       const myCategoryToggle = document.getElementById('myCategoryToggle');
       if (myCategoryBreakdownEl) {
         const sortedCategories = Object.entries(myCategories)
           .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他')
-          .sort((a, b) => b[1] - a[1]);
+          .sort((a, b) => b[1].count - a[1].count);
         const totalCategoryCount = sortedCategories.length;
 
         const renderMyCategories = (showAll) => {
           const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
-          myCategoryBreakdownEl.innerHTML = displayCategories.map(([category, count]) => `
-            <div class="breakdown-item expandable ${category === '(未分類)' ? 'unknown' : ''}" data-category="${escapeHtml(category)}">
-              <div class="breakdown-header">
-                <span class="expand-icon">▶</span>
-                <span class="brand-name">${escapeHtml(category)}</span>
-                <span class="brand-count">${count}件</span>
-              </div>
-              <div class="breakdown-items" style="display: none;">
-                <div class="loading-items">読み込み中...</div>
-              </div>
-            </div>
-          `).join('');
+          myCategoryBreakdownEl.innerHTML = displayCategories.map(([mainCategory, data]) => {
+            // 細分類をソート（その他を除く）
+            const sortedSubs = Object.entries(data.subs)
+              .filter(([sub]) => sub !== 'その他')
+              .sort((a, b) => b[1] - a[1]);
+            const otherCount = data.subs['その他'] || 0;
 
-          // 展開クリックイベント
-          myCategoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-            item.querySelector('.breakdown-header').addEventListener('click', function() {
-              const category = item.dataset.category;
-              const itemsDiv = item.querySelector('.breakdown-items');
-              const expandIcon = item.querySelector('.expand-icon');
+            return `
+              <div class="breakdown-item expandable category-main" data-category="${escapeHtml(mainCategory)}">
+                <div class="breakdown-header">
+                  <span class="expand-icon">▶</span>
+                  <span class="brand-name">${escapeHtml(mainCategory)}</span>
+                  <span class="brand-count">${data.count}件</span>
+                </div>
+                <div class="breakdown-items subcategory-list" style="display: none;">
+                  ${sortedSubs.map(([subCategory, subCount]) => `
+                    <div class="breakdown-item expandable subcategory-item" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="${escapeHtml(subCategory)}">
+                      <div class="breakdown-header sub-header">
+                        <span class="expand-icon">▶</span>
+                        <span class="brand-name">${escapeHtml(subCategory)}</span>
+                        <span class="brand-count">${subCount}件</span>
+                      </div>
+                      <div class="breakdown-items item-list" style="display: none;">
+                        <div class="loading-items">読み込み中...</div>
+                      </div>
+                    </div>
+                  `).join('')}
+                  ${otherCount > 0 ? `
+                    <div class="breakdown-item expandable subcategory-item other-sub" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="その他">
+                      <div class="breakdown-header sub-header">
+                        <span class="expand-icon">▶</span>
+                        <span class="brand-name">その他</span>
+                        <span class="brand-count">${otherCount}件</span>
+                      </div>
+                      <div class="breakdown-items item-list" style="display: none;">
+                        <div class="loading-items">読み込み中...</div>
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          // 大分類の展開クリックイベント
+          myCategoryBreakdownEl.querySelectorAll('.category-main > .breakdown-header').forEach(header => {
+            header.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const item = header.closest('.category-main');
+              const itemsDiv = item.querySelector('.subcategory-list');
+              const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
 
               if (itemsDiv.style.display === 'none') {
                 itemsDiv.style.display = 'block';
                 expandIcon.textContent = '▼';
                 item.classList.add('expanded');
-                loadMyCategoryItems(category, itemsDiv, allMyItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
+          });
+
+          // 細分類の展開クリックイベント
+          myCategoryBreakdownEl.querySelectorAll('.subcategory-item > .breakdown-header').forEach(header => {
+            header.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const item = header.closest('.subcategory-item');
+              const mainCategory = item.dataset.mainCategory;
+              const subCategory = item.dataset.subCategory;
+              const itemsDiv = item.querySelector('.item-list');
+              const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMyCategorySubItems(mainCategory, subCategory, itemsDiv, allMyItems);
               } else {
                 itemsDiv.style.display = 'none';
                 expandIcon.textContent = '▶';
@@ -1981,11 +2148,18 @@ async function restoreAnalysisResults() {
       if (marketUnclassifiedEl) marketUnclassifiedEl.textContent = marketUnclassified.toLocaleString();
       if (marketBrandCountEl) marketBrandCountEl.textContent = (Object.keys(marketBrands).length - (marketBrands['(未分類)'] ? 1 : 0)).toLocaleString();
 
-      // カテゴリ分類も計算
-      const marketCategories = {};
+      // カテゴリ分類も計算（階層構造）
+      const marketCategories = {};  // { main: { count, subs: { sub: count } } }
       marketItems.forEach(item => {
-        const category = detectCategoryFromTitle(item.title) || '(未分類)';
-        marketCategories[category] = (marketCategories[category] || 0) + 1;
+        const { main, sub } = detectCategoryWithSub(item.title);
+        if (!marketCategories[main]) {
+          marketCategories[main] = { count: 0, subs: {} };
+        }
+        marketCategories[main].count++;
+        if (!marketCategories[main].subs[sub]) {
+          marketCategories[main].subs[sub] = 0;
+        }
+        marketCategories[main].subs[sub]++;
       });
 
       // ブランド内訳を表示 - 未分類を除外
@@ -2050,42 +2224,96 @@ async function restoreAnalysisResults() {
         }
       }
 
-      // カテゴリ内訳を表示 - 未分類を除外
+      // カテゴリ内訳を表示（階層構造） - 未分類を除外
       const marketCategoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
       const marketCategoryToggle = document.getElementById('marketCategoryToggle');
       if (marketCategoryBreakdownEl) {
         const sortedCategories = Object.entries(marketCategories)
           .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他')
-          .sort((a, b) => b[1] - a[1]);
+          .sort((a, b) => b[1].count - a[1].count);
         const totalCategoryCount = sortedCategories.length;
 
         const renderMarketCategories = (showAll) => {
           const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
-          marketCategoryBreakdownEl.innerHTML = displayCategories.map(([category, count]) => `
-            <div class="breakdown-item expandable ${category === '(未分類)' ? 'unknown' : ''}" data-category="${escapeHtml(category)}">
-              <div class="breakdown-header">
-                <span class="expand-icon">▶</span>
-                <span class="brand-name">${escapeHtml(category)}</span>
-                <span class="brand-count">${count}件</span>
-              </div>
-              <div class="breakdown-items" style="display: none;">
-                <div class="loading-items">読み込み中...</div>
-              </div>
-            </div>
-          `).join('');
+          marketCategoryBreakdownEl.innerHTML = displayCategories.map(([mainCategory, data]) => {
+            // 細分類をソート（その他を除く）
+            const sortedSubs = Object.entries(data.subs)
+              .filter(([sub]) => sub !== 'その他')
+              .sort((a, b) => b[1] - a[1]);
+            const otherCount = data.subs['その他'] || 0;
 
-          // 展開クリックイベント
-          marketCategoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-            item.querySelector('.breakdown-header').addEventListener('click', function() {
-              const category = item.dataset.category;
-              const itemsDiv = item.querySelector('.breakdown-items');
-              const expandIcon = item.querySelector('.expand-icon');
+            return `
+              <div class="breakdown-item expandable category-main" data-category="${escapeHtml(mainCategory)}">
+                <div class="breakdown-header">
+                  <span class="expand-icon">▶</span>
+                  <span class="brand-name">${escapeHtml(mainCategory)}</span>
+                  <span class="brand-count">${data.count}件</span>
+                </div>
+                <div class="breakdown-items subcategory-list" style="display: none;">
+                  ${sortedSubs.map(([subCategory, subCount]) => `
+                    <div class="breakdown-item expandable subcategory-item" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="${escapeHtml(subCategory)}">
+                      <div class="breakdown-header sub-header">
+                        <span class="expand-icon">▶</span>
+                        <span class="brand-name">${escapeHtml(subCategory)}</span>
+                        <span class="brand-count">${subCount}件</span>
+                      </div>
+                      <div class="breakdown-items item-list" style="display: none;">
+                        <div class="loading-items">読み込み中...</div>
+                      </div>
+                    </div>
+                  `).join('')}
+                  ${otherCount > 0 ? `
+                    <div class="breakdown-item expandable subcategory-item other-sub" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="その他">
+                      <div class="breakdown-header sub-header">
+                        <span class="expand-icon">▶</span>
+                        <span class="brand-name">その他</span>
+                        <span class="brand-count">${otherCount}件</span>
+                      </div>
+                      <div class="breakdown-items item-list" style="display: none;">
+                        <div class="loading-items">読み込み中...</div>
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          // 大分類の展開クリックイベント
+          marketCategoryBreakdownEl.querySelectorAll('.category-main > .breakdown-header').forEach(header => {
+            header.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const item = header.closest('.category-main');
+              const itemsDiv = item.querySelector('.subcategory-list');
+              const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
 
               if (itemsDiv.style.display === 'none') {
                 itemsDiv.style.display = 'block';
                 expandIcon.textContent = '▼';
                 item.classList.add('expanded');
-                loadMarketCategoryItems(category, itemsDiv, marketItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
+          });
+
+          // 細分類の展開クリックイベント
+          marketCategoryBreakdownEl.querySelectorAll('.subcategory-item > .breakdown-header').forEach(header => {
+            header.addEventListener('click', function(e) {
+              e.stopPropagation();
+              const item = header.closest('.subcategory-item');
+              const mainCategory = item.dataset.mainCategory;
+              const subCategory = item.dataset.subCategory;
+              const itemsDiv = item.querySelector('.item-list');
+              const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMarketCategorySubItems(mainCategory, subCategory, itemsDiv, marketItems);
               } else {
                 itemsDiv.style.display = 'none';
                 expandIcon.textContent = '▶';
@@ -4068,6 +4296,45 @@ function detectCategoryFromTitle(title) {
   }
 
   return 'その他';
+}
+
+/**
+ * タイトルからカテゴリと細分類を検出
+ * @param {string} title - 商品タイトル
+ * @returns {{ main: string, sub: string }} - 大分類と細分類
+ */
+function detectCategoryWithSub(title) {
+  if (!title) return { main: 'その他', sub: 'その他' };
+
+  const titleLower = title.toLowerCase();
+
+  for (const [key, category] of Object.entries(ANALYSIS_CATEGORIES)) {
+    // まず大分類にマッチするか確認
+    let mainMatched = false;
+    for (const keyword of category.keywords) {
+      if (titleLower.includes(keyword.toLowerCase())) {
+        mainMatched = true;
+        break;
+      }
+    }
+
+    if (mainMatched) {
+      // 大分類にマッチしたら、細分類を探す
+      if (category.subcategories) {
+        for (const [subKey, subCat] of Object.entries(category.subcategories)) {
+          for (const subKeyword of subCat.keywords) {
+            if (subKeyword && titleLower.includes(subKeyword.toLowerCase())) {
+              return { main: category.nameJa, sub: subCat.nameJa };
+            }
+          }
+        }
+      }
+      // 細分類が見つからなければ「その他」
+      return { main: category.nameJa, sub: 'その他' };
+    }
+  }
+
+  return { main: 'その他', sub: 'その他' };
 }
 
 // =====================================
