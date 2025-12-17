@@ -63,7 +63,7 @@ const ANALYSIS_CATEGORIES = {
     ],
     subcategories: {
       bags: { nameJa: 'バッグ', keywords: ['bag', 'handbag', 'shoulder', 'tote', 'backpack', 'clutch', 'crossbody', 'satchel', 'hobo', 'bucket bag', 'messenger'] },
-      wallets: { nameJa: '財布・小物', keywords: ['wallet', 'purse', 'pouch', 'card case', 'card holder', 'coin', 'key case', 'key ring'] },
+      wallets: { nameJa: '財布・小物', keywords: ['wallet', 'purse', 'pouch', 'card case', 'card holder', 'coin purse', 'coin case', 'key case', 'key holder', 'keyring', 'key ring', 'key chain'] },
       shoes: { nameJa: '靴', keywords: ['shoes', 'sneakers', 'boots', 'heels', 'pumps', 'sandals', 'loafers', 'flats', 'oxford', 'mules', 'slides', 'espadrilles', 'moccasin'] },
       tops: { nameJa: 'トップス', keywords: ['shirt', 'blouse', 'top', 'sweater', 'cardigan', 'hoodie', 't-shirt', 'tee', 'tank', 'polo shirt', 'knit'] },
       outerwear: { nameJa: 'アウター', keywords: ['jacket', 'coat', 'blazer', 'parka', 'down', 'trench', 'bomber', 'leather jacket', 'denim jacket'] },
@@ -89,8 +89,8 @@ const ANALYSIS_CATEGORIES = {
       watches: { nameJa: '時計', keywords: ['watch', 'watches', 'wristwatch', 'timepiece', 'chronograph', 'rolex', 'omega', 'tag heuer', 'breitling', 'patek', 'audemars', 'iwc', 'longines', 'tissot', 'seiko', 'citizen', 'casio', 'g-shock', 'tudor', 'hamilton', 'orient', 'movado', 'fossil'] },
       necklaces: { nameJa: 'ネックレス・ペンダント', keywords: ['necklace', 'pendant', 'chain', 'choker', 'lariat'] },
       bracelets: { nameJa: 'ブレスレット・バングル', keywords: ['bracelet', 'bangle', 'cuff', 'tennis bracelet', 'charm bracelet'] },
-      rings: { nameJa: 'リング・指輪', keywords: ['ring', 'band', 'engagement', 'wedding ring', 'cocktail ring', 'signet'] },
-      earrings: { nameJa: 'ピアス・イヤリング', keywords: ['earring', 'stud', 'hoop', 'drop earring', 'dangle', 'clip-on'] },
+      rings: { nameJa: 'リング・指輪', keywords: ['engagement ring', 'wedding ring', 'cocktail ring', 'signet ring', 'diamond ring', 'gold ring', 'silver ring', 'platinum ring'] },
+      earrings: { nameJa: 'ピアス・イヤリング', keywords: ['earring', 'earrings', 'stud earring', 'hoop earring', 'drop earring', 'dangle earring', 'clip-on earring', 'ear cuff'] },
       brooches: { nameJa: 'ブローチ・ピン', keywords: ['brooch', 'pin', 'lapel'] },
       fine_jewelry: { nameJa: 'ファインジュエリー', keywords: ['diamond', 'gold', 'platinum', 'pearl', 'ruby', 'sapphire', 'emerald', '18k', '14k', 'sterling', '925', 'tiffany', 'cartier', 'bvlgari', 'van cleef', 'harry winston'] },
       other_jewelry: { nameJa: 'その他ジュエリー', keywords: ['anklet', 'charm', 'body jewelry'] }
@@ -4299,6 +4299,21 @@ function detectCategoryFromTitle(title) {
 }
 
 /**
+ * 単語境界でキーワードがマッチするかチェック
+ * @param {string} text - 検索対象テキスト
+ * @param {string} keyword - キーワード
+ * @returns {boolean}
+ */
+function matchKeywordWithBoundary(text, keyword) {
+  if (!text || !keyword) return false;
+  // 特殊文字をエスケープ
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 単語境界または文字列境界でマッチ
+  const regex = new RegExp(`(^|[\\s,\\-\\/\\(\\)])${escaped}($|[\\s,\\-\\/\\(\\)s])`, 'i');
+  return regex.test(text);
+}
+
+/**
  * タイトルからカテゴリと細分類を検出
  * @param {string} title - 商品タイトル
  * @returns {{ main: string, sub: string }} - 大分類と細分類
@@ -4307,6 +4322,14 @@ function detectCategoryWithSub(title) {
   if (!title) return { main: 'その他', sub: 'その他' };
 
   const titleLower = title.toLowerCase();
+
+  // 細分類の優先マッチングルール（earring/keyringをringより先にチェック）
+  const prioritySubRules = [
+    { main: '時計・ジュエリー', sub: 'ピアス・イヤリング', keywords: ['earring', 'earrings', 'stud', 'hoop earring', 'drop earring', 'dangle', 'clip-on', 'ear ring'] },
+    { main: '衣類・靴・アクセサリー', sub: 'アクセサリー', keywords: ['keyring', 'key ring', 'key chain', 'keychain'] },
+    { main: '時計・ジュエリー', sub: 'リング・指輪', keywords: ['ring', 'rings', 'band', 'engagement ring', 'wedding ring', 'cocktail ring', 'signet ring'],
+      excludes: ['earring', 'keyring', 'key ring', 'spring', 'string', 'o-ring', 'boxing ring'] },
+  ];
 
   for (const [key, category] of Object.entries(ANALYSIS_CATEGORIES)) {
     // まず大分類にマッチするか確認
@@ -4319,11 +4342,34 @@ function detectCategoryWithSub(title) {
     }
 
     if (mainMatched) {
-      // 大分類にマッチしたら、細分類を探す
+      // 優先ルールを先にチェック
+      for (const rule of prioritySubRules) {
+        if (rule.main === category.nameJa) {
+          // 除外キーワードがあれば先にチェック
+          if (rule.excludes) {
+            let excluded = false;
+            for (const exc of rule.excludes) {
+              if (titleLower.includes(exc)) {
+                excluded = true;
+                break;
+              }
+            }
+            if (excluded) continue;
+          }
+          // キーワードマッチ
+          for (const kw of rule.keywords) {
+            if (matchKeywordWithBoundary(titleLower, kw)) {
+              return { main: category.nameJa, sub: rule.sub };
+            }
+          }
+        }
+      }
+
+      // 通常の細分類マッチング
       if (category.subcategories) {
         for (const [subKey, subCat] of Object.entries(category.subcategories)) {
           for (const subKeyword of subCat.keywords) {
-            if (subKeyword && titleLower.includes(subKeyword.toLowerCase())) {
+            if (subKeyword && matchKeywordWithBoundary(titleLower, subKeyword)) {
               return { main: category.nameJa, sub: subCat.nameJa };
             }
           }
