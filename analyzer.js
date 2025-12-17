@@ -1055,6 +1055,9 @@ class EbayAnalyzer {
         ? extractBrandFromTitle
         : (title) => this.extractBrand(title) || '(不明)';
 
+    // カテゴリ抽出関数
+    const extractCategory = (title) => this.extractCategoryFromTitle(title) || '(不明)';
+
     // 出品中のブランド集計
     for (const item of this.activeListings) {
       // 既存のbrand値を信頼せず、常にタイトルから再判定
@@ -1064,6 +1067,8 @@ class EbayAnalyzer {
       } else {
         brand = extractBrand(item.title);
       }
+      const category = item.category || extractCategory(item.title);
+
       if (!brandStats[brand]) {
         brandStats[brand] = {
           brand,
@@ -1073,12 +1078,26 @@ class EbayAnalyzer {
           revenue: 0,
           totalActivePrice: 0,
           avgDaysToSell: null,
-          daysToSellList: []
+          daysToSellList: [],
+          categoryStats: {} // カテゴリ別内訳
         };
       }
       brandStats[brand].active++;
       brandStats[brand].totalWatchers += item.watchers || 0;
       brandStats[brand].totalActivePrice += item.price || 0;
+
+      // カテゴリ別内訳を集計
+      if (!brandStats[brand].categoryStats[category]) {
+        brandStats[brand].categoryStats[category] = {
+          category,
+          active: 0,
+          sold: 0,
+          totalPrice: 0,
+          revenue: 0
+        };
+      }
+      brandStats[brand].categoryStats[category].active++;
+      brandStats[brand].categoryStats[category].totalPrice += item.price || 0;
     }
 
     // 売れたブランド集計
@@ -1090,6 +1109,8 @@ class EbayAnalyzer {
       } else {
         brand = extractBrand(item.title);
       }
+      const category = item.category || extractCategory(item.title);
+
       if (!brandStats[brand]) {
         brandStats[brand] = {
           brand,
@@ -1099,11 +1120,25 @@ class EbayAnalyzer {
           revenue: 0,
           totalActivePrice: 0,
           avgDaysToSell: null,
-          daysToSellList: []
+          daysToSellList: [],
+          categoryStats: {}
         };
       }
       brandStats[brand].sold += item.quantity || 1;
       brandStats[brand].revenue += (item.soldFor || 0) * (item.quantity || 1);
+
+      // カテゴリ別内訳を集計
+      if (!brandStats[brand].categoryStats[category]) {
+        brandStats[brand].categoryStats[category] = {
+          category,
+          active: 0,
+          sold: 0,
+          totalPrice: 0,
+          revenue: 0
+        };
+      }
+      brandStats[brand].categoryStats[category].sold += item.quantity || 1;
+      brandStats[brand].categoryStats[category].revenue += (item.soldFor || 0) * (item.quantity || 1);
     }
 
     // 売上率と平均価格を計算してソート
@@ -1114,6 +1149,16 @@ class EbayAnalyzer {
         // 売却平均価格
         const avgSoldPrice = stat.sold > 0 ? stat.revenue / stat.sold : 0;
 
+        // カテゴリ別内訳を配列に変換（件数順）
+        const categories = Object.values(stat.categoryStats)
+          .map(cat => ({
+            ...cat,
+            avgPrice: (cat.active + cat.sold) > 0
+              ? (cat.totalPrice + cat.revenue) / (cat.active + cat.sold)
+              : 0
+          }))
+          .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
+
         return {
           ...stat,
           sellThroughRate: stat.active + stat.sold > 0
@@ -1123,7 +1168,8 @@ class EbayAnalyzer {
             ? (stat.totalWatchers / stat.active).toFixed(1)
             : 0,
           avgPrice: avgPrice,
-          avgSoldPrice: avgSoldPrice
+          avgSoldPrice: avgSoldPrice,
+          categories: categories // カテゴリ内訳配列
         };
       })
       .sort((a, b) => (b.sold + b.active) - (a.sold + a.active));

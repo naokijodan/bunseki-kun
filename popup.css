@@ -4585,3 +4585,114 @@ body {
   color: var(--text-tertiary);
   font-size: 14px;
 }
+
+/* ========================================
+   ブランド別パフォーマンス展開テーブル
+   ======================================== */
+.brand-expandable-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.brand-expandable-table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.brand-expandable-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand-expandable-table .col-bar {
+  width: 100px;
+  padding-right: 8px;
+}
+
+.brand-expandable-table .col-name {
+  font-weight: 500;
+}
+
+.brand-expandable-table .brand-main-row.expandable {
+  cursor: pointer;
+}
+
+.brand-expandable-table .brand-main-row.expandable:hover {
+  background: var(--bg-tertiary);
+}
+
+.brand-expandable-table .brand-main-row.expanded {
+  background: var(--bg-secondary);
+}
+
+.brand-expandable-table .row-expand-icon {
+  display: inline-block;
+  width: 16px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s;
+}
+
+.brand-expandable-table .brand-category-row {
+  background: var(--bg-tertiary);
+}
+
+.brand-expandable-table .brand-category-row td {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.brand-expandable-table .subcategory-name {
+  padding-left: 28px;
+  font-weight: normal;
+}
+
+.brand-expandable-table .unknown-row {
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.brand-expandable-table .unknown-row:hover {
+  background: rgba(255, 193, 7, 0.15);
+}
+
+.unknown-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--warning-color);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.table-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.table-bar {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.table-bar-light {
+  background: var(--primary-light);
+  opacity: 0.6;
+}
+
+.table-bar-warning {
+  background: var(--warning-color);
+}

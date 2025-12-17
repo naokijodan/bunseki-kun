@@ -2773,48 +2773,24 @@ function setupPeriodButtons() {
  */
 function generateBrandPerformanceAnalysis() {
   const brands = analyzer.results.brandPerformance || [];
-  const top20 = brands.slice(0, 20);
 
-  // 未分類（不明・その他）の件数を計算
-  const unknownBrand = brands.find(b => b.brand === '(不明)' || b.brand === 'その他' || b.brand === null);
-  const unknownCount = unknownBrand ? (unknownBrand.active + unknownBrand.sold) : 0;
+  // 未分類を除外したリスト（最後に追加するため）
+  const knownBrands = brands.filter(b => b.brand !== '(不明)' && b.brand !== 'その他' && b.brand !== null);
+  const unknownBrands = brands.filter(b => b.brand === '(不明)' || b.brand === 'その他' || b.brand === null);
 
-  // 未分類アラートHTML
-  let unknownAlertHtml = '';
-  if (unknownCount > 0) {
-    unknownAlertHtml = `
-      <div class="unknown-alert-inline" id="brandUnknownAlert">
-        <div class="unknown-alert-header">
-          <span class="unknown-icon">⚠️</span>
-          <span>${unknownCount.toLocaleString()}件の商品が「未分類」です</span>
-        </div>
-        <p class="unknown-hint">ブランドを判定できなかった商品があります。AIで再分類できます。</p>
-        <button id="classifyWithAIBtnInline" class="ai-classify-btn">
-          <span class="btn-icon">🤖</span>
-          AIで自動判定する
-        </button>
-        <div id="aiClassifyProgressInline" class="ai-progress" style="display: none;">
-          <div class="progress-bar">
-            <div class="progress-fill" id="aiProgressFillInline"></div>
-          </div>
-          <span id="aiProgressTextInline">0/0 判定中...</span>
-        </div>
-      </div>
-    `;
-  }
+  // 未分類を最後に追加した全ブランドリスト
+  const sortedBrands = [...knownBrands, ...unknownBrands];
+
+  // 最大値を取得（バーの幅計算用）
+  const maxCount = Math.max(...sortedBrands.map(b => b.active + b.sold));
 
   let html = `
-    ${unknownAlertHtml}
-
-    <div class="chart-container">
-      <canvas id="analysisChart"></canvas>
-    </div>
-
     <div class="analysis-detail">
-      <h4>ブランド別パフォーマンス TOP20</h4>
-      <table class="data-table">
+      <h4>ブランド別パフォーマンス（全${sortedBrands.length}件）</h4>
+      <table class="data-table brand-expandable-table">
         <thead>
           <tr>
+            <th class="col-bar">件数</th>
             <th>ブランド</th>
             <th>出品中</th>
             <th>販売済</th>
@@ -2823,19 +2799,55 @@ function generateBrandPerformanceAnalysis() {
           </tr>
         </thead>
         <tbody>
-          ${top20.map(brand => {
+          ${sortedBrands.map((brand, idx) => {
             const total = brand.active + brand.sold;
             const sellRate = total > 0 ? Math.round((brand.sold / total) * 100) : 0;
-            const isUnknown = brand.brand === '(不明)' || brand.brand === 'その他';
-            return `
-              <tr class="${isUnknown ? 'unknown-row' : ''}">
-                <td>${escapeHtml(brand.brand)}${isUnknown ? ' ⚠️' : ''}</td>
+            const isUnknown = brand.brand === '(不明)' || brand.brand === 'その他' || brand.brand === null;
+            const barWidth = maxCount > 0 ? (total / maxCount * 100).toFixed(1) : 0;
+            const hasCategories = brand.categories && brand.categories.length > 0;
+
+            let rowHtml = `
+              <tr class="brand-main-row ${isUnknown ? 'unknown-row' : ''} ${hasCategories ? 'expandable' : ''}" data-brand-idx="${idx}">
+                <td class="col-bar">
+                  <div class="table-bar-container">
+                    <div class="table-bar ${isUnknown ? 'table-bar-warning' : ''}" style="width: ${barWidth}%"></div>
+                  </div>
+                </td>
+                <td class="col-name">
+                  ${hasCategories ? '<span class="row-expand-icon">▶</span>' : ''}
+                  ${escapeHtml(brand.brand || '(不明)')}${isUnknown ? ' <span class="unknown-badge">未分類</span>' : ''}
+                </td>
                 <td>${brand.active}</td>
                 <td>${brand.sold}</td>
                 <td>${sellRate}%</td>
                 <td>$${brand.avgPrice ? brand.avgPrice.toFixed(2) : '-'}</td>
               </tr>
             `;
+
+            // カテゴリ別内訳行（展開時に表示）
+            if (hasCategories) {
+              brand.categories.forEach(cat => {
+                const catTotal = cat.active + cat.sold;
+                const catSellRate = catTotal > 0 ? Math.round((cat.sold / catTotal) * 100) : 0;
+                const catBarWidth = maxCount > 0 ? (catTotal / maxCount * 100).toFixed(1) : 0;
+                rowHtml += `
+                  <tr class="brand-category-row" data-parent-idx="${idx}" style="display: none;">
+                    <td class="col-bar">
+                      <div class="table-bar-container">
+                        <div class="table-bar table-bar-light" style="width: ${catBarWidth}%"></div>
+                      </div>
+                    </td>
+                    <td class="col-name subcategory-name">└ ${escapeHtml(cat.category)}</td>
+                    <td>${cat.active}</td>
+                    <td>${cat.sold}</td>
+                    <td>${catSellRate}%</td>
+                    <td>$${cat.avgPrice ? cat.avgPrice.toFixed(2) : '-'}</td>
+                  </tr>
+                `;
+              });
+            }
+
+            return rowHtml;
           }).join('')}
         </tbody>
       </table>
@@ -2843,15 +2855,38 @@ function generateBrandPerformanceAnalysis() {
   `;
 
   setTimeout(() => {
-    drawBrandChart(top20);
-    // AI判定ボタンのイベントリスナーを設定
-    const aiBtn = document.getElementById('classifyWithAIBtnInline');
-    if (aiBtn) {
-      aiBtn.addEventListener('click', () => classifyUnknownItemsWithAI(true));
-    }
+    // 展開/折りたたみのイベントリスナーを設定
+    setupBrandExpandListeners();
+    // グラフを描画（上位20件）
+    drawBrandChart(sortedBrands.slice(0, 20));
   }, 100);
 
   return html;
+}
+
+/**
+ * ブランド展開/折りたたみのイベントリスナーを設定
+ */
+function setupBrandExpandListeners() {
+  const mainRows = document.querySelectorAll('.brand-expandable-table .brand-main-row.expandable');
+  mainRows.forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = row.dataset.brandIdx;
+      const subRows = document.querySelectorAll(`.brand-category-row[data-parent-idx="${idx}"]`);
+      const icon = row.querySelector('.row-expand-icon');
+      const isExpanded = row.classList.contains('expanded');
+
+      if (isExpanded) {
+        row.classList.remove('expanded');
+        if (icon) icon.textContent = '▶';
+        subRows.forEach(subRow => subRow.style.display = 'none');
+      } else {
+        row.classList.add('expanded');
+        if (icon) icon.textContent = '▼';
+        subRows.forEach(subRow => subRow.style.display = 'table-row');
+      }
+    });
+  });
 }
 
 // Watch数分析のフィルター設定
