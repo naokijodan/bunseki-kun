@@ -2562,21 +2562,19 @@ async function reanalyzeMyData() {
 
     // 出品中データを再判定
     const activeListings = analyzer.activeListings.map(item => {
-      const detected = analyzer.detectBrand(item.title);
+      const brand = analyzer.extractBrand(item.title) || '(不明)';
       return {
         ...item,
-        brand: detected.brand,
-        detectedType: detected.type
+        brand: brand
       };
     });
 
     // 販売済みデータを再判定
     const soldItems = analyzer.soldItems.map(item => {
-      const detected = analyzer.detectBrand(item.title);
+      const brand = analyzer.extractBrand(item.title) || '(不明)';
       return {
         ...item,
-        brand: detected.brand,
-        detectedType: detected.type
+        brand: brand
       };
     });
 
