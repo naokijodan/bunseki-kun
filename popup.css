@@ -2296,6 +2296,55 @@ body {
 }
 
 /* ブランド内訳 */
+/* 2カラムの内訳コンテナ */
+.breakdown-container {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.breakdown-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.breakdown-column h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.breakdown-toggle {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.breakdown-toggle:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.breakdown-list.expanded {
+  max-height: 400px;
+}
+
+/* 後方互換性のため残す */
 .brand-breakdown {
   margin-top: 12px;
 }
@@ -2305,14 +2354,6 @@ body {
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 8px;
-}
-
-.breakdown-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 .breakdown-item {

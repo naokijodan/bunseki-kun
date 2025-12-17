@@ -734,6 +734,47 @@ function loadMyBrandItems(brand, container, allItems) {
 }
 
 /**
+ * 自分のデータのカテゴリ別アイテム一覧を読み込む
+ */
+function loadMyCategoryItems(category, container, allItems) {
+  const categoryItems = allItems.filter(item => {
+    const itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
+    return itemCategory === category;
+  });
+
+  if (categoryItems.length === 0) {
+    container.innerHTML = '<p class="no-items">商品が見つかりません</p>';
+    return;
+  }
+
+  let html = `
+    <div class="brand-items-list">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>タイトル</th>
+            <th>価格</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  categoryItems.forEach(item => {
+    const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+    const title = item.title || '(タイトルなし)';
+    html += `
+      <tr>
+        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
+        <td class="item-price">${price}</td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+/**
  * 未分類リストの表示/非表示を切り替え
  * @param {string} type - 'my' または 'market'
  */
@@ -1098,6 +1139,59 @@ function loadMarketBrandItems(brand, container, marketData) {
   `;
 
   brandItems.forEach(item => {
+    const title = item.title || '';
+    html += `
+      <tr>
+        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 80))}${title.length > 80 ? '...' : ''}</td>
+        <td class="item-price">$${(item.price || 0).toLocaleString()}</td>
+        <td class="item-sold">${item.sold || 0}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+/**
+ * 市場データのカテゴリ別アイテム一覧を読み込む
+ */
+function loadMarketCategoryItems(category, container, marketData) {
+  const categoryItems = marketData.filter(item => {
+    const itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
+    return itemCategory === category;
+  });
+
+  if (categoryItems.length === 0) {
+    container.innerHTML = '<p class="no-items">商品が見つかりません</p>';
+    return;
+  }
+
+  // 売上数順でソート
+  categoryItems.sort((a, b) => (b.sold || 0) - (a.sold || 0));
+
+  let html = `
+    <div class="brand-items-list">
+      <div class="items-header">
+        <span class="items-count">${categoryItems.length}件</span>
+      </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>タイトル</th>
+            <th>価格</th>
+            <th>売上数</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  categoryItems.forEach(item => {
     const title = item.title || '';
     html += `
       <tr>
@@ -1717,45 +1811,134 @@ async function restoreAnalysisResults() {
       if (myUnclassifiedEl) myUnclassifiedEl.textContent = myUnclassified.toLocaleString();
       if (myBrandCountEl) myBrandCountEl.textContent = (Object.keys(myBrands).length - (myBrands['(未分類)'] ? 1 : 0)).toLocaleString();
 
+      // カテゴリ分類も計算
+      const myCategories = {};
+      allMyItems.forEach(item => {
+        const category = detectCategoryFromTitle(item.title) || '(未分類)';
+        myCategories[category] = (myCategories[category] || 0) + 1;
+      });
+
       // ブランド内訳を表示
       const myBreakdownEl = document.getElementById('myBrandBreakdown');
+      const myBrandToggle = document.getElementById('myBrandToggle');
       if (myBreakdownEl) {
-        const sortedBrands = Object.entries(myBrands)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10);
+        const sortedBrands = Object.entries(myBrands).sort((a, b) => b[1] - a[1]);
+        const totalBrandCount = sortedBrands.length;
 
-        myBreakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
-          <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
-            <div class="breakdown-header">
-              <span class="expand-icon">▶</span>
-              <span class="brand-name">${escapeHtml(brand)}</span>
-              <span class="brand-count">${count}件</span>
+        // 表示用関数
+        const renderMyBrands = (showAll) => {
+          const displayBrands = showAll ? sortedBrands : sortedBrands.slice(0, 10);
+          myBreakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+            <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
+              <div class="breakdown-header">
+                <span class="expand-icon">▶</span>
+                <span class="brand-name">${escapeHtml(brand)}</span>
+                <span class="brand-count">${count}件</span>
+              </div>
+              <div class="breakdown-items" style="display: none;">
+                <div class="loading-items">読み込み中...</div>
+              </div>
             </div>
-            <div class="breakdown-items" style="display: none;">
-              <div class="loading-items">読み込み中...</div>
-            </div>
-          </div>
-        `).join('');
+          `).join('');
 
-        // 展開クリックイベント
-        myBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-          item.querySelector('.breakdown-header').addEventListener('click', function() {
-            const brand = item.dataset.brand;
-            const itemsDiv = item.querySelector('.breakdown-items');
-            const expandIcon = item.querySelector('.expand-icon');
+          // 展開クリックイベント
+          myBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+            item.querySelector('.breakdown-header').addEventListener('click', function() {
+              const brand = item.dataset.brand;
+              const itemsDiv = item.querySelector('.breakdown-items');
+              const expandIcon = item.querySelector('.expand-icon');
 
-            if (itemsDiv.style.display === 'none') {
-              itemsDiv.style.display = 'block';
-              expandIcon.textContent = '▼';
-              item.classList.add('expanded');
-              loadMyBrandItems(brand, itemsDiv, allMyItems);
-            } else {
-              itemsDiv.style.display = 'none';
-              expandIcon.textContent = '▶';
-              item.classList.remove('expanded');
-            }
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMyBrandItems(brand, itemsDiv, allMyItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
           });
-        });
+        };
+
+        // 初期表示
+        renderMyBrands(false);
+
+        // トグルボタン設定
+        if (myBrandToggle && totalBrandCount > 10) {
+          myBrandToggle.textContent = `(上位10件 - 全${totalBrandCount}件表示)`;
+          myBrandToggle.style.display = 'inline';
+          myBrandToggle.onclick = () => {
+            const isExpanded = myBrandToggle.dataset.expanded === 'true';
+            myBrandToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+            myBrandToggle.textContent = isExpanded ? `(上位10件 - 全${totalBrandCount}件表示)` : `(上位10件に戻す)`;
+            myBreakdownEl.classList.toggle('expanded', !isExpanded);
+            renderMyBrands(!isExpanded);
+          };
+        } else if (myBrandToggle) {
+          myBrandToggle.style.display = 'none';
+        }
+      }
+
+      // カテゴリ内訳を表示
+      const myCategoryBreakdownEl = document.getElementById('myCategoryBreakdown');
+      const myCategoryToggle = document.getElementById('myCategoryToggle');
+      if (myCategoryBreakdownEl) {
+        const sortedCategories = Object.entries(myCategories).sort((a, b) => b[1] - a[1]);
+        const totalCategoryCount = sortedCategories.length;
+
+        const renderMyCategories = (showAll) => {
+          const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
+          myCategoryBreakdownEl.innerHTML = displayCategories.map(([category, count]) => `
+            <div class="breakdown-item expandable ${category === '(未分類)' ? 'unknown' : ''}" data-category="${escapeHtml(category)}">
+              <div class="breakdown-header">
+                <span class="expand-icon">▶</span>
+                <span class="brand-name">${escapeHtml(category)}</span>
+                <span class="brand-count">${count}件</span>
+              </div>
+              <div class="breakdown-items" style="display: none;">
+                <div class="loading-items">読み込み中...</div>
+              </div>
+            </div>
+          `).join('');
+
+          // 展開クリックイベント
+          myCategoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+            item.querySelector('.breakdown-header').addEventListener('click', function() {
+              const category = item.dataset.category;
+              const itemsDiv = item.querySelector('.breakdown-items');
+              const expandIcon = item.querySelector('.expand-icon');
+
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMyCategoryItems(category, itemsDiv, allMyItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
+          });
+        };
+
+        renderMyCategories(false);
+
+        if (myCategoryToggle && totalCategoryCount > 10) {
+          myCategoryToggle.textContent = `(上位10件 - 全${totalCategoryCount}件表示)`;
+          myCategoryToggle.style.display = 'inline';
+          myCategoryToggle.onclick = () => {
+            const isExpanded = myCategoryToggle.dataset.expanded === 'true';
+            myCategoryToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+            myCategoryToggle.textContent = isExpanded ? `(上位10件 - 全${totalCategoryCount}件表示)` : `(上位10件に戻す)`;
+            myCategoryBreakdownEl.classList.toggle('expanded', !isExpanded);
+            renderMyCategories(!isExpanded);
+          };
+        } else if (myCategoryToggle) {
+          myCategoryToggle.style.display = 'none';
+        }
       }
 
       // AI再判定セクション
@@ -1793,45 +1976,131 @@ async function restoreAnalysisResults() {
       if (marketUnclassifiedEl) marketUnclassifiedEl.textContent = marketUnclassified.toLocaleString();
       if (marketBrandCountEl) marketBrandCountEl.textContent = (Object.keys(marketBrands).length - (marketBrands['(未分類)'] ? 1 : 0)).toLocaleString();
 
+      // カテゴリ分類も計算
+      const marketCategories = {};
+      marketItems.forEach(item => {
+        const category = detectCategoryFromTitle(item.title) || '(未分類)';
+        marketCategories[category] = (marketCategories[category] || 0) + 1;
+      });
+
       // ブランド内訳を表示
       const marketBreakdownEl = document.getElementById('marketBrandBreakdown');
+      const marketBrandToggle = document.getElementById('marketBrandToggle');
       if (marketBreakdownEl) {
-        const sortedBrands = Object.entries(marketBrands)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10);
+        const sortedBrands = Object.entries(marketBrands).sort((a, b) => b[1] - a[1]);
+        const totalBrandCount = sortedBrands.length;
 
-        marketBreakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
-          <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
-            <div class="breakdown-header">
-              <span class="expand-icon">▶</span>
-              <span class="brand-name">${escapeHtml(brand)}</span>
-              <span class="brand-count">${count}件</span>
+        const renderMarketBrands = (showAll) => {
+          const displayBrands = showAll ? sortedBrands : sortedBrands.slice(0, 10);
+          marketBreakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+            <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
+              <div class="breakdown-header">
+                <span class="expand-icon">▶</span>
+                <span class="brand-name">${escapeHtml(brand)}</span>
+                <span class="brand-count">${count}件</span>
+              </div>
+              <div class="breakdown-items" style="display: none;">
+                <div class="loading-items">読み込み中...</div>
+              </div>
             </div>
-            <div class="breakdown-items" style="display: none;">
-              <div class="loading-items">読み込み中...</div>
-            </div>
-          </div>
-        `).join('');
+          `).join('');
 
-        // 展開クリックイベント
-        marketBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-          item.querySelector('.breakdown-header').addEventListener('click', function() {
-            const brand = item.dataset.brand;
-            const itemsDiv = item.querySelector('.breakdown-items');
-            const expandIcon = item.querySelector('.expand-icon');
+          // 展開クリックイベント
+          marketBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+            item.querySelector('.breakdown-header').addEventListener('click', function() {
+              const brand = item.dataset.brand;
+              const itemsDiv = item.querySelector('.breakdown-items');
+              const expandIcon = item.querySelector('.expand-icon');
 
-            if (itemsDiv.style.display === 'none') {
-              itemsDiv.style.display = 'block';
-              expandIcon.textContent = '▼';
-              item.classList.add('expanded');
-              loadMarketBrandItems(brand, itemsDiv, marketItems);
-            } else {
-              itemsDiv.style.display = 'none';
-              expandIcon.textContent = '▶';
-              item.classList.remove('expanded');
-            }
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMarketBrandItems(brand, itemsDiv, marketItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
           });
-        });
+        };
+
+        renderMarketBrands(false);
+
+        if (marketBrandToggle && totalBrandCount > 10) {
+          marketBrandToggle.textContent = `(上位10件 - 全${totalBrandCount}件表示)`;
+          marketBrandToggle.style.display = 'inline';
+          marketBrandToggle.onclick = () => {
+            const isExpanded = marketBrandToggle.dataset.expanded === 'true';
+            marketBrandToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+            marketBrandToggle.textContent = isExpanded ? `(上位10件 - 全${totalBrandCount}件表示)` : `(上位10件に戻す)`;
+            marketBreakdownEl.classList.toggle('expanded', !isExpanded);
+            renderMarketBrands(!isExpanded);
+          };
+        } else if (marketBrandToggle) {
+          marketBrandToggle.style.display = 'none';
+        }
+      }
+
+      // カテゴリ内訳を表示
+      const marketCategoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
+      const marketCategoryToggle = document.getElementById('marketCategoryToggle');
+      if (marketCategoryBreakdownEl) {
+        const sortedCategories = Object.entries(marketCategories).sort((a, b) => b[1] - a[1]);
+        const totalCategoryCount = sortedCategories.length;
+
+        const renderMarketCategories = (showAll) => {
+          const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
+          marketCategoryBreakdownEl.innerHTML = displayCategories.map(([category, count]) => `
+            <div class="breakdown-item expandable ${category === '(未分類)' ? 'unknown' : ''}" data-category="${escapeHtml(category)}">
+              <div class="breakdown-header">
+                <span class="expand-icon">▶</span>
+                <span class="brand-name">${escapeHtml(category)}</span>
+                <span class="brand-count">${count}件</span>
+              </div>
+              <div class="breakdown-items" style="display: none;">
+                <div class="loading-items">読み込み中...</div>
+              </div>
+            </div>
+          `).join('');
+
+          // 展開クリックイベント
+          marketCategoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+            item.querySelector('.breakdown-header').addEventListener('click', function() {
+              const category = item.dataset.category;
+              const itemsDiv = item.querySelector('.breakdown-items');
+              const expandIcon = item.querySelector('.expand-icon');
+
+              if (itemsDiv.style.display === 'none') {
+                itemsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+                loadMarketCategoryItems(category, itemsDiv, marketItems);
+              } else {
+                itemsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            });
+          });
+        };
+
+        renderMarketCategories(false);
+
+        if (marketCategoryToggle && totalCategoryCount > 10) {
+          marketCategoryToggle.textContent = `(上位10件 - 全${totalCategoryCount}件表示)`;
+          marketCategoryToggle.style.display = 'inline';
+          marketCategoryToggle.onclick = () => {
+            const isExpanded = marketCategoryToggle.dataset.expanded === 'true';
+            marketCategoryToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+            marketCategoryToggle.textContent = isExpanded ? `(上位10件 - 全${totalCategoryCount}件表示)` : `(上位10件に戻す)`;
+            marketCategoryBreakdownEl.classList.toggle('expanded', !isExpanded);
+            renderMarketCategories(!isExpanded);
+          };
+        } else if (marketCategoryToggle) {
+          marketCategoryToggle.style.display = 'none';
+        }
       }
 
       // AI再判定セクション
