@@ -4054,16 +4054,30 @@ function generateLearnedRulesHtml() {
   const totalCount = rules.length;
   const totalKeywords = rules.reduce((sum, r) => sum + r.keywordCount, 0);
 
+  // マニュアル入力フォーム
+  const manualInputHtml = `
+    <div class="manual-rule-input">
+      <div class="manual-input-row">
+        <input type="text" class="manual-brand-input" placeholder="ブランド名">
+        <input type="text" class="manual-keyword-input" placeholder="キーワード（カンマ区切り）">
+        <button class="add-rule-btn" title="ルールを追加">＋</button>
+      </div>
+      <p class="manual-input-hint">例: ブランド名「TIFFANY」、キーワード「ティファニー, tiffany&co」</p>
+    </div>
+  `;
+
   if (totalCount === 0) {
     return `
+      ${manualInputHtml}
       <div class="learned-rules-empty">
         <p>学習済みルールはありません</p>
-        <p class="hint">AI判定を実行すると、新しいブランド・キーワードが自動で学習されます</p>
+        <p class="hint">AI判定を実行するか、上のフォームから手動でルールを追加してください</p>
       </div>
     `;
   }
 
   return `
+    ${manualInputHtml}
     <div class="learned-rules-summary">
       <div class="summary-stat">
         <span class="stat-value">${totalCount}</span>
@@ -4073,7 +4087,7 @@ function generateLearnedRulesHtml() {
         <span class="stat-value">${totalKeywords}</span>
         <span class="stat-label">キーワード</span>
       </div>
-      <button id="clearLearnedRulesBtn" class="action-btn danger small">
+      <button class="clear-all-rules-btn action-btn danger small">
         <span class="btn-icon">🗑️</span> 全クリア
       </button>
     </div>
@@ -4088,6 +4102,49 @@ function generateLearnedRulesHtml() {
       `).join('')}
     </div>
   `;
+}
+
+/**
+ * 手動でブランドルールを追加
+ */
+async function addManualBrandRule(brand, keywords) {
+  if (!brand || !brand.trim()) {
+    showAlert('ブランド名を入力してください', 'warning');
+    return false;
+  }
+
+  brand = brand.trim().toUpperCase();
+  const keywordList = keywords
+    ? keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k)
+    : [];
+
+  if (!analyzer.customBrandRules) {
+    analyzer.customBrandRules = {};
+  }
+
+  if (!analyzer.customBrandRules[brand]) {
+    analyzer.customBrandRules[brand] = {
+      brand: brand,
+      keywords: []
+    };
+  }
+
+  // キーワードを追加（重複除外）
+  keywordList.forEach(kw => {
+    if (!analyzer.customBrandRules[brand].keywords.includes(kw)) {
+      analyzer.customBrandRules[brand].keywords.push(kw);
+    }
+  });
+
+  // ブランド名自体もキーワードに追加
+  const brandLower = brand.toLowerCase();
+  if (!analyzer.customBrandRules[brand].keywords.includes(brandLower)) {
+    analyzer.customBrandRules[brand].keywords.push(brandLower);
+  }
+
+  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  showAlert(`「${brand}」を追加しました`, 'success');
+  return true;
 }
 
 /**
@@ -4167,6 +4224,45 @@ function setupLearnedRulesEvents(container) {
         updateLearnedRulesDisplay();
       }
     };
+  });
+
+  // マニュアル入力ボタン
+  const addBtn = container.querySelector('.add-rule-btn');
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      const brandInput = container.querySelector('.manual-brand-input');
+      const keywordInput = container.querySelector('.manual-keyword-input');
+      const brand = brandInput?.value;
+      const keywords = keywordInput?.value;
+
+      const added = await addManualBrandRule(brand, keywords);
+      if (added) {
+        brandInput.value = '';
+        keywordInput.value = '';
+        updateLearnedRulesDisplay();
+      }
+    };
+  }
+
+  // Enterキーでも追加できるように
+  const brandInput = container.querySelector('.manual-brand-input');
+  const keywordInput = container.querySelector('.manual-keyword-input');
+
+  [brandInput, keywordInput].forEach(input => {
+    if (input) {
+      input.onkeypress = async (e) => {
+        if (e.key === 'Enter') {
+          const brand = container.querySelector('.manual-brand-input')?.value;
+          const keywords = container.querySelector('.manual-keyword-input')?.value;
+          const added = await addManualBrandRule(brand, keywords);
+          if (added) {
+            container.querySelector('.manual-brand-input').value = '';
+            container.querySelector('.manual-keyword-input').value = '';
+            updateLearnedRulesDisplay();
+          }
+        }
+      };
+    }
   });
 }
 
