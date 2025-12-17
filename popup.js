@@ -4022,7 +4022,7 @@ function getLearnedRulesCount() {
 }
 
 /**
- * 学習済みルールの一覧を取得
+ * 学習済みルールの一覧を取得（アルファベット順）
  */
 function getLearnedRulesList() {
   const rules = analyzer.customBrandRules || {};
@@ -4030,7 +4030,7 @@ function getLearnedRulesList() {
     brand: rule.brand || brand,
     keywords: rule.keywords || [],
     keywordCount: (rule.keywords || []).length
-  })).sort((a, b) => b.keywordCount - a.keywordCount);
+  })).sort((a, b) => a.brand.localeCompare(b.brand));
 }
 
 /**
@@ -4074,12 +4074,13 @@ function generateLearnedRulesHtml() {
         <span class="stat-label">キーワード</span>
       </div>
       <button id="clearLearnedRulesBtn" class="action-btn danger small">
-        <span class="btn-icon">🗑️</span> クリア
+        <span class="btn-icon">🗑️</span> 全クリア
       </button>
     </div>
     <div class="learned-rules-list">
       ${rules.map(rule => `
-        <div class="learned-rule-item">
+        <div class="learned-rule-item" data-brand="${escapeHtml(rule.brand)}">
+          <button class="delete-rule-btn" title="このルールを削除">×</button>
           <span class="rule-brand">${escapeHtml(rule.brand)}</span>
           <span class="rule-keywords">${rule.keywords.map(k => escapeHtml(k)).join(', ')}</span>
           <span class="rule-count">${rule.keywordCount}件</span>
@@ -4090,33 +4091,83 @@ function generateLearnedRulesHtml() {
 }
 
 /**
+ * 個別の学習済みルールを削除
+ */
+async function deleteLearnedRule(brand) {
+  if (!analyzer.customBrandRules || !analyzer.customBrandRules[brand]) {
+    return false;
+  }
+
+  delete analyzer.customBrandRules[brand];
+  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  return true;
+}
+
+/**
  * 学習済みルール表示を更新
  */
 function updateLearnedRulesDisplay() {
+  // 自分のデータセクション
   const section = document.getElementById('learnedRulesSection');
   const content = document.getElementById('learnedRulesContent');
 
-  if (!section || !content) return;
+  // 市場データセクション
+  const marketSection = document.getElementById('marketLearnedRulesSection');
+  const marketContent = document.getElementById('marketLearnedRulesContent');
 
   const rulesCount = Object.keys(analyzer.customBrandRules || {}).length;
+  const html = generateLearnedRulesHtml();
 
-  if (rulesCount > 0) {
-    section.style.display = 'block';
-    content.innerHTML = generateLearnedRulesHtml();
-
-    // クリアボタンのイベントリスナーを追加
-    const clearBtn = document.getElementById('clearLearnedRulesBtn');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', async () => {
-        const cleared = await clearLearnedRules();
-        if (cleared) {
-          updateLearnedRulesDisplay();
-        }
-      });
+  // 自分のデータセクションに表示
+  if (section && content) {
+    if (rulesCount > 0) {
+      section.style.display = 'block';
+      content.innerHTML = html;
+      setupLearnedRulesEvents(content);
+    } else {
+      section.style.display = 'none';
     }
-  } else {
-    section.style.display = 'none';
   }
+
+  // 市場データセクションにも表示
+  if (marketSection && marketContent) {
+    if (rulesCount > 0) {
+      marketSection.style.display = 'block';
+      marketContent.innerHTML = html;
+      setupLearnedRulesEvents(marketContent);
+    } else {
+      marketSection.style.display = 'none';
+    }
+  }
+}
+
+/**
+ * 学習済みルールのイベントを設定
+ */
+function setupLearnedRulesEvents(container) {
+  // 全クリアボタン
+  const clearBtn = container.querySelector('#clearLearnedRulesBtn, .clear-all-rules-btn');
+  if (clearBtn) {
+    clearBtn.onclick = async () => {
+      const cleared = await clearLearnedRules();
+      if (cleared) {
+        updateLearnedRulesDisplay();
+      }
+    };
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.delete-rule-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const item = btn.closest('.learned-rule-item');
+      const brand = item?.dataset.brand;
+      if (brand) {
+        await deleteLearnedRule(brand);
+        updateLearnedRulesDisplay();
+      }
+    };
+  });
 }
 
 // =====================================

@@ -1758,6 +1758,28 @@ body {
   white-space: nowrap;
 }
 
+.learned-rule-item .delete-rule-btn {
+  background: none;
+  border: none;
+  color: #e53935;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.learned-rule-item .delete-rule-btn:hover {
+  opacity: 1;
+  background: rgba(229, 57, 53, 0.1);
+}
+
+.learned-rules-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 .more-hint {
   text-align: center;
   font-size: 11px;
