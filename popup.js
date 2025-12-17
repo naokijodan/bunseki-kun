@@ -6150,16 +6150,20 @@ function renderComparison(comparison) {
         font-size: 48px;
         font-weight: 700;
         line-height: 1;
+        color: #ffd700;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
       }
       .trend-score-label {
         font-size: 14px;
         margin-top: 8px;
-        opacity: 0.9;
+        color: #fff;
+        font-weight: 600;
       }
       .trend-score-desc {
         font-size: 12px;
         margin-top: 8px;
-        opacity: 0.8;
+        color: #e0e0ff;
+        font-weight: 500;
       }
       .comparison-summary {
         display: grid;
