@@ -2518,23 +2518,44 @@ body {
 
 .market-analysis-actions.top {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   padding-top: 0;
   border-top: none;
   border-bottom: none;
+  justify-content: flex-end;
 }
 
 .market-analysis-actions .action-btn {
   flex: 1;
 }
 
-.market-analysis-actions .action-btn.compact {
-  padding: 8px 12px;
-  font-size: 12px;
+.market-analysis-actions.top .action-btn.compact {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 4px;
 }
 
-.market-analysis-actions .action-btn.compact .btn-icon {
-  font-size: 12px;
+.market-analysis-actions.top .action-btn.compact.primary {
+  background: var(--info-color);
+  color: white;
+}
+
+.market-analysis-actions.top .action-btn.compact.primary:hover {
+  background: #1976d2;
+}
+
+.market-analysis-actions.top .action-btn.compact.secondary {
+  background: #e0e0e0;
+  color: var(--text-secondary);
+}
+
+.market-analysis-actions.top .action-btn.compact.secondary:hover {
+  background: #d0d0d0;
+}
+
+.market-analysis-actions.top .action-btn.compact .btn-icon {
+  font-size: 10px;
 }
 
 /* ランキングヘッダー */
