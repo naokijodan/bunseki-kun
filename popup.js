@@ -184,6 +184,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadSavedData();
   await updateMarketDataInfo();
   await checkAPIStatus();
+
+  // 学習済みルールを常に表示（手動入力用）
+  updateLearnedRulesDisplay();
 });
 
 /**
@@ -4203,29 +4206,20 @@ function updateLearnedRulesDisplay() {
   const marketSection = document.getElementById('marketLearnedRulesSection');
   const marketContent = document.getElementById('marketLearnedRulesContent');
 
-  const rulesCount = Object.keys(analyzer.customBrandRules || {}).length;
   const html = generateLearnedRulesHtml();
 
-  // 自分のデータセクションに表示
+  // 自分のデータセクションに表示（常に表示）
   if (section && content) {
-    if (rulesCount > 0) {
-      section.style.display = 'block';
-      content.innerHTML = html;
-      setupLearnedRulesEvents(content);
-    } else {
-      section.style.display = 'none';
-    }
+    section.style.display = 'block';
+    content.innerHTML = html;
+    setupLearnedRulesEvents(content);
   }
 
-  // 市場データセクションにも表示
+  // 市場データセクションにも表示（常に表示）
   if (marketSection && marketContent) {
-    if (rulesCount > 0) {
-      marketSection.style.display = 'block';
-      marketContent.innerHTML = html;
-      setupLearnedRulesEvents(marketContent);
-    } else {
-      marketSection.style.display = 'none';
-    }
+    marketSection.style.display = 'block';
+    marketContent.innerHTML = html;
+    setupLearnedRulesEvents(marketContent);
   }
 }
 
