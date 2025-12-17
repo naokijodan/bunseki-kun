@@ -4131,7 +4131,10 @@ function generateLearnedRulesHtml() {
     <div class="learned-rules-list">
       ${rules.map(rule => `
         <div class="learned-rule-item" data-brand="${escapeHtml(rule.brand)}">
-          <button class="delete-rule-btn" title="このルールを削除">×</button>
+          <div class="rule-actions">
+            <button class="edit-rule-btn" title="このルールを編集">✎</button>
+            <button class="delete-rule-btn" title="このルールを削除">×</button>
+          </div>
           <span class="rule-brand">${escapeHtml(rule.brand)}</span>
           <span class="rule-keywords">${rule.keywords.map(k => escapeHtml(k)).join(', ')}</span>
           <span class="rule-count">${rule.keywordCount}件</span>
@@ -4198,6 +4201,99 @@ async function deleteLearnedRule(brand) {
 }
 
 /**
+ * ルール編集モーダルを開く
+ */
+function openEditRuleModal(brand) {
+  const rule = analyzer.customBrandRules?.[brand];
+  if (!rule) {
+    showAlert('ルールが見つかりません', 'warning');
+    return;
+  }
+
+  const keywords = rule.keywords || [];
+  const keywordsText = keywords.join(', ');
+
+  // モーダルHTMLを作成
+  const modalHtml = `
+    <div class="edit-rule-modal-overlay" id="editRuleModalOverlay">
+      <div class="edit-rule-modal">
+        <div class="modal-header">
+          <h3>ルールを編集</h3>
+          <button class="modal-close-btn" id="closeEditRuleModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>ブランド名</label>
+            <input type="text" id="editRuleBrand" value="${escapeHtml(brand)}" readonly class="readonly-input">
+          </div>
+          <div class="form-group">
+            <label>キーワード（カンマ区切り）</label>
+            <textarea id="editRuleKeywords" rows="4" placeholder="キーワードをカンマで区切って入力">${escapeHtml(keywordsText)}</textarea>
+            <p class="form-hint">例: tiffany, ティファニー, tiffany&co</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="action-btn secondary" id="cancelEditRule">キャンセル</button>
+          <button class="action-btn primary" id="saveEditRule">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // モーダルをDOMに追加
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // イベント設定
+  const overlay = document.getElementById('editRuleModalOverlay');
+  const closeBtn = document.getElementById('closeEditRuleModal');
+  const cancelBtn = document.getElementById('cancelEditRule');
+  const saveBtn = document.getElementById('saveEditRule');
+
+  const closeModal = () => {
+    overlay.remove();
+  };
+
+  closeBtn.onclick = closeModal;
+  cancelBtn.onclick = closeModal;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeModal();
+  };
+
+  saveBtn.onclick = async () => {
+    const newKeywords = document.getElementById('editRuleKeywords').value;
+    await saveEditedRule(brand, newKeywords);
+    closeModal();
+  };
+}
+
+/**
+ * 編集されたルールを保存
+ */
+async function saveEditedRule(brand, keywordsText) {
+  if (!analyzer.customBrandRules || !analyzer.customBrandRules[brand]) {
+    showAlert('ルールが見つかりません', 'warning');
+    return false;
+  }
+
+  // キーワードをパース
+  const keywords = keywordsText
+    .split(',')
+    .map(k => k.trim().toLowerCase())
+    .filter(k => k.length > 0);
+
+  // ルールを更新
+  analyzer.customBrandRules[brand].keywords = keywords;
+
+  // 保存
+  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  showAlert(`「${brand}」のルールを更新しました`, 'success');
+
+  // 表示を更新
+  updateLearnedRulesDisplay();
+  return true;
+}
+
+/**
  * 学習済みルール表示を更新
  */
 function updateLearnedRulesDisplay() {
@@ -4250,6 +4346,18 @@ function setupLearnedRulesEvents(container) {
       if (brand) {
         await deleteLearnedRule(brand);
         updateLearnedRulesDisplay();
+      }
+    };
+  });
+
+  // 編集ボタン
+  container.querySelectorAll('.edit-rule-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const item = btn.closest('.learned-rule-item');
+      const brand = item?.dataset.brand;
+      if (brand) {
+        openEditRuleModal(brand);
       }
     };
   });

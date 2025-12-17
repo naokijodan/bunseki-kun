@@ -1758,16 +1758,34 @@ body {
   white-space: nowrap;
 }
 
+.learned-rule-item .rule-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.learned-rule-item .edit-rule-btn,
 .learned-rule-item .delete-rule-btn {
   background: none;
   border: none;
-  color: #e53935;
   font-size: 14px;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
   opacity: 0.6;
   transition: opacity 0.2s, background 0.2s;
+}
+
+.learned-rule-item .edit-rule-btn {
+  color: #1976d2;
+}
+
+.learned-rule-item .edit-rule-btn:hover {
+  opacity: 1;
+  background: rgba(25, 118, 210, 0.1);
+}
+
+.learned-rule-item .delete-rule-btn {
+  color: #e53935;
 }
 
 .learned-rule-item .delete-rule-btn:hover {
@@ -1837,6 +1855,112 @@ body {
   font-size: 10px;
   color: var(--text-muted);
   margin: 6px 0 0 0;
+}
+
+/* ルール編集モーダル */
+.edit-rule-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.edit-rule-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.edit-rule-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.edit-rule-modal .modal-header h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.edit-rule-modal .modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+.edit-rule-modal .modal-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.edit-rule-modal .modal-body {
+  padding: 16px;
+}
+
+.edit-rule-modal .form-group {
+  margin-bottom: 16px;
+}
+
+.edit-rule-modal .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.edit-rule-modal .form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.edit-rule-modal .form-group input,
+.edit-rule-modal .form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.edit-rule-modal .form-group input:focus,
+.edit-rule-modal .form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.edit-rule-modal .form-group .readonly-input {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.edit-rule-modal .form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.edit-rule-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
 }
 
 .more-hint {
