@@ -4808,7 +4808,7 @@ async function saveEditedRule(brand, keywordsText) {
 }
 
 /**
- * 学習済みルール表示を更新
+ * 学習済みルール表示を更新（スクロール位置を保持）
  */
 function updateLearnedRulesDisplay() {
   // 自分のデータセクション
@@ -4821,18 +4821,45 @@ function updateLearnedRulesDisplay() {
 
   const html = generateLearnedRulesHtml();
 
+  // スクロール位置を保存
+  const scrollPositions = {};
+
   // 自分のデータセクションに表示（常に表示）
   if (section && content) {
+    // 各リストのスクロール位置を保存
+    content.querySelectorAll('.learned-rules-list').forEach((list, idx) => {
+      scrollPositions[`my-${idx}`] = list.scrollTop;
+    });
+
     section.style.display = 'block';
     content.innerHTML = html;
     setupLearnedRulesEvents(content);
+
+    // スクロール位置を復元
+    content.querySelectorAll('.learned-rules-list').forEach((list, idx) => {
+      if (scrollPositions[`my-${idx}`]) {
+        list.scrollTop = scrollPositions[`my-${idx}`];
+      }
+    });
   }
 
   // 市場データセクションにも表示（常に表示）
   if (marketSection && marketContent) {
+    // 各リストのスクロール位置を保存
+    marketContent.querySelectorAll('.learned-rules-list').forEach((list, idx) => {
+      scrollPositions[`market-${idx}`] = list.scrollTop;
+    });
+
     marketSection.style.display = 'block';
     marketContent.innerHTML = html;
     setupLearnedRulesEvents(marketContent);
+
+    // スクロール位置を復元
+    marketContent.querySelectorAll('.learned-rules-list').forEach((list, idx) => {
+      if (scrollPositions[`market-${idx}`]) {
+        list.scrollTop = scrollPositions[`market-${idx}`];
+      }
+    });
   }
 }
 
