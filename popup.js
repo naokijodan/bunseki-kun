@@ -2474,6 +2474,14 @@ async function loadMyAnalysisTabContent(tabId) {
   }
 
   contentEl.innerHTML = html;
+
+  // ブランド別タブの場合、展開イベントリスナーを設定
+  if (tabId === 'brand-performance') {
+    // DOMが更新された後にイベントリスナーを設定
+    setTimeout(() => {
+      setupBrandExpandListeners();
+    }, 50);
+  }
 }
 
 /**
@@ -2854,10 +2862,8 @@ function generateBrandPerformanceAnalysis() {
     </div>
   `;
 
+  // グラフは即座に描画予約（setTimeoutで）
   setTimeout(() => {
-    // 展開/折りたたみのイベントリスナーを設定
-    setupBrandExpandListeners();
-    // グラフを描画（上位20件）
     drawBrandChart(sortedBrands.slice(0, 20));
   }, 100);
 
@@ -2866,22 +2872,32 @@ function generateBrandPerformanceAnalysis() {
 
 /**
  * ブランド展開/折りたたみのイベントリスナーを設定
+ * （HTMLがDOMに反映された後に呼び出す必要あり）
  */
 function setupBrandExpandListeners() {
   const mainRows = document.querySelectorAll('.brand-expandable-table .brand-main-row.expandable');
+  console.log('setupBrandExpandListeners: 展開可能な行数:', mainRows.length);
+
   mainRows.forEach(row => {
-    row.addEventListener('click', () => {
-      const idx = row.dataset.brandIdx;
+    // 既存のイベントリスナーを削除するためにcloneを使う
+    const newRow = row.cloneNode(true);
+    row.parentNode.replaceChild(newRow, row);
+
+    newRow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = newRow.dataset.brandIdx;
       const subRows = document.querySelectorAll(`.brand-category-row[data-parent-idx="${idx}"]`);
-      const icon = row.querySelector('.row-expand-icon');
-      const isExpanded = row.classList.contains('expanded');
+      const icon = newRow.querySelector('.row-expand-icon');
+      const isExpanded = newRow.classList.contains('expanded');
+
+      console.log('クリック:', idx, '展開状態:', isExpanded, 'サブ行数:', subRows.length);
 
       if (isExpanded) {
-        row.classList.remove('expanded');
+        newRow.classList.remove('expanded');
         if (icon) icon.textContent = '▶';
         subRows.forEach(subRow => subRow.style.display = 'none');
       } else {
-        row.classList.add('expanded');
+        newRow.classList.add('expanded');
         if (icon) icon.textContent = '▼';
         subRows.forEach(subRow => subRow.style.display = 'table-row');
       }
