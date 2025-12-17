@@ -4054,18 +4054,27 @@ body {
    売れ筋価格帯バッジ
    ===================================== */
 .col-price-range {
-  width: 90px;
+  width: 80px;
+  min-width: 80px;
   text-align: center;
 }
 
 .price-range-badge {
   display: inline-block;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 2px 6px;
+  font-size: 9px;
   font-weight: 600;
   color: #fff;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* 細分類行用の小さめバッジ */
+.price-range-badge.sub-badge {
+  font-size: 8px;
+  padding: 1px 5px;
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
 }
 
 /* =====================================
