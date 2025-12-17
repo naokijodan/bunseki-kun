@@ -2790,7 +2790,53 @@ function generateBrandPerformanceAnalysis() {
   const sortedBrands = [...knownBrands, ...unknownBrands];
 
   // 最大値を取得（バーの幅計算用）
-  const maxCount = Math.max(...sortedBrands.map(b => b.active + b.sold));
+  const maxCount = Math.max(...sortedBrands.map(b => b.active + b.sold), 1);
+
+  // ブランドごとのカテゴリ内訳を計算
+  const brandsWithCategories = sortedBrands.map(brand => {
+    // カテゴリ別内訳を計算（analyzer.results.brandPerformanceにcategoriesがなければ自前で計算）
+    let categories = brand.categories || [];
+
+    // categoriesが空の場合、アイテムから直接計算
+    if (categories.length === 0) {
+      const categoryStats = {};
+
+      // 出品中アイテムからカテゴリを集計
+      analyzer.activeListings.forEach(item => {
+        const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
+        if (itemBrand === brand.brand) {
+          const cat = item.category || analyzer.extractCategoryFromTitle(item.title) || '(不明)';
+          if (!categoryStats[cat]) {
+            categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
+          }
+          categoryStats[cat].active++;
+          categoryStats[cat].totalPrice += item.price || 0;
+        }
+      });
+
+      // 販売済みアイテムからカテゴリを集計
+      analyzer.soldItems.forEach(item => {
+        const itemBrand = analyzer.extractBrand(item.title) || '(不明)';
+        if (itemBrand === brand.brand) {
+          const cat = item.category || analyzer.extractCategoryFromTitle(item.title) || '(不明)';
+          if (!categoryStats[cat]) {
+            categoryStats[cat] = { category: cat, active: 0, sold: 0, totalPrice: 0 };
+          }
+          categoryStats[cat].sold += item.quantity || 1;
+          categoryStats[cat].totalPrice += item.soldFor || 0;
+        }
+      });
+
+      categories = Object.values(categoryStats)
+        .map(cat => ({
+          ...cat,
+          avgPrice: (cat.active + cat.sold) > 0 ? cat.totalPrice / (cat.active + cat.sold) : 0
+        }))
+        .sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
+    }
+
+    return { ...brand, categories };
+  });
 
   let html = `
     <div class="analysis-detail">
@@ -2807,7 +2853,7 @@ function generateBrandPerformanceAnalysis() {
           </tr>
         </thead>
         <tbody>
-          ${sortedBrands.map((brand, idx) => {
+          ${brandsWithCategories.map((brand, idx) => {
             const total = brand.active + brand.sold;
             const sellRate = total > 0 ? Math.round((brand.sold / total) * 100) : 0;
             const isUnknown = brand.brand === '(不明)' || brand.brand === 'その他' || brand.brand === null;
@@ -2862,12 +2908,26 @@ function generateBrandPerformanceAnalysis() {
     </div>
   `;
 
-  // グラフは即座に描画予約（setTimeoutで）
+  // グラフは即座に描画予約（setTimeoutで）- 既存のチャートを破棄
   setTimeout(() => {
+    destroyExistingChart('analysisChart');
     drawBrandChart(sortedBrands.slice(0, 20));
   }, 100);
 
   return html;
+}
+
+/**
+ * 既存のChartを破棄
+ */
+function destroyExistingChart(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (canvas) {
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+      existingChart.destroy();
+    }
+  }
 }
 
 /**
@@ -2879,25 +2939,25 @@ function setupBrandExpandListeners() {
   console.log('setupBrandExpandListeners: 展開可能な行数:', mainRows.length);
 
   mainRows.forEach(row => {
-    // 既存のイベントリスナーを削除するためにcloneを使う
-    const newRow = row.cloneNode(true);
-    row.parentNode.replaceChild(newRow, row);
+    // イベントリスナーが既に設定されているか確認
+    if (row.dataset.listenerAttached) return;
+    row.dataset.listenerAttached = 'true';
 
-    newRow.addEventListener('click', (e) => {
+    row.addEventListener('click', (e) => {
       e.stopPropagation();
-      const idx = newRow.dataset.brandIdx;
+      const idx = row.dataset.brandIdx;
       const subRows = document.querySelectorAll(`.brand-category-row[data-parent-idx="${idx}"]`);
-      const icon = newRow.querySelector('.row-expand-icon');
-      const isExpanded = newRow.classList.contains('expanded');
+      const icon = row.querySelector('.row-expand-icon');
+      const isExpanded = row.classList.contains('expanded');
 
       console.log('クリック:', idx, '展開状態:', isExpanded, 'サブ行数:', subRows.length);
 
       if (isExpanded) {
-        newRow.classList.remove('expanded');
+        row.classList.remove('expanded');
         if (icon) icon.textContent = '▶';
         subRows.forEach(subRow => subRow.style.display = 'none');
       } else {
-        newRow.classList.add('expanded');
+        row.classList.add('expanded');
         if (icon) icon.textContent = '▼';
         subRows.forEach(subRow => subRow.style.display = 'table-row');
       }
