@@ -3847,7 +3847,7 @@ function displayCompareResults(results) {
 }
 
 /**
- * AI結果をHTMLにフォーマット
+ * AI結果をHTMLにフォーマット（新形式対応・後方互換あり）
  */
 function formatAIResultHTML(data, provider) {
   const providerName = {
@@ -3858,8 +3858,34 @@ function formatAIResultHTML(data, provider) {
 
   let html = `<div class="ai-result-header"><span>📊 ${providerName} の分析結果</span></div>`;
 
-  // アラート
-  if (data.alerts && data.alerts.length > 0) {
+  // 新形式: 今週の最優先アクション
+  if (data.weeklyFocus) {
+    html += `
+      <div class="ai-section weekly-focus">
+        <h4>🎯 今週の最優先アクション</h4>
+        <p class="focus-action">${escapeHtml(data.weeklyFocus)}</p>
+      </div>
+    `;
+  }
+
+  // 新形式: 緊急アラート
+  if (data.urgentAlerts && data.urgentAlerts.length > 0) {
+    html += `
+      <div class="ai-section alerts">
+        <h4>🚨 緊急アラート</h4>
+        <ul>
+          ${data.urgentAlerts.map(a => `
+            <li class="alert-${a.severity || 'medium'}">
+              <strong>${escapeHtml(a.name)}</strong>: ${escapeHtml(a.reason)}
+              ${a.action ? `<br><span class="action-tag">→ ${escapeHtml(a.action)}</span>` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `;
+  }
+  // 旧形式: アラート（後方互換）
+  else if (data.alerts && data.alerts.length > 0) {
     html += `
       <div class="ai-section alerts">
         <h4>⚠️ アラート</h4>
@@ -3870,8 +3896,66 @@ function formatAIResultHTML(data, provider) {
     `;
   }
 
-  // 強化推奨
-  if (data.strengthen && data.strengthen.length > 0) {
+  // 新形式: 価格最適化
+  if (data.priceOptimization && data.priceOptimization.length > 0) {
+    html += `
+      <div class="ai-section price-optimization">
+        <h4>💰 価格調整の提案</h4>
+        <ul>
+          ${data.priceOptimization.map(p => {
+            const arrow = p.direction === 'up' ? '↑値上げ' : p.direction === 'down' ? '↓値下げ' : '→維持';
+            const arrowClass = p.direction === 'up' ? 'price-up' : p.direction === 'down' ? 'price-down' : 'price-hold';
+            return `
+              <li>
+                <strong>${escapeHtml(p.brand)}</strong>
+                <span class="price-direction ${arrowClass}">${arrow}</span>
+                : ${escapeHtml(p.reason)}
+                ${p.potential ? `<span class="potential">(${escapeHtml(p.potential)})</span>` : ''}
+              </li>
+            `;
+          }).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  // 新形式: 在庫戦略
+  if (data.inventoryStrategy) {
+    // 仕入れ強化
+    if (data.inventoryStrategy.increase && data.inventoryStrategy.increase.length > 0) {
+      html += `
+        <div class="ai-section strengths">
+          <h4>📈 仕入れ強化</h4>
+          <ul>
+            ${data.inventoryStrategy.increase.map(s => `
+              <li>
+                <strong>${escapeHtml(s.brand)}</strong>: ${escapeHtml(s.reason)}
+                ${s.priority === 'high' ? '<span class="priority-high">優先度高</span>' : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
+    }
+    // 在庫縮小
+    if (data.inventoryStrategy.decrease && data.inventoryStrategy.decrease.length > 0) {
+      html += `
+        <div class="ai-section reviews">
+          <h4>📉 在庫見直し</h4>
+          <ul>
+            ${data.inventoryStrategy.decrease.map(d => `
+              <li>
+                <strong>${escapeHtml(d.brand)}</strong>: ${escapeHtml(d.reason)}
+                ${d.action ? `<span class="action-tag">→ ${escapeHtml(d.action)}</span>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `;
+    }
+  }
+  // 旧形式: 強化推奨（後方互換）
+  else if (data.strengthen && data.strengthen.length > 0) {
     html += `
       <div class="ai-section strengths">
         <h4>💪 強化推奨</h4>
@@ -3882,8 +3966,8 @@ function formatAIResultHTML(data, provider) {
     `;
   }
 
-  // 見直し推奨
-  if (data.review && data.review.length > 0) {
+  // 旧形式: 見直し推奨（後方互換）
+  if (!data.inventoryStrategy && data.review && data.review.length > 0) {
     html += `
       <div class="ai-section reviews">
         <h4>🔍 見直し推奨</h4>
@@ -3894,8 +3978,25 @@ function formatAIResultHTML(data, provider) {
     `;
   }
 
-  // 売れ筋・チャンス
-  if (data.opportunities && data.opportunities.length > 0) {
+  // 新形式: 市場参入機会
+  if (data.marketOpportunities && data.marketOpportunities.length > 0) {
+    html += `
+      <div class="ai-section opportunities">
+        <h4>🌟 市場参入チャンス</h4>
+        <ul>
+          ${data.marketOpportunities.map(o => `
+            <li>
+              <strong>${escapeHtml(o.brand)}</strong>
+              <span class="market-info">市場規模:${o.marketSize} / 競合:${o.competition}</span>
+              <br>${escapeHtml(o.recommendation)}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `;
+  }
+  // 旧形式: 売れ筋・チャンス（後方互換）
+  else if (data.opportunities && data.opportunities.length > 0) {
     html += `
       <div class="ai-section opportunities">
         <h4>💡 仕入れチャンス</h4>
@@ -3906,7 +4007,17 @@ function formatAIResultHTML(data, provider) {
     `;
   }
 
-  // 総合提案
+  // 新形式: インサイト
+  if (data.insight) {
+    html += `
+      <div class="ai-section insight">
+        <h4>💡 データからの気づき</h4>
+        <p>${escapeHtml(data.insight)}</p>
+      </div>
+    `;
+  }
+
+  // 旧形式: 総合提案（後方互換）
   if (data.suggestion) {
     html += `
       <div class="ai-section suggestion">

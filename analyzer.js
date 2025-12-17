@@ -1322,21 +1322,123 @@ class EbayAnalyzer {
   }
 
   /**
-   * AI分析用サマリーデータ
+   * AI分析用サマリーデータ（強化版）
    */
   getAISummary() {
+    const last7days = this.results.listingPace.slice(-7);
+    const prev7days = this.results.listingPace.slice(-14, -7);
+
+    // 前週比計算
+    const thisWeekListings = last7days.reduce((sum, p) => sum + p.listings, 0);
+    const thisWeekSales = last7days.reduce((sum, p) => sum + p.sales, 0);
+    const prevWeekListings = prev7days.reduce((sum, p) => sum + p.listings, 0);
+    const prevWeekSales = prev7days.reduce((sum, p) => sum + p.sales, 0);
+
+    const weekOverWeek = {
+      listingsChange: prevWeekListings > 0 ? Math.round(((thisWeekListings - prevWeekListings) / prevWeekListings) * 100) : 0,
+      salesChange: prevWeekSales > 0 ? Math.round(((thisWeekSales - prevWeekSales) / prevWeekSales) * 100) : 0
+    };
+
     return {
       summary: this.results.summary,
       brandPerformance: this.results.brandPerformance.slice(0, 20),
       categoryStats: Object.values(this.results.byCategory).slice(0, 15),
       watchRanking: this.results.watchRanking,
       listingPace: {
-        last7days: this.results.listingPace.slice(-7),
-        totalListings: this.results.listingPace.reduce((sum, p) => sum + p.listings, 0),
-        totalSales: this.results.listingPace.reduce((sum, p) => sum + p.sales, 0)
+        last7days: last7days,
+        totalListings: thisWeekListings,
+        totalSales: thisWeekSales
       },
-      alerts: this.results.alerts
+      alerts: this.results.alerts,
+      // 新規追加データ
+      priceDistribution: this.getPriceDistribution(),
+      staleItems: this.getStaleItems(),
+      efficiencyMetrics: {
+        avgSoldPrice: this.getAverageSoldPrice(),
+        weekOverWeek: weekOverWeek
+      }
     };
+  }
+
+  /**
+   * 価格帯別パフォーマンスを計算
+   */
+  getPriceDistribution() {
+    const ranges = [
+      { min: 0, max: 50, active: 0, sold: 0 },
+      { min: 51, max: 100, active: 0, sold: 0 },
+      { min: 101, max: 200, active: 0, sold: 0 },
+      { min: 201, max: 500, active: 0, sold: 0 },
+      { min: 501, max: 99999, active: 0, sold: 0 }
+    ];
+
+    // 出品中の価格帯分布
+    this.activeListings.forEach(item => {
+      const price = item.price || 0;
+      for (const range of ranges) {
+        if (price >= range.min && price <= range.max) {
+          range.active++;
+          break;
+        }
+      }
+    });
+
+    // 販売済みの価格帯分布
+    this.soldItems.forEach(item => {
+      const price = item.soldFor || 0;
+      for (const range of ranges) {
+        if (price >= range.min && price <= range.max) {
+          range.sold++;
+          break;
+        }
+      }
+    });
+
+    // 売上率を計算
+    return ranges.map(r => ({
+      min: r.min,
+      max: r.max === 99999 ? '500+' : r.max,
+      active: r.active,
+      sold: r.sold,
+      sellThrough: (r.active + r.sold) > 0
+        ? Math.round((r.sold / (r.active + r.sold)) * 100)
+        : 0
+    })).filter(r => r.active > 0 || r.sold > 0);
+  }
+
+  /**
+   * 滞留在庫（30日以上未販売）を取得
+   */
+  getStaleItems() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    return this.activeListings
+      .filter(item => {
+        if (!item.startDate) return false;
+        return item.startDate < thirtyDaysAgo;
+      })
+      .map(item => {
+        const daysListed = Math.floor((now - item.startDate) / (24 * 60 * 60 * 1000));
+        return {
+          title: item.title,
+          price: item.price || 0,
+          watchers: item.watchers || 0,
+          daysListed: daysListed,
+          brand: item.brand || '(不明)'
+        };
+      })
+      .sort((a, b) => b.daysListed - a.daysListed)
+      .slice(0, 20);
+  }
+
+  /**
+   * 平均販売価格を計算
+   */
+  getAverageSoldPrice() {
+    if (this.soldItems.length === 0) return 0;
+    const total = this.soldItems.reduce((sum, item) => sum + (item.soldFor || 0), 0);
+    return Math.round(total / this.soldItems.length);
   }
 
   /**

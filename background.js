@@ -517,36 +517,45 @@ async function chatWithGemini(message, history, analysisData, apiKey) {
  * 分析用システムプロンプトを取得
  */
 function getAnalysisSystemPrompt() {
-  return `あなたはeBayセラー向けの販売データアナリストです。
-日本人セラーが海外バイヤーに販売するeBay輸出ビジネスのデータを分析します。
+  return `あなたはeBay輸出ビジネス専門のデータアナリストです。
+日本人セラーの販売データを分析し、利益最大化のための具体的アクションを提案します。
 
-与えられたデータを分析し、以下の形式でJSON形式で提案を行ってください。
+【分析の優先順位】
+1. 即座に行動すべき緊急事項（売上低下、長期滞留在庫、価格設定ミス）
+2. 利益率改善のチャンス（価格調整、仕入れ強化）
+3. 中長期的な戦略改善（市場参入機会）
 
+【出力形式】必ず以下のJSON形式で回答してください：
 {
-  "alerts": [
-    { "name": "項目名", "reason": "アラート内容（30文字以内）" }
+  "urgentAlerts": [
+    { "name": "項目名", "severity": "high または medium", "reason": "具体的理由（30文字）", "action": "今すぐやるべきこと（20文字）" }
   ],
-  "strengthen": [
-    { "name": "ブランド名", "reason": "強化すべき理由（30文字以内）" }
+  "priceOptimization": [
+    { "brand": "ブランド名", "direction": "up または down または hold", "reason": "理由（25文字）", "potential": "改善見込み" }
   ],
-  "review": [
-    { "name": "ブランド名", "reason": "見直すべき理由（30文字以内）" }
+  "inventoryStrategy": {
+    "increase": [{ "brand": "名前", "reason": "理由（25文字）", "priority": "high/medium" }],
+    "decrease": [{ "brand": "名前", "reason": "理由（25文字）", "action": "値下げ/出品停止" }]
+  },
+  "marketOpportunities": [
+    { "brand": "ブランド名", "marketSize": "大/中/小", "competition": "高/中/低", "recommendation": "参入推奨度と理由" }
   ],
-  "opportunities": [
-    { "name": "ブランド名", "reason": "売れ筋の理由（30文字以内）" }
-  ],
-  "suggestion": "総合的な仕入れ・出品戦略の提案（150文字程度）"
+  "weeklyFocus": "今週最優先で取り組むべきアクション1つ（具体的に、40文字以内）",
+  "insight": "データから読み取れる重要な傾向や気づき（80文字以内）"
 }
 
-分析の観点：
-1. alerts: 出品ペースの低下、Watch数が多いのに売れていない商品など、緊急度の高い警告
-2. strengthen: 売上率が高く、もっと仕入れを増やすべきブランド（仕入れ強化推奨）
-3. review: 出品数が多いが売れ行きが悪い、または在庫が滞留しているブランド（価格見直し推奨）
-4. opportunities: 売上率・回転率が良い売れ筋ブランド
-5. suggestion: 全体を踏まえた具体的な改善提案
+【分析基準】
+- 売上率: 30%以上=優良（強化）、10%未満=要改善（見直し）
+- Watch/出品比率: 0.5以上=需要あり、0.1未満=要注意
+- 市場価格差: 自分が20%以上安い=値上げ余地、20%以上高い=値下げ検討
+- 滞留期間: 30日以上=要対策、60日以上=即対応
+- 出品ペース: 前週比30%以上減少=警告
 
-各項目は最大3つまでに絞り、最も重要なものを選んでください。
-データが不足している項目は空配列[]で返してください。`;
+【重要ルール】
+- 各項目は最大3つまで、最も重要なものを優先
+- データ不足の項目は空配列[]で返す
+- 具体的なブランド名・商品名・数値を使う
+- 曖昧な表現を避け、実行可能なアクションを提案`;
 }
 
 /**
@@ -573,29 +582,68 @@ ${JSON.stringify(analysisData, null, 2)}
  * ユーザープロンプトを構築
  */
 function buildUserPrompt(data) {
-  const { summary, brandPerformance, categoryStats, watchRanking, listingPace, alerts, marketData } = data;
+  const { summary, brandPerformance, categoryStats, watchRanking, listingPace, alerts, marketData, priceDistribution, staleItems, efficiencyMetrics } = data;
 
-  let prompt = `以下のeBay販売データを分析してください：
+  // 効率指標を計算
+  const totalItems = (summary.totalActive || 0) + (summary.totalSold || 0);
+  const sellThroughRate = totalItems > 0 ? ((summary.totalSold / totalItems) * 100).toFixed(1) : 0;
+  const watchPerListing = summary.totalActive > 0 ? (summary.totalWatchers / summary.totalActive).toFixed(2) : 0;
+  const avgSoldPrice = efficiencyMetrics?.avgSoldPrice || 0;
 
-【基本サマリー】
+  let prompt = `以下のeBay販売データを分析し、JSON形式で回答してください：
+
+【販売効率サマリー】
 - 出品中: ${summary.totalActive}件
 - 販売済み: ${summary.totalSold}件
+- 売上率: ${sellThroughRate}%${sellThroughRate >= 30 ? '（良好）' : sellThroughRate >= 10 ? '（普通）' : '（要改善）'}
 - 総Watch数: ${summary.totalWatchers}
-- 最終出品からの日数: ${summary.daysSinceLastListing !== null ? summary.daysSinceLastListing + '日' : '不明'}
+- Watch/出品比率: ${watchPerListing}${watchPerListing >= 0.5 ? '（需要あり）' : watchPerListing >= 0.1 ? '（普通）' : '（要注意）'}
+- 平均販売価格: $${avgSoldPrice}
+- 最終出品からの日数: ${summary.daysSinceLastListing !== null ? summary.daysSinceLastListing + '日' : '不明'}`;
+
+  // 価格帯別分析がある場合
+  if (priceDistribution && priceDistribution.length > 0) {
+    prompt += `
+
+【価格帯別パフォーマンス】
+${formatPriceDistribution(priceDistribution)}`;
+  }
+
+  prompt += `
 
 【出品ペース（過去7日）】
 ${formatListingPace(listingPace.last7days)}
 - 7日間の出品数合計: ${listingPace.totalListings}件
-- 7日間の販売数合計: ${listingPace.totalSales}件
+- 7日間の販売数合計: ${listingPace.totalSales}件`;
+
+  // 前週比較がある場合
+  if (efficiencyMetrics?.weekOverWeek) {
+    const wow = efficiencyMetrics.weekOverWeek;
+    prompt += `
+- 前週比: 出品${wow.listingsChange >= 0 ? '+' : ''}${wow.listingsChange}%、販売${wow.salesChange >= 0 ? '+' : ''}${wow.salesChange}%`;
+  }
+
+  prompt += `
 
 【ブランド別パフォーマンス TOP20】
-${formatBrandPerformance(brandPerformance)}
+${formatBrandPerformanceEnhanced(brandPerformance)}
 
 【eBayカテゴリ別】
 ${formatCategoryStats(categoryStats)}
 
-【Watch数ランキング TOP10】
-${formatWatchRanking(watchRanking)}
+【Watch数ランキング TOP10】（需要があるが未販売＝価格調整候補）
+${formatWatchRanking(watchRanking)}`;
+
+  // 滞留在庫がある場合
+  if (staleItems && staleItems.length > 0) {
+    prompt += `
+
+【滞留在庫（30日以上未販売）】
+- 該当件数: ${staleItems.length}件
+${formatStaleItems(staleItems)}`;
+  }
+
+  prompt += `
 
 【システムアラート】
 ${formatAlerts(alerts)}`;
@@ -610,7 +658,7 @@ ${formatAlerts(alerts)}`;
 ${formatMarketTopBrands(marketData.topBrands)}
 
 ■ 競合比較（自分も扱っているブランド）:
-${formatCompetitorBrands(marketData.competitorBrands)}
+${formatCompetitorBrandsEnhanced(marketData.competitorBrands)}
 
 ■ 仕入れチャンス（市場で売れているが自分は未出品）:
 ${formatOpportunityBrands(marketData.opportunities)}`;
@@ -618,10 +666,60 @@ ${formatOpportunityBrands(marketData.opportunities)}`;
 
   prompt += `
 
-上記データを分析し、具体的な改善提案をJSONで回答してください。
-特に市場データがある場合は、市場の傾向と自分の在庫を比較した提案を重視してください。`;
+上記データを分析し、指定のJSON形式で具体的な改善提案を回答してください。
+特に「価格調整」「仕入れ強化/縮小」「今週やるべきこと」を重視してください。`;
 
   return prompt;
+}
+
+/**
+ * 価格帯別分布をフォーマット
+ */
+function formatPriceDistribution(distribution) {
+  if (!distribution || distribution.length === 0) return '（データなし）';
+  return distribution
+    .map(d => `- $${d.min}-${d.max}: 出品${d.active}件, 販売${d.sold}件, 売上率${d.sellThrough}%${d.sellThrough >= 30 ? '★' : ''}`)
+    .join('\n');
+}
+
+/**
+ * 滞留在庫をフォーマット
+ */
+function formatStaleItems(items) {
+  if (!items || items.length === 0) return '（なし）';
+  return items
+    .slice(0, 5)
+    .map(item => `- ${item.title.substring(0, 40)}... (${item.daysListed}日経過, $${item.price}, Watch${item.watchers})`)
+    .join('\n');
+}
+
+/**
+ * ブランドパフォーマンスを強化フォーマット
+ */
+function formatBrandPerformanceEnhanced(brands) {
+  if (!brands || brands.length === 0) return '（データなし）';
+  return brands
+    .map(b => {
+      const watchRatio = b.active > 0 ? (b.totalWatchers / b.active).toFixed(1) : 0;
+      const status = b.sellThroughRate >= 30 ? '【優良】' : b.sellThroughRate < 10 && b.active >= 5 ? '【要見直し】' : '';
+      return `- ${b.brand}: 出品${b.active}件, 販売${b.sold}件, 売上率${b.sellThroughRate}%, Watch比${watchRatio}, 売上$${b.revenue.toFixed(0)} ${status}`;
+    })
+    .join('\n');
+}
+
+/**
+ * 競合ブランド比較を強化フォーマット
+ */
+function formatCompetitorBrandsEnhanced(brands) {
+  if (!brands || brands.length === 0) return '（該当なし）';
+  return brands
+    .slice(0, 10)
+    .map(b => {
+      const priceDiff = b.myAvgPrice && b.avgPrice ? (((b.myAvgPrice - b.avgPrice) / b.avgPrice) * 100).toFixed(0) : 0;
+      const priceNote = priceDiff > 20 ? '（高め→値下げ検討）' : priceDiff < -20 ? '（安め→値上げ余地）' : '';
+      return `- ${b.brand}: 市場${b.marketCount}件(平均$${b.avgPrice}) vs 自分:出品${b.myActive}件,販売${b.mySold}件(平均$${b.myAvgPrice || 0}) ${priceNote}`;
+    })
+    .join('\n');
 }
 
 /**
