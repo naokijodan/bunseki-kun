@@ -2516,8 +2516,25 @@ body {
   border-top: 1px solid var(--border-color);
 }
 
+.market-analysis-actions.top {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding-top: 0;
+  border-top: none;
+  border-bottom: none;
+}
+
 .market-analysis-actions .action-btn {
   flex: 1;
+}
+
+.market-analysis-actions .action-btn.compact {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.market-analysis-actions .action-btn.compact .btn-icon {
+  font-size: 12px;
 }
 
 /* ランキングヘッダー */
