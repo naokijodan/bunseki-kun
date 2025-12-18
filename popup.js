@@ -3791,6 +3791,248 @@ function setupBrandExpandListeners() {
       }
     });
   });
+
+  // カテゴリ行のクリックイベントも設定
+  setupCategoryClickListeners();
+}
+
+/**
+ * カテゴリ行クリックで商品一覧を表示するリスナーを設定
+ */
+function setupCategoryClickListeners() {
+  const categoryRows = document.querySelectorAll('.brand-expandable-table .brand-category-row');
+  console.log('setupCategoryClickListeners: カテゴリ行数:', categoryRows.length);
+
+  categoryRows.forEach(row => {
+    // イベントリスナーが既に設定されているか確認
+    if (row.dataset.categoryListenerAttached) return;
+    row.dataset.categoryListenerAttached = 'true';
+
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parentIdx = row.dataset.parentIdx;
+      const categoryName = row.querySelector('.subcategory-name')?.textContent?.replace('└ ', '').trim();
+
+      // 親ブランドを取得
+      const parentRow = document.querySelector(`.brand-main-row[data-brand-idx="${parentIdx}"]`);
+      const brandName = parentRow?.querySelector('.col-name')?.textContent?.replace('▶', '').replace('▼', '').replace('未分類', '').trim();
+
+      console.log('カテゴリクリック:', brandName, categoryName);
+
+      if (brandName && categoryName) {
+        showItemListForBrandCategory(brandName, categoryName, 'my-data');
+      }
+    });
+  });
+}
+
+/**
+ * ブランド×カテゴリの商品一覧を表示（自分のデータ用）
+ */
+function showItemListForBrandCategory(brand, category, source = 'my-data') {
+  const modal = document.getElementById('itemListModal');
+  const titleEl = document.getElementById('itemListTitle');
+  const container = document.getElementById('itemListContainer');
+
+  if (!modal || !container) return;
+
+  // タイトル設定
+  titleEl.textContent = `${brand} - ${category}`;
+
+  let items = [];
+
+  if (source === 'my-data') {
+    // 自分のデータから該当商品を抽出
+    const aiClassifications = window.aiClassificationResults || {};
+
+    const getItemBrand = (item) => {
+      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+        return aiClassifications[item.title].brand;
+      }
+      return analyzer.extractBrand(item.title) || '(不明)';
+    };
+
+    const getItemCategory = (item) => {
+      let cat = item.categorySub || item.categoryMain || item.category;
+      if (!cat) {
+        const extracted = analyzer.extractCategoryFromTitle ? analyzer.extractCategoryFromTitle(item.title) : null;
+        if (extracted && analyzer.normalizeCategory) {
+          const normalized = analyzer.normalizeCategory(extracted);
+          cat = normalized.sub || normalized.main || '(不明)';
+        } else {
+          cat = '(不明)';
+        }
+      }
+      return cat;
+    };
+
+    const brandLower = brand.toLowerCase().trim();
+    const brandNoSpace = brandLower.replace(/\s+/g, '');
+
+    // マッチング関数
+    const matchesBrand = (item) => {
+      const itemBrand = getItemBrand(item);
+      const itemBrandLower = itemBrand.toLowerCase().trim();
+      const itemBrandNoSpace = itemBrandLower.replace(/\s+/g, '');
+      const titleLower = (item.title || '').toLowerCase();
+
+      return itemBrandLower === brandLower ||
+             itemBrandNoSpace === brandNoSpace ||
+             itemBrand === brand ||
+             (brandLower.length >= 4 && itemBrandLower.includes(brandLower)) ||
+             (itemBrandLower.length >= 4 && brandLower.includes(itemBrandLower)) ||
+             (brandNoSpace.length >= 4 && itemBrandNoSpace.includes(brandNoSpace)) ||
+             (itemBrandNoSpace.length >= 4 && brandNoSpace.includes(itemBrandNoSpace)) ||
+             (brandLower.length >= 4 && titleLower.includes(brandLower)) ||
+             (brandNoSpace.length >= 4 && titleLower.replace(/\s+/g, '').includes(brandNoSpace));
+    };
+
+    // 出品中から抽出
+    (analyzer.activeListings || []).forEach(item => {
+      if (matchesBrand(item) && getItemCategory(item) === category) {
+        items.push({
+          title: item.title,
+          price: item.price,
+          status: 'active'
+        });
+      }
+    });
+
+    // 販売済みから抽出
+    (analyzer.soldItems || []).forEach(item => {
+      if (matchesBrand(item) && getItemCategory(item) === category) {
+        items.push({
+          title: item.title,
+          price: item.soldFor || item.price,
+          status: 'sold'
+        });
+      }
+    });
+  } else if (source === 'market') {
+    // 市場データから該当商品を抽出（後で実装）
+    items = getMarketItemsForBrandCategory(brand, category);
+  }
+
+  // 価格で降順ソート
+  items.sort((a, b) => (b.price || 0) - (a.price || 0));
+
+  // HTML生成
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="item-list-empty">
+        <p>該当する商品がありません</p>
+      </div>
+    `;
+  } else {
+    const prices = items.map(i => i.price || 0).filter(p => p > 0);
+    const avgPrice = prices.length > 0 ? prices.reduce((sum, p) => sum + p, 0) / prices.length : 0;
+    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+    // 売れ筋価格帯を計算（最頻出価格帯）
+    const getPriceRange = (price) => {
+      if (price < 50) return '~$50';
+      if (price < 100) return '$50-100';
+      if (price < 200) return '$100-200';
+      if (price < 500) return '$200-500';
+      if (price < 1000) return '$500-1000';
+      return '$1000+';
+    };
+    const priceRangeCounts = {};
+    prices.forEach(p => {
+      const range = getPriceRange(p);
+      priceRangeCounts[range] = (priceRangeCounts[range] || 0) + 1;
+    });
+    const topPriceRange = Object.entries(priceRangeCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+
+    container.innerHTML = `
+      <div class="item-list-summary">
+        <div class="item-list-summary-item">
+          <span class="item-list-summary-label">件数:</span>
+          <span class="item-list-summary-value">${items.length}件</span>
+        </div>
+        <div class="item-list-summary-item">
+          <span class="item-list-summary-label">平均:</span>
+          <span class="item-list-summary-value highlight">$${avgPrice.toFixed(0)}</span>
+        </div>
+        <div class="item-list-summary-item">
+          <span class="item-list-summary-label">最低:</span>
+          <span class="item-list-summary-value">$${minPrice.toFixed(0)}</span>
+        </div>
+        <div class="item-list-summary-item">
+          <span class="item-list-summary-label">最高:</span>
+          <span class="item-list-summary-value">$${maxPrice.toFixed(0)}</span>
+        </div>
+        <div class="item-list-summary-item">
+          <span class="item-list-summary-label">売れ筋:</span>
+          <span class="item-list-summary-value highlight">${topPriceRange}</span>
+        </div>
+      </div>
+      ${items.map(item => `
+        <div class="item-list-item">
+          <span class="item-title">${escapeHtml(item.title)}</span>
+          <span class="item-price">$${(item.price || 0).toFixed(0)}</span>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  // モーダル表示
+  modal.style.display = 'flex';
+
+  // 閉じるボタン
+  const closeBtn = document.getElementById('closeItemListModal');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+
+  // オーバーレイクリックで閉じる
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
+  };
+}
+
+/**
+ * 市場データからブランド×カテゴリの商品を取得
+ */
+function getMarketItemsForBrandCategory(brand, category) {
+  const items = [];
+  const marketData = window.currentMarketData || [];
+
+  const brandLower = brand.toLowerCase().trim();
+  const brandNoSpace = brandLower.replace(/\s+/g, '');
+
+  marketData.forEach(item => {
+    const itemBrand = (item.brand || item.detectedBrand || '').toLowerCase().trim();
+    const itemBrandNoSpace = itemBrand.replace(/\s+/g, '');
+    const titleLower = (item.title || '').toLowerCase();
+
+    // ブランドマッチ
+    const brandMatch = itemBrand === brandLower ||
+                       itemBrandNoSpace === brandNoSpace ||
+                       (brandLower.length >= 4 && itemBrand.includes(brandLower)) ||
+                       (itemBrand.length >= 4 && brandLower.includes(itemBrand)) ||
+                       (brandLower.length >= 4 && titleLower.includes(brandLower));
+
+    // カテゴリマッチ
+    const itemCategory = item.categorySub || item.categoryMain || item.category || '(不明)';
+    const categoryMatch = itemCategory === category;
+
+    if (brandMatch && categoryMatch) {
+      items.push({
+        title: item.title,
+        price: item.soldPrice || item.price || 0,
+        status: item.status === 'sold' ? 'sold' : 'active'
+      });
+    }
+  });
+
+  return items;
 }
 
 // Watch数分析のフィルター設定
@@ -6363,8 +6605,9 @@ async function addManualBrandRule(brand, keywords) {
   await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
   showAlert(`「${brand}」を追加しました`, 'success');
 
-  // ルール追加後に分析結果を自動更新
+  // ルール追加後に分析結果を自動更新（自分のデータ + 市場データ）
   await restoreAnalysisResults();
+  await restoreMarketAnalysis();
 
   return true;
 }
@@ -6380,8 +6623,9 @@ async function deleteLearnedRule(brand) {
   delete analyzer.customBrandRules[brand];
   await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
 
-  // 分析結果も自動更新
+  // 分析結果も自動更新（自分のデータ + 市場データ）
   await restoreAnalysisResults();
+  await restoreMarketAnalysis();
 
   return true;
 }
@@ -6478,8 +6722,9 @@ async function saveEditedRule(brand, keywordsText) {
   // 表示を更新
   updateLearnedRulesDisplay();
 
-  // 分析結果も自動更新
+  // 分析結果も自動更新（自分のデータ + 市場データ）
   await restoreAnalysisResults();
+  await restoreMarketAnalysis();
 
   return true;
 }
@@ -6709,6 +6954,9 @@ async function loadMarketAnalysis() {
     // 市場データを正規化
     const normalizedItems = analyzer.normalizeMarketData(marketItems);
 
+    // 商品一覧表示用にグローバルに保存
+    window.currentMarketData = normalizedItems;
+
     // 各種ランキングを取得
     const brandRanking = analyzer.getMarketBrandRanking(normalizedItems, 30);
     const categoryRanking = analyzer.getMarketCategoryRanking(normalizedItems, 20);
@@ -6754,6 +7002,9 @@ async function restoreMarketAnalysis() {
     if (marketItems && marketItems.length > 0) {
       // 市場データを正規化
       const normalizedItems = analyzer.normalizeMarketData(marketItems);
+
+      // 商品一覧表示用にグローバルに保存
+      window.currentMarketData = normalizedItems;
 
       // 各種ランキングを取得
       const brandRanking = analyzer.getMarketBrandRanking(normalizedItems, 30);
@@ -7031,6 +7282,21 @@ function renderBrandRanking(ranking) {
         row.classList.add('expanded');
         if (expandIcon) expandIcon.textContent = '▼';
         subRows.forEach(sr => sr.style.display = '');
+      }
+    });
+  });
+
+  // カテゴリ行のクリックイベント（商品一覧表示）
+  container.querySelectorAll('.brand-subcategory-row:not(.brand-price-dist-row)').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const brand = row.dataset.parentBrand;
+      const categoryEl = row.querySelector('.subcategory-name');
+      const category = categoryEl?.textContent?.replace('└', '').trim();
+
+      if (brand && category) {
+        showItemListForBrandCategory(brand, category, 'market');
       }
     });
   });
