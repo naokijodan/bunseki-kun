@@ -316,6 +316,92 @@
       align-items: center;
       gap: 12px;
     }
+
+    /* アカウントステータス */
+    .account-status-box {
+      background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #ddd;
+    }
+
+    .account-status-box.premium {
+      background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+      border: 1px solid #ffc107;
+    }
+
+    .account-status-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .account-icon {
+      font-size: 40px;
+    }
+
+    .account-info {
+      flex: 1;
+    }
+
+    .account-type {
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .account-desc {
+      font-size: 13px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .code-status {
+      font-size: 13px;
+      margin-left: 8px;
+    }
+
+    .code-status.success {
+      color: #4caf50;
+    }
+
+    .code-status.error {
+      color: #f44336;
+    }
+
+    /* 機能比較表 */
+    .feature-comparison {
+      margin-top: 16px;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 12px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    .comparison-table th {
+      background: #f9f9f9;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .comparison-table th:first-child,
+    .comparison-table td:first-child {
+      text-align: left;
+    }
+
+    .comparison-table tbody tr:hover {
+      background: #fafafa;
+    }
   </style>
 </head>
 <body>
@@ -327,6 +413,102 @@
     </header>
 
     <div id="alert" class="alert" style="display: none;"></div>
+
+    <!-- アカウント・ライセンスセクション -->
+    <div class="section">
+      <h2><span class="icon">🔑</span> アカウント・ライセンス</h2>
+
+      <!-- 現在のステータス -->
+      <div class="account-status-box" id="accountStatusBox">
+        <div class="account-status-header">
+          <span class="account-icon" id="accountIcon">🔒</span>
+          <div class="account-info">
+            <div class="account-type" id="accountType">無料プラン</div>
+            <div class="account-desc" id="accountDesc">一部機能のみ利用可能</div>
+          </div>
+          <span id="accountBadge" class="status-badge pending">Free</span>
+        </div>
+      </div>
+
+      <!-- シークレットコード入力 -->
+      <div class="api-section" style="border-left: 4px solid #9c27b0;">
+        <div class="api-header">
+          <span class="api-logo">🎫</span>
+          <div>
+            <div class="api-title">シークレットコード</div>
+            <div class="api-subtitle">スクール会員の方はこちら</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="secretCode">認証コード</label>
+          <div class="password-wrapper">
+            <input type="password" id="secretCode" placeholder="コードを入力...">
+            <button type="button" class="toggle-password" data-target="secretCode">👁</button>
+          </div>
+          <p class="hint">スクール会員の方に配布されたコードを入力してください</p>
+        </div>
+        <div class="test-row">
+          <button type="button" class="btn btn-secondary btn-sm" id="activateCodeBtn">認証する</button>
+          <span id="codeStatus" class="code-status"></span>
+        </div>
+      </div>
+
+      <!-- 購入オプション -->
+      <div class="api-section" style="border-left: 4px solid #4caf50;">
+        <div class="api-header">
+          <span class="api-logo">💳</span>
+          <div>
+            <div class="api-title">フルバージョンを購入</div>
+            <div class="api-subtitle">1,000円（買い切り）</div>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
+          全機能が永久に使えるようになります。シート機能（10シート）、市場分析、AI提案など。
+        </p>
+        <button type="button" class="btn btn-primary" id="purchaseBtn">購入する</button>
+        <p class="hint" style="margin-top: 8px;">※ 決済はStripeによる安全な処理です</p>
+      </div>
+
+      <!-- 機能比較表 -->
+      <div class="feature-comparison">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>機能</th>
+              <th>無料</th>
+              <th>フル版</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>自分のデータ分析</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>市場データ取得・分析</td>
+              <td>❌</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>市場比較</td>
+              <td>❌</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>AI提案</td>
+              <td>❌</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>シート機能</td>
+              <td>1シート</td>
+              <td>10シート</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="section">
       <h2><span class="icon">🤖</span> AI API設定</h2>
@@ -438,6 +620,7 @@
     </footer>
   </div>
 
+  <script src="auth.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

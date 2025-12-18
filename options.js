@@ -20,7 +20,17 @@ const elements = {
   geminiStatus: document.getElementById('geminiStatus'),
   saveBtn: document.getElementById('saveBtn'),
   resetBtn: document.getElementById('resetBtn'),
-  alert: document.getElementById('alert')
+  alert: document.getElementById('alert'),
+  // アカウント関連
+  secretCode: document.getElementById('secretCode'),
+  activateCodeBtn: document.getElementById('activateCodeBtn'),
+  codeStatus: document.getElementById('codeStatus'),
+  purchaseBtn: document.getElementById('purchaseBtn'),
+  accountStatusBox: document.getElementById('accountStatusBox'),
+  accountIcon: document.getElementById('accountIcon'),
+  accountType: document.getElementById('accountType'),
+  accountDesc: document.getElementById('accountDesc'),
+  accountBadge: document.getElementById('accountBadge')
 };
 
 /**
@@ -28,6 +38,7 @@ const elements = {
  */
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
+  await loadAccountStatus();
   initEventListeners();
 });
 
@@ -91,6 +102,16 @@ function initEventListeners() {
 
   // リセット
   elements.resetBtn.addEventListener('click', resetSettings);
+
+  // シークレットコード認証
+  if (elements.activateCodeBtn) {
+    elements.activateCodeBtn.addEventListener('click', activateSecretCode);
+  }
+
+  // 購入ボタン
+  if (elements.purchaseBtn) {
+    elements.purchaseBtn.addEventListener('click', openPurchasePage);
+  }
 }
 
 /**
@@ -235,4 +256,141 @@ function showAlert(type, message) {
   setTimeout(() => {
     alert.style.display = 'none';
   }, 5000);
+}
+
+// ========================================
+// アカウント・ライセンス関連
+// ========================================
+
+/**
+ * アカウント状態を読み込み・表示
+ */
+async function loadAccountStatus() {
+  try {
+    if (typeof BunsekiAuth === 'undefined') {
+      console.warn('BunsekiAuth not loaded');
+      return;
+    }
+
+    const userType = await BunsekiAuth.getUserType();
+    updateAccountDisplay(userType);
+  } catch (error) {
+    console.error('Failed to load account status:', error);
+  }
+}
+
+/**
+ * アカウント表示を更新
+ */
+function updateAccountDisplay(userType) {
+  if (!elements.accountStatusBox) return;
+
+  switch (userType) {
+    case 'member':
+      elements.accountStatusBox.classList.add('premium');
+      elements.accountIcon.textContent = '🎓';
+      elements.accountType.textContent = 'スクール会員';
+      elements.accountDesc.textContent = '全機能が利用可能です';
+      elements.accountBadge.className = 'status-badge success';
+      elements.accountBadge.textContent = 'Member';
+      // シークレットコード入力欄を非表示
+      hideSecretCodeSection();
+      break;
+
+    case 'paid':
+      elements.accountStatusBox.classList.add('premium');
+      elements.accountIcon.textContent = '👑';
+      elements.accountType.textContent = 'フルバージョン';
+      elements.accountDesc.textContent = '全機能が利用可能です';
+      elements.accountBadge.className = 'status-badge success';
+      elements.accountBadge.textContent = 'Premium';
+      // 購入セクションを非表示
+      hidePurchaseSection();
+      break;
+
+    default: // free
+      elements.accountStatusBox.classList.remove('premium');
+      elements.accountIcon.textContent = '🔒';
+      elements.accountType.textContent = '無料プラン';
+      elements.accountDesc.textContent = '一部機能のみ利用可能';
+      elements.accountBadge.className = 'status-badge pending';
+      elements.accountBadge.textContent = 'Free';
+      break;
+  }
+}
+
+/**
+ * シークレットコードで認証
+ */
+async function activateSecretCode() {
+  const code = elements.secretCode?.value.trim();
+
+  if (!code) {
+    updateCodeStatus('error', 'コードを入力してください');
+    return;
+  }
+
+  try {
+    const result = await BunsekiAuth.activateWithSecretCode(code);
+
+    if (result.success) {
+      updateCodeStatus('success', '✓ ' + result.message);
+      showAlert('success', result.message);
+      // 表示を更新
+      await loadAccountStatus();
+    } else {
+      updateCodeStatus('error', '✗ ' + result.message);
+      showAlert('error', result.message);
+    }
+  } catch (error) {
+    console.error('Activation error:', error);
+    updateCodeStatus('error', '認証に失敗しました');
+    showAlert('error', '認証処理中にエラーが発生しました');
+  }
+}
+
+/**
+ * コード認証状態を更新
+ */
+function updateCodeStatus(type, message) {
+  if (elements.codeStatus) {
+    elements.codeStatus.className = `code-status ${type}`;
+    elements.codeStatus.textContent = message;
+  }
+}
+
+/**
+ * 購入ページを開く
+ */
+async function openPurchasePage() {
+  try {
+    // ExtensionPay導入後に実装
+    // await BunsekiAuth.openPaymentPage();
+
+    // 仮実装：メッセージを表示
+    showAlert('error', '購入機能は準備中です。シークレットコードをお持ちの方はそちらをご利用ください。');
+  } catch (error) {
+    console.error('Purchase error:', error);
+    showAlert('error', '購入処理中にエラーが発生しました');
+  }
+}
+
+/**
+ * シークレットコードセクションを非表示
+ */
+function hideSecretCodeSection() {
+  const section = elements.secretCode?.closest('.api-section');
+  if (section) {
+    section.style.display = 'none';
+  }
+}
+
+/**
+ * 購入セクションを非表示
+ */
+function hidePurchaseSection() {
+  const section = elements.purchaseBtn?.closest('.api-section');
+  if (section) {
+    section.style.display = 'none';
+  }
 }
