@@ -10,7 +10,7 @@
 const BunsekiAuth = {
   // シークレットコード（スクール会員用）
   // 本番環境では環境変数やサーバーから取得することを推奨
-  SECRET_CODES: ['SCHOOL2025'],
+  SECRET_CODES: ['MGOOSE2025'],
 
   // ストレージキー
   STORAGE_KEYS: {
