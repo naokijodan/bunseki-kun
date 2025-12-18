@@ -227,6 +227,29 @@ body {
   background: var(--bg-secondary);
 }
 
+/* ロックされたタブ */
+.main-tab.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.main-tab.locked::before {
+  content: '🔒';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 10px;
+}
+
+.main-tab.locked:hover {
+  background: var(--bg-primary);
+}
+
+.main-tab.locked .tab-icon {
+  filter: grayscale(1);
+}
+
 .tab-icon {
   font-size: 20px;
 }
@@ -234,6 +257,55 @@ body {
 .tab-label {
   font-size: 12px;
   font-weight: 500;
+}
+
+/* アップグレードモーダル */
+.upgrade-modal-content {
+  text-align: center;
+  padding: 20px;
+}
+
+.upgrade-modal-content .upgrade-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.upgrade-modal-content h3 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.upgrade-modal-content p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.upgrade-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.upgrade-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.upgrade-option .option-icon {
+  font-size: 24px;
+}
+
+.upgrade-option .option-text {
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 /* =====================================

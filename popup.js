@@ -204,7 +204,10 @@ const ANALYSIS_CATEGORIES = {
 // =====================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // シート管理を最初に初期化
+  // 認証状態を最初にチェック
+  await initAuthCheck();
+
+  // シート管理を初期化
   await initSheetManagement();
 
   initTabs();
@@ -224,6 +227,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 前回の分析結果を表示
   await restoreAnalysisResults();
+
+  // タブ制限を適用（認証状態に基づく）
+  await applyTabRestrictions();
 });
 
 // =====================================
@@ -830,6 +836,12 @@ function initTabs() {
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const targetId = tab.dataset.tab;
+
+      // ロックされたタブの場合、アップグレード案内を表示
+      if (tab.hasAttribute('data-locked')) {
+        showUpgradePrompt();
+        return;
+      }
 
       // タブのアクティブ状態を切り替え
       tabs.forEach(t => t.classList.remove('active'));
@@ -7604,6 +7616,145 @@ function renderComparison(comparison) {
 }
 
 // =====================================
+// 認証・ライセンス管理
+// =====================================
+
+// 現在のユーザータイプをキャッシュ
+let currentUserType = 'free';
+
+/**
+ * 認証状態を初期化
+ */
+async function initAuthCheck() {
+  try {
+    if (typeof BunsekiAuth !== 'undefined') {
+      currentUserType = await BunsekiAuth.getUserType();
+      console.log('[Auth] User type:', currentUserType);
+    }
+  } catch (error) {
+    console.error('[Auth] Init error:', error);
+    currentUserType = 'free';
+  }
+}
+
+/**
+ * プレミアムユーザーか確認
+ */
+function isPremiumUser() {
+  return currentUserType === 'member' || currentUserType === 'paid';
+}
+
+/**
+ * タブ制限を適用
+ */
+async function applyTabRestrictions() {
+  const isPremium = isPremiumUser();
+
+  // 制限対象のタブ（無料ユーザーはアクセス不可）
+  const restrictedTabs = ['market-data', 'market-analysis', 'ai-suggestions'];
+
+  restrictedTabs.forEach(tabId => {
+    const tabButton = document.querySelector(`.main-tab[data-tab="${tabId}"]`);
+    if (tabButton) {
+      if (isPremium) {
+        // プレミアムユーザー: 制限解除
+        tabButton.classList.remove('locked');
+        tabButton.removeAttribute('data-locked');
+      } else {
+        // 無料ユーザー: ロック状態に
+        tabButton.classList.add('locked');
+        tabButton.setAttribute('data-locked', 'true');
+      }
+    }
+  });
+
+  // シート制限を適用
+  await applySheetRestrictions();
+
+  // ロック中のタブにいる場合、自分のデータタブに移動
+  if (!isPremium) {
+    const activeTab = document.querySelector('.main-tab.active');
+    if (activeTab && restrictedTabs.includes(activeTab.dataset.tab)) {
+      switchMainTab('my-data');
+    }
+  }
+}
+
+/**
+ * シート制限を適用
+ */
+async function applySheetRestrictions() {
+  const maxSheets = isPremiumUser() ? 10 : 1;
+  const sheetSelect = document.getElementById('sheetSelect');
+
+  if (!sheetSelect) return;
+
+  // シートオプションの有効/無効を設定
+  const options = sheetSelect.querySelectorAll('option');
+  options.forEach((option, index) => {
+    if (index >= maxSheets) {
+      option.disabled = true;
+      option.textContent = option.textContent.replace(' 🔒', '') + ' 🔒';
+    } else {
+      option.disabled = false;
+      option.textContent = option.textContent.replace(' 🔒', '');
+    }
+  });
+
+  // 無料ユーザーがロックされたシートを選択している場合、シート1に戻す
+  if (!isPremiumUser() && currentSheetId !== 'sheet1') {
+    await switchSheet('sheet1');
+    sheetSelect.value = 'sheet1';
+  }
+}
+
+/**
+ * ロックされたタブをクリックした時の処理
+ */
+function showUpgradePrompt() {
+  const modalHtml = `
+    <div class="upgrade-modal-content">
+      <div class="upgrade-icon">🔒</div>
+      <h3>この機能はフルバージョン限定です</h3>
+      <p>市場分析、AI提案、複数シートなどの機能を使うには、フルバージョンが必要です。</p>
+      <div class="upgrade-options">
+        <div class="upgrade-option">
+          <span class="option-icon">🎫</span>
+          <span class="option-text">スクール会員の方はシークレットコードを入力</span>
+        </div>
+        <div class="upgrade-option">
+          <span class="option-icon">💳</span>
+          <span class="option-text">1,000円で全機能を永久解放</span>
+        </div>
+      </div>
+      <button id="goToSettingsBtn" class="action-btn primary">
+        <span class="btn-icon">⚙️</span>
+        設定画面へ
+      </button>
+    </div>
+  `;
+
+  const modal = document.getElementById('analysisModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalContent = document.getElementById('modalContent');
+
+  if (modal && modalContent) {
+    modalTitle.textContent = 'アップグレード';
+    modalContent.innerHTML = modalHtml;
+    modal.style.display = 'flex';
+
+    // 設定画面へボタン
+    const goToSettingsBtn = document.getElementById('goToSettingsBtn');
+    if (goToSettingsBtn) {
+      goToSettingsBtn.addEventListener('click', () => {
+        chrome.runtime.openOptionsPage();
+        modal.style.display = 'none';
+      });
+    }
+  }
+}
+
+// =====================================
 // グローバルエクスポート（互換性のため）
 // =====================================
 
@@ -7616,3 +7767,5 @@ window.saveCustomBrandRules = saveCustomBrandRules;
 window.clearLearnedRules = clearLearnedRules;
 window.switchMarketTab = switchMarketTab;
 window.loadMarketAnalysis = loadMarketAnalysis;
+window.isPremiumUser = isPremiumUser;
+window.showUpgradePrompt = showUpgradePrompt;
