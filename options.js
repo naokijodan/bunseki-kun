@@ -112,6 +112,12 @@ function initEventListeners() {
   if (elements.purchaseBtn) {
     elements.purchaseBtn.addEventListener('click', openPurchasePage);
   }
+
+  // 開発用：認証リセットボタン
+  const resetAuthBtn = document.getElementById('resetAuthBtn');
+  if (resetAuthBtn) {
+    resetAuthBtn.addEventListener('click', resetAuthentication);
+  }
 }
 
 /**
@@ -392,5 +398,40 @@ function hidePurchaseSection() {
   const section = elements.purchaseBtn?.closest('.api-section');
   if (section) {
     section.style.display = 'none';
+  }
+}
+
+/**
+ * 開発用：認証をリセット
+ */
+async function resetAuthentication() {
+  if (!confirm('認証状態をリセットしますか？\n無料プランに戻ります。')) {
+    return;
+  }
+
+  try {
+    await BunsekiAuth.reset();
+
+    const statusEl = document.getElementById('resetAuthStatus');
+    if (statusEl) {
+      statusEl.textContent = '✓ リセット完了';
+      statusEl.style.color = '#4caf50';
+    }
+
+    // 表示を更新
+    await loadAccountStatus();
+
+    // シークレットコード入力欄をクリア
+    if (elements.secretCode) {
+      elements.secretCode.value = '';
+    }
+    if (elements.codeStatus) {
+      elements.codeStatus.textContent = '';
+    }
+
+    showAlert('success', '認証をリセットしました。新しいコードでテストできます。');
+  } catch (error) {
+    console.error('Reset error:', error);
+    showAlert('error', 'リセットに失敗しました');
   }
 }
