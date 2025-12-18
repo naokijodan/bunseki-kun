@@ -4467,6 +4467,233 @@ function setupCategoryExpandListeners() {
       }
     });
   });
+
+  // カテゴリ詳細行のクリックイベント（ブランド別グラフ表示）
+  setupCategorySubRowClickListeners();
+}
+
+/**
+ * カテゴリ詳細行クリックでブランド別グラフを表示するリスナー
+ */
+function setupCategorySubRowClickListeners() {
+  const subRows = document.querySelectorAll('.category-expandable-table .category-sub-row');
+  console.log('setupCategorySubRowClickListeners: 詳細行数:', subRows.length);
+
+  subRows.forEach(row => {
+    if (row.dataset.subClickListenerAttached) return;
+    row.dataset.subClickListenerAttached = 'true';
+
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parentIdx = row.dataset.parentCatIdx;
+      const subCategoryName = row.querySelector('.subcategory-name')?.textContent?.replace('└', '').trim();
+
+      // 親カテゴリを取得
+      const parentRow = document.querySelector(`.category-main-row[data-cat-idx="${parentIdx}"]`);
+      const mainCategoryName = parentRow?.querySelector('.col-name')?.textContent?.replace('▶', '').replace('▼', '').trim();
+
+      console.log('カテゴリ詳細クリック:', mainCategoryName, subCategoryName);
+
+      if (mainCategoryName && subCategoryName) {
+        showBrandChartForCategory(mainCategoryName, subCategoryName, 'my-data');
+      }
+    });
+  });
+}
+
+// グローバル変数でチャートインスタンスを管理
+let categoryBrandChartInstance = null;
+
+/**
+ * カテゴリ内のブランド別グラフを表示
+ */
+function showBrandChartForCategory(mainCategory, subCategory, source = 'my-data') {
+  const modal = document.getElementById('brandChartModal');
+  const titleEl = document.getElementById('brandChartTitle');
+  const summaryEl = document.getElementById('brandChartSummary');
+  const listEl = document.getElementById('brandChartList');
+  const canvas = document.getElementById('categoryBrandChart');
+
+  if (!modal || !canvas) return;
+
+  // タイトル設定
+  titleEl.textContent = `${subCategory} - ブランド別内訳`;
+
+  // ブランド別データを集計
+  let brandData = {};
+  let totalCount = 0;
+  let totalPrice = 0;
+
+  if (source === 'my-data') {
+    // 自分のデータから該当カテゴリのブランドを集計
+    const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
+
+    allItems.forEach(item => {
+      const itemMainCat = item.categoryMain || item.category || '(不明)';
+      const itemSubCat = item.categorySub || '(不明)';
+
+      if (itemMainCat === mainCategory && itemSubCat === subCategory) {
+        const brand = analyzer.extractBrand(item.title) || '(不明)';
+        const price = item.soldFor || item.price || 0;
+
+        if (!brandData[brand]) {
+          brandData[brand] = { brand, count: 0, totalPrice: 0 };
+        }
+        brandData[brand].count++;
+        brandData[brand].totalPrice += price;
+        totalCount++;
+        totalPrice += price;
+      }
+    });
+  } else if (source === 'market') {
+    // 市場データから集計
+    const marketData = window.currentMarketData || [];
+
+    marketData.forEach(item => {
+      const itemMainCat = item.categoryMain || item.category || '(不明)';
+      const itemSubCat = item.categorySub || '(不明)';
+
+      if (itemMainCat === mainCategory && itemSubCat === subCategory) {
+        const brand = item.brand || item.detectedBrand || '(不明)';
+        const price = item.soldPrice || item.price || 0;
+
+        if (!brandData[brand]) {
+          brandData[brand] = { brand, count: 0, totalPrice: 0 };
+        }
+        brandData[brand].count++;
+        brandData[brand].totalPrice += price;
+        totalCount++;
+        totalPrice += price;
+      }
+    });
+  }
+
+  // 配列に変換してソート
+  const brands = Object.values(brandData)
+    .map(b => ({
+      ...b,
+      avgPrice: b.count > 0 ? b.totalPrice / b.count : 0
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const maxCount = brands.length > 0 ? brands[0].count : 1;
+  const avgPrice = totalCount > 0 ? totalPrice / totalCount : 0;
+
+  // サマリー表示
+  summaryEl.innerHTML = `
+    <div class="brand-chart-summary-item">
+      <span class="brand-chart-summary-label">合計:</span>
+      <span class="brand-chart-summary-value">${totalCount}件</span>
+    </div>
+    <div class="brand-chart-summary-item">
+      <span class="brand-chart-summary-label">ブランド数:</span>
+      <span class="brand-chart-summary-value highlight">${brands.length}</span>
+    </div>
+    <div class="brand-chart-summary-item">
+      <span class="brand-chart-summary-label">平均価格:</span>
+      <span class="brand-chart-summary-value highlight">$${avgPrice.toFixed(0)}</span>
+    </div>
+  `;
+
+  // リスト表示（上位20件）
+  const displayBrands = brands.slice(0, 20);
+  listEl.innerHTML = displayBrands.map((b, idx) => {
+    const barWidth = (b.count / maxCount * 100).toFixed(1);
+    return `
+      <div class="brand-chart-item" data-brand="${escapeHtml(b.brand)}" data-category="${escapeHtml(subCategory)}">
+        <span class="brand-chart-rank ${idx < 3 ? 'top' : ''}">${idx + 1}</span>
+        <span class="brand-chart-name">${escapeHtml(b.brand)}</span>
+        <div class="brand-chart-bar-container">
+          <div class="brand-chart-bar" style="width: ${barWidth}%"></div>
+        </div>
+        <span class="brand-chart-count">${b.count}件</span>
+        <span class="brand-chart-avg-price">$${b.avgPrice.toFixed(0)}</span>
+      </div>
+    `;
+  }).join('');
+
+  // 棒グラフを描画（Chart.js）
+  if (categoryBrandChartInstance) {
+    categoryBrandChartInstance.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  const chartBrands = displayBrands.slice(0, 10); // グラフは上位10件
+
+  categoryBrandChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartBrands.map(b => b.brand.length > 12 ? b.brand.substring(0, 12) + '...' : b.brand),
+      datasets: [{
+        label: '件数',
+        data: chartBrands.map(b => b.count),
+        backgroundColor: 'rgba(255, 152, 0, 0.7)',
+        borderColor: 'rgba(255, 152, 0, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const brand = chartBrands[context.dataIndex];
+              return `${brand.count}件 (平均: $${brand.avgPrice.toFixed(0)})`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        },
+        y: {
+          ticks: {
+            font: {
+              size: 11
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // ブランドリストのクリックで商品一覧表示
+  listEl.querySelectorAll('.brand-chart-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const brand = item.dataset.brand;
+      const category = item.dataset.category;
+      modal.style.display = 'none';
+      showItemListForBrandCategory(brand, category, source);
+    });
+  });
+
+  // モーダル表示
+  modal.style.display = 'flex';
+
+  // 閉じるボタン
+  const closeBtn = document.getElementById('closeBrandChartModal');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.style.display = 'none';
+    };
+  }
+
+  // オーバーレイクリックで閉じる
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
+  };
 }
 
 /**
@@ -7479,6 +7706,21 @@ function renderCategoryRanking(ranking) {
         row.classList.add('expanded');
         if (expandIcon) expandIcon.textContent = '▼';
         subRows.forEach(sr => sr.style.display = '');
+      }
+    });
+  });
+
+  // 細分類行のクリックイベント（ブランド別グラフ表示）
+  container.querySelectorAll('.subcategory-row:not(.category-price-dist-row)').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const mainCategory = row.dataset.parentCategory;
+      const subCategoryEl = row.querySelector('.subcategory-name');
+      const subCategory = subCategoryEl?.textContent?.replace('└', '').replace('その他', '').trim() || 'その他';
+
+      if (mainCategory && subCategory) {
+        showBrandChartForCategory(mainCategory, subCategory, 'market');
       }
     });
   });
