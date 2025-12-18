@@ -33,8 +33,13 @@
         </div>
       </div>
       <div class="header-right">
-        <button id="settingsBtn" class="icon-btn" title="設定">
-          <span>⚙️</span>
+        <button id="brandMasterBtn" class="header-btn with-label" title="ブランド管理">
+          <span class="btn-icon">🏷️</span>
+          <span class="btn-label">ブランド</span>
+        </button>
+        <button id="settingsBtn" class="header-btn with-label" title="設定">
+          <span class="btn-icon">⚙️</span>
+          <span class="btn-label">設定</span>
         </button>
       </div>
     </header>
@@ -730,10 +735,236 @@
       </div>
     </div>
 
+    <!-- ブランドマスター管理モーダル -->
+    <div id="brandMasterModal" class="modal-overlay" style="display: none;">
+      <div class="modal brand-master-modal">
+        <div class="modal-header">
+          <h2>ブランド管理</h2>
+          <button id="closeBrandMasterModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content brand-master-content">
+          <!-- 検索・フィルタ -->
+          <div class="brand-search-bar">
+            <input type="text" id="brandSearchInput" class="brand-search-input" placeholder="ブランド名で検索...">
+            <select id="brandCategoryFilter" class="brand-category-filter">
+              <option value="">全カテゴリ</option>
+            </select>
+            <span class="brand-count-badge" id="brandCountBadge">0件</span>
+          </div>
+
+          <!-- ブランドリスト -->
+          <div class="brand-list-container" id="brandListContainer">
+            <!-- 動的に生成 -->
+          </div>
+
+          <!-- アクションバー -->
+          <div class="brand-action-bar">
+            <button id="addBrandBtn" class="action-btn primary small">
+              <span class="btn-icon">+</span>
+              ブランド追加
+            </button>
+            <button id="resetBrandMasterBtn" class="action-btn danger small">
+              <span class="btn-icon">🔄</span>
+              初期化
+            </button>
+          </div>
+
+          <!-- シート別設定 -->
+          <div class="sheet-brand-section">
+            <h4>このシートの設定</h4>
+            <div class="sheet-brand-options">
+              <label class="radio-option">
+                <input type="radio" name="sheetBrandMode" value="master" checked>
+                <span>共通設定を使用</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="sheetBrandMode" value="custom">
+                <span>このシート専用の追加ブランドを使用</span>
+              </label>
+            </div>
+            <div id="sheetBrandsContainer" class="sheet-brands-container" style="display: none;">
+              <!-- シート固有のブランドリスト -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ブランド追加/編集モーダル -->
+    <div id="brandEditModal" class="modal-overlay" style="display: none;">
+      <div class="modal brand-edit-modal">
+        <div class="modal-header">
+          <h2 id="brandEditTitle">ブランド追加</h2>
+          <button id="closeBrandEditModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content">
+          <div class="form-group">
+            <label for="brandNameInput">ブランド名</label>
+            <input type="text" id="brandNameInput" class="form-input" placeholder="例: SEIKO">
+          </div>
+          <div class="form-group">
+            <label>マッチパターン</label>
+            <div id="brandPatternsContainer" class="brand-patterns-container">
+              <!-- 動的に生成 -->
+            </div>
+            <button id="addPatternBtn" class="add-pattern-btn">+ パターン追加</button>
+          </div>
+          <div class="form-group">
+            <label>マッチタイプ</label>
+            <div class="match-type-options">
+              <label class="radio-option">
+                <input type="radio" name="matchType" value="word" checked>
+                <span>単語マッチ（推奨）</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="matchType" value="exact">
+                <span>完全一致</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="matchType" value="contains">
+                <span>部分一致</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="brandEnabledCheck" checked>
+              このブランドを有効にする
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="saveBrandBtn" class="action-btn primary">保存</button>
+          <button id="cancelBrandBtn" class="action-btn secondary">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定モーダル -->
+    <div id="settingsModal" class="modal-overlay" style="display: none;">
+      <div class="modal settings-modal">
+        <div class="modal-header">
+          <h2>設定</h2>
+          <button id="closeSettingsModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content settings-content">
+          <!-- アカウント・ライセンス -->
+          <div class="settings-section">
+            <h3 class="settings-section-title">
+              <span class="section-icon">🔑</span>
+              アカウント・ライセンス
+            </h3>
+
+            <!-- 現在のステータス -->
+            <div class="account-status-box" id="settingsAccountStatusBox">
+              <div class="account-status-header">
+                <span class="account-icon" id="settingsAccountIcon">🔒</span>
+                <div class="account-info">
+                  <div class="account-type" id="settingsAccountType">無料プラン</div>
+                  <div class="account-desc" id="settingsAccountDesc">一部機能のみ利用可能</div>
+                </div>
+                <span id="settingsAccountBadge" class="status-badge pending">Free</span>
+              </div>
+            </div>
+
+            <!-- シークレットコード -->
+            <div class="settings-card purple">
+              <div class="settings-card-header">
+                <span class="card-icon">🎫</span>
+                <div class="card-title">シークレットコード</div>
+              </div>
+              <div class="form-group">
+                <div class="password-input-wrapper">
+                  <input type="password" id="settingsSecretCode" class="form-input" placeholder="コードを入力...">
+                  <button type="button" class="toggle-password-btn" data-target="settingsSecretCode">👁</button>
+                </div>
+                <p class="form-hint">スクール会員の方に配布されたコード</p>
+              </div>
+              <button id="settingsActivateCodeBtn" class="action-btn secondary small">認証する</button>
+            </div>
+          </div>
+
+          <!-- AI API設定 -->
+          <div class="settings-section">
+            <h3 class="settings-section-title">
+              <span class="section-icon">🤖</span>
+              AI API設定
+            </h3>
+            <p class="settings-hint">AI分析を使用するには、少なくとも1つのAPIキーを設定してください。</p>
+
+            <!-- OpenAI -->
+            <div class="settings-card green">
+              <div class="settings-card-header">
+                <span class="card-icon">🟢</span>
+                <div>
+                  <div class="card-title">OpenAI</div>
+                  <div class="card-subtitle">GPT-4o</div>
+                </div>
+                <span id="settingsOpenaiStatus" class="status-badge pending">未設定</span>
+              </div>
+              <div class="form-group">
+                <div class="password-input-wrapper">
+                  <input type="password" id="settingsOpenaiKey" class="form-input" placeholder="sk-...">
+                  <button type="button" class="toggle-password-btn" data-target="settingsOpenaiKey">👁</button>
+                </div>
+                <p class="form-hint"><a href="https://platform.openai.com/api-keys" target="_blank">APIキーを取得</a></p>
+              </div>
+              <button class="action-btn secondary small" data-test-api="openai">接続テスト</button>
+            </div>
+
+            <!-- Claude -->
+            <div class="settings-card orange">
+              <div class="settings-card-header">
+                <span class="card-icon">🟠</span>
+                <div>
+                  <div class="card-title">Anthropic Claude</div>
+                  <div class="card-subtitle">Claude 3.5 Sonnet</div>
+                </div>
+                <span id="settingsClaudeStatus" class="status-badge pending">未設定</span>
+              </div>
+              <div class="form-group">
+                <div class="password-input-wrapper">
+                  <input type="password" id="settingsClaudeKey" class="form-input" placeholder="sk-ant-...">
+                  <button type="button" class="toggle-password-btn" data-target="settingsClaudeKey">👁</button>
+                </div>
+                <p class="form-hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">APIキーを取得</a></p>
+              </div>
+              <button class="action-btn secondary small" data-test-api="claude">接続テスト</button>
+            </div>
+
+            <!-- Gemini -->
+            <div class="settings-card blue">
+              <div class="settings-card-header">
+                <span class="card-icon">🔵</span>
+                <div>
+                  <div class="card-title">Google Gemini</div>
+                  <div class="card-subtitle">Gemini Pro</div>
+                </div>
+                <span id="settingsGeminiStatus" class="status-badge pending">未設定</span>
+              </div>
+              <div class="form-group">
+                <div class="password-input-wrapper">
+                  <input type="password" id="settingsGeminiKey" class="form-input" placeholder="AIza...">
+                  <button type="button" class="toggle-password-btn" data-target="settingsGeminiKey">👁</button>
+                </div>
+                <p class="form-hint"><a href="https://aistudio.google.com/app/apikey" target="_blank">APIキーを取得</a></p>
+              </div>
+              <button class="action-btn secondary small" data-test-api="gemini">接続テスト</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="saveSettingsBtn" class="action-btn primary">保存</button>
+          <button id="closeSettingsBtn" class="action-btn secondary">閉じる</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="chart.min.js"></script>
   <script src="category-rules.js"></script>
+  <script src="brand-master.js"></script>
   <script src="db.js"></script>
   <script src="auth.js"></script>
   <script src="analyzer.js"></script>

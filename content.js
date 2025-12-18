@@ -15,6 +15,10 @@ class BunsekiKunHighlighter {
     this.opportunityBrands = [];  // チャンス（売れてるが自分は出品なし）
     this.pricingAlerts = {};      // 価格アラート { brand: { myAvg, marketAvg, diff } }
 
+    // ブランドマスター（chrome.storageから読み込み）
+    this.brandMasterData = null;
+    this.brandPatternCache = [];  // プリコンパイル済み正規表現
+
     // 処理済み要素の追跡
     this.processedElements = new WeakSet();
 
@@ -59,6 +63,14 @@ class BunsekiKunHighlighter {
         this.processedElements = new WeakSet();
         this.highlightPage();
       }
+      // ブランドマスター変更を監視
+      if (changes.brandMaster) {
+        console.log('ぶんせき君: ブランドマスター更新検知');
+        this.loadBrandMaster(changes.brandMaster.newValue).then(() => {
+          this.processedElements = new WeakSet();
+          this.highlightPage();
+        });
+      }
     });
   }
 
@@ -70,7 +82,8 @@ class BunsekiKunHighlighter {
       'bunsekiData',
       'bunsekiSettings',
       'excludedBrands',
-      'highlightEnabled'
+      'highlightEnabled',
+      'brandMaster'
     ]);
 
     if (data.bunsekiData) {
@@ -89,6 +102,69 @@ class BunsekiKunHighlighter {
     this.settings.highlightEnabled = data.highlightEnabled !== false;
 
     this.excludedBrands = (data.excludedBrands || []).map(b => b.toLowerCase());
+
+    // ブランドマスターを読み込み・パターンをプリコンパイル
+    await this.loadBrandMaster(data.brandMaster);
+  }
+
+  /**
+   * ブランドマスターを読み込み、正規表現パターンをプリコンパイル
+   */
+  async loadBrandMaster(brandMaster) {
+    this.brandMasterData = brandMaster;
+    this.brandPatternCache = [];
+
+    if (!brandMaster || !brandMaster.brands) {
+      console.log('ぶんせき君: ブランドマスターが見つかりません（初回起動時は正常）');
+      return;
+    }
+
+    const brands = brandMaster.brands.filter(b => b.enabled !== false);
+    console.log('ぶんせき君: ブランドマスター読み込み:', brands.length, '件');
+
+    // 各ブランドのパターンをプリコンパイル
+    for (const brand of brands) {
+      if (!brand.patterns || brand.patterns.length === 0) continue;
+
+      for (const pattern of brand.patterns) {
+        let regex;
+        try {
+          switch (brand.matchType) {
+            case 'exact':
+              // 完全一致（大文字小文字無視）
+              regex = new RegExp(`^${this.escapeRegex(pattern)}$`, 'i');
+              break;
+            case 'contains':
+              // 部分一致
+              regex = new RegExp(this.escapeRegex(pattern), 'i');
+              break;
+            case 'word':
+            default:
+              // 単語境界マッチ（デフォルト）
+              regex = new RegExp(`\\b${this.escapeRegex(pattern)}\\b`, 'i');
+              break;
+          }
+
+          this.brandPatternCache.push({
+            regex,
+            brandName: brand.name,
+            brandId: brand.id,
+            pattern: pattern
+          });
+        } catch (e) {
+          console.warn('ぶんせき君: 正規表現エラー:', pattern, e);
+        }
+      }
+    }
+
+    console.log('ぶんせき君: パターンキャッシュ作成完了:', this.brandPatternCache.length, '件');
+  }
+
+  /**
+   * 正規表現の特殊文字をエスケープ
+   */
+  escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   /**
@@ -361,64 +437,36 @@ class BunsekiKunHighlighter {
   }
 
   /**
-   * タイトルからブランドを抽出
+   * タイトルからブランドを抽出（ブランドマスター使用）
    */
   extractBrandFromTitle(title) {
-    // BRAND_PATTERNS から判定（category-rules.jsと共有したいが、content scriptでは別途定義）
-    const brandPatterns = [
+    if (!title) return null;
+
+    // 1. ブランドマスターのプリコンパイル済みパターンを使用（545ブランド）
+    if (this.brandPatternCache && this.brandPatternCache.length > 0) {
+      for (const { regex, brandName } of this.brandPatternCache) {
+        if (regex.test(title)) {
+          return brandName;
+        }
+      }
+    }
+
+    // 2. フォールバック: ブランドマスターがまだ読み込まれていない場合の基本パターン
+    const fallbackPatterns = [
       { pattern: /\b(CHANEL)\b/i, brand: 'CHANEL' },
       { pattern: /\b(HERMES|HERMÈS)\b/i, brand: 'HERMES' },
       { pattern: /\b(Louis\s?Vuitton|LV)\b/i, brand: 'LOUIS VUITTON' },
       { pattern: /\b(GUCCI)\b/i, brand: 'GUCCI' },
       { pattern: /\b(PRADA)\b/i, brand: 'PRADA' },
-      { pattern: /\b(DIOR|Christian\s?Dior)\b/i, brand: 'DIOR' },
-      { pattern: /\b(FENDI)\b/i, brand: 'FENDI' },
-      { pattern: /\b(CELINE|CÉLINE)\b/i, brand: 'CELINE' },
-      { pattern: /\b(BALENCIAGA)\b/i, brand: 'BALENCIAGA' },
-      { pattern: /\b(BOTTEGA\s?VENETA)\b/i, brand: 'BOTTEGA VENETA' },
-      { pattern: /\b(BURBERRY)\b/i, brand: 'BURBERRY' },
-      { pattern: /\b(COACH)\b/i, brand: 'COACH' },
-      { pattern: /\b(TIFFANY)\b/i, brand: 'TIFFANY' },
-      { pattern: /\b(CARTIER)\b/i, brand: 'CARTIER' },
-      { pattern: /\b(BVLGARI|BULGARI)\b/i, brand: 'BVLGARI' },
       { pattern: /\b(ROLEX)\b/i, brand: 'ROLEX' },
       { pattern: /\b(OMEGA)\b/i, brand: 'OMEGA' },
-      { pattern: /\b(TAG\s?HEUER)\b/i, brand: 'TAG HEUER' },
+      { pattern: /\b(SEIKO)\b/i, brand: 'SEIKO' },
+      { pattern: /\b(CASIO)\b/i, brand: 'CASIO' },
       { pattern: /\b(NIKE)\b/i, brand: 'NIKE' },
-      { pattern: /\b(ADIDAS)\b/i, brand: 'ADIDAS' },
-      { pattern: /\b(NEW\s?BALANCE)\b/i, brand: 'NEW BALANCE' },
-      { pattern: /\b(SUPREME)\b/i, brand: 'SUPREME' },
-      { pattern: /\b(YEEZY)\b/i, brand: 'YEEZY' },
-      { pattern: /\b(JORDAN|AIR\s?JORDAN)\b/i, brand: 'JORDAN' },
-      { pattern: /\b(VIVIENNE\s?WESTWOOD)\b/i, brand: 'VIVIENNE WESTWOOD' },
-      { pattern: /\b(MARC\s?JACOBS)\b/i, brand: 'MARC JACOBS' },
-      { pattern: /\b(MICHAEL\s?KORS)\b/i, brand: 'MICHAEL KORS' },
-      { pattern: /\b(KATE\s?SPADE)\b/i, brand: 'KATE SPADE' },
-      { pattern: /\b(VERSACE)\b/i, brand: 'VERSACE' },
-      { pattern: /\b(VALENTINO)\b/i, brand: 'VALENTINO' },
-      { pattern: /\b(GIVENCHY)\b/i, brand: 'GIVENCHY' },
-      { pattern: /\b(SAINT\s?LAURENT|YSL)\b/i, brand: 'SAINT LAURENT' },
-      { pattern: /\b(LOEWE)\b/i, brand: 'LOEWE' },
-      { pattern: /\b(MONCLER)\b/i, brand: 'MONCLER' },
-      { pattern: /\b(CANADA\s?GOOSE)\b/i, brand: 'CANADA GOOSE' },
-      { pattern: /\b(NORTH\s?FACE)\b/i, brand: 'THE NORTH FACE' },
-      { pattern: /\b(PATAGONIA)\b/i, brand: 'PATAGONIA' },
-      { pattern: /\b(ARC['']?TERYX)\b/i, brand: "ARC'TERYX" },
-      // 日本ブランド
-      { pattern: /\b(COMME\s?DES\s?GARCONS|CDG)\b/i, brand: 'COMME DES GARCONS' },
-      { pattern: /\b(ISSEY\s?MIYAKE)\b/i, brand: 'ISSEY MIYAKE' },
-      { pattern: /\b(YOHJI\s?YAMAMOTO)\b/i, brand: 'YOHJI YAMAMOTO' },
-      { pattern: /\b(UNDERCOVER)\b/i, brand: 'UNDERCOVER' },
-      { pattern: /\b(BAPE|A\s?BATHING\s?APE)\b/i, brand: 'BAPE' },
-      { pattern: /\b(HUMAN\s?MADE)\b/i, brand: 'HUMAN MADE' },
-      { pattern: /\b(NEIGHBORHOOD)\b/i, brand: 'NEIGHBORHOOD' },
-      { pattern: /\b(WTAPS)\b/i, brand: 'WTAPS' },
-      { pattern: /\b(PORTER|PORTER-YOSHIDA)\b/i, brand: 'PORTER' },
-      { pattern: /\b(ANTEPRIMA)\b/i, brand: 'ANTEPRIMA' },
-      { pattern: /\b(SAMANTHA\s?THAVASA)\b/i, brand: 'SAMANTHA THAVASA' }
+      { pattern: /\b(ADIDAS)\b/i, brand: 'ADIDAS' }
     ];
 
-    for (const { pattern, brand } of brandPatterns) {
+    for (const { pattern, brand } of fallbackPatterns) {
       if (pattern.test(title)) {
         return brand;
       }

@@ -204,6 +204,12 @@ const ANALYSIS_CATEGORIES = {
 // =====================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // ブランドマスターを初期化
+  if (typeof brandMaster !== 'undefined') {
+    await brandMaster.init();
+    console.log('ブランドマスター初期化完了:', brandMaster.brands.length, '件');
+  }
+
   // 認証状態を最初にチェック
   await initAuthCheck();
 
@@ -215,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAnalysisButtons();
   initMarketAnalysis();
   initAITab();
-  initSettings();
+  // initSettings(); は削除 - initSettingsUI()で設定モーダルを使用
 
   // 保存データの復元
   await loadSavedData();
@@ -5841,15 +5847,10 @@ function addChatMessage(role, content) {
 // =====================================
 
 /**
- * 設定の初期化
+ * 設定の初期化（設定モーダルはinitSettingsUI()で処理）
  */
 function initSettings() {
-  const settingsBtn = document.getElementById('settingsBtn');
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
-      chrome.runtime.openOptionsPage();
-    });
-  }
+  // 設定ボタンのイベントはinitSettingsUI()で設定するため、ここでは何もしない
 }
 
 // =====================================
@@ -5955,9 +5956,6 @@ function readFileAsText(file) {
 function extractBrandFromTitle(title) {
   if (!title) return '(不明)';
 
-  const titleLower = title.toLowerCase();
-  const titleUpper = title.toUpperCase();
-
   // 除外ワードリスト（これらはブランド名ではない）
   const EXCLUDED_WORDS = new Set([
     'vintage', 'antique', 'rare', 'limited', 'auth', 'authentic', 'genuine', 'original',
@@ -5977,7 +5975,7 @@ function extractBrandFromTitle(title) {
     return EXCLUDED_WORDS.has(word.toLowerCase().trim());
   };
 
-  // まずAI学習済みルール（customBrandRules）をチェック
+  // 1. まずAI学習済みルール（customBrandRules）をチェック
   if (analyzer.customBrandRules && Object.keys(analyzer.customBrandRules).length > 0) {
     for (const [brandKey, rule] of Object.entries(analyzer.customBrandRules)) {
       const brandName = rule.brand || brandKey;
@@ -5994,11 +5992,9 @@ function extractBrandFromTitle(title) {
       }
 
       // 学習済みキーワードがタイトルに含まれているか
-      // ただし、キーワードが除外ワードの場合はスキップ
       if (rule.keywords && rule.keywords.length > 0) {
         for (const keyword of rule.keywords) {
           if (keyword && !isExcludedWord(keyword)) {
-            // 単語境界マッチと部分一致の両方を試行
             const keywordRegex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
             const partialRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
             if (keywordRegex.test(title) || partialRegex.test(title)) {
@@ -6010,88 +6006,15 @@ function extractBrandFromTitle(title) {
     }
   }
 
-  // ブランドパターン
-  const brandPatterns = [
-    // ジュエリーブランド
-    { pattern: /\b(TIFFANY)\b/i, brand: 'TIFFANY' },
-    { pattern: /\b(CARTIER)\b/i, brand: 'CARTIER' },
-    { pattern: /\b(BVLGARI|BULGARI)\b/i, brand: 'BVLGARI' },
-    { pattern: /\b(VAN CLEEF|VCA)\b/i, brand: 'VAN CLEEF' },
-    { pattern: /\b(HARRY WINSTON)\b/i, brand: 'HARRY WINSTON' },
-    { pattern: /\b(DAVID YURMAN)\b/i, brand: 'DAVID YURMAN' },
-    { pattern: /\b(MIKIMOTO)\b/i, brand: 'MIKIMOTO' },
-    { pattern: /\b(PANDORA)\b/i, brand: 'PANDORA' },
-    { pattern: /\b(SWAROVSKI)\b/i, brand: 'SWAROVSKI' },
-    { pattern: /\b(CHOPARD)\b/i, brand: 'CHOPARD' },
-    { pattern: /\b(PIAGET)\b/i, brand: 'PIAGET' },
-    { pattern: /\b(BOUCHERON)\b/i, brand: 'BOUCHERON' },
-    { pattern: /\b(GRAFF)\b/i, brand: 'GRAFF' },
+  // 2. ブランドマスターを使用（545ブランド対応）
+  if (typeof brandMaster !== 'undefined' && brandMaster.initialized) {
+    // 現在のシートIDを取得
+    const sheetSelect = document.getElementById('sheetSelect');
+    const currentSheetId = sheetSelect ? sheetSelect.value : null;
 
-    // 時計ブランド
-    { pattern: /\b(ROLEX)\b/i, brand: 'ROLEX' },
-    { pattern: /\b(OMEGA)\b/i, brand: 'OMEGA' },
-    { pattern: /\b(TAG HEUER)\b/i, brand: 'TAG HEUER' },
-    { pattern: /\b(BREITLING)\b/i, brand: 'BREITLING' },
-    { pattern: /\b(PATEK PHILIPPE)\b/i, brand: 'PATEK PHILIPPE' },
-    { pattern: /\b(AUDEMARS PIGUET|AP)\b/i, brand: 'AUDEMARS PIGUET' },
-    { pattern: /\b(IWC)\b/i, brand: 'IWC' },
-    { pattern: /\b(LONGINES)\b/i, brand: 'LONGINES' },
-    { pattern: /\b(TISSOT)\b/i, brand: 'TISSOT' },
-    { pattern: /\b(SEIKO)\b/i, brand: 'SEIKO' },
-    { pattern: /\b(CITIZEN)\b/i, brand: 'CITIZEN' },
-    { pattern: /\b(CASIO|G-SHOCK)\b/i, brand: 'CASIO' },
-    { pattern: /\b(TUDOR)\b/i, brand: 'TUDOR' },
-
-    // ファッションブランド
-    { pattern: /\b(LOUIS VUITTON|LV)\b/i, brand: 'LOUIS VUITTON' },
-    { pattern: /\b(GUCCI)\b/i, brand: 'GUCCI' },
-    { pattern: /\b(CHANEL)\b/i, brand: 'CHANEL' },
-    { pattern: /\b(HERMES|HERMÈS)\b/i, brand: 'HERMES' },
-    { pattern: /\b(PRADA)\b/i, brand: 'PRADA' },
-    { pattern: /\b(BURBERRY)\b/i, brand: 'BURBERRY' },
-    { pattern: /\b(FENDI)\b/i, brand: 'FENDI' },
-    { pattern: /\b(DIOR)\b/i, brand: 'DIOR' },
-    { pattern: /\b(CELINE|CÉLINE)\b/i, brand: 'CELINE' },
-    { pattern: /\b(BALENCIAGA)\b/i, brand: 'BALENCIAGA' },
-    { pattern: /\b(BOTTEGA VENETA)\b/i, brand: 'BOTTEGA VENETA' },
-    { pattern: /\b(LOEWE)\b/i, brand: 'LOEWE' },
-    { pattern: /\b(SAINT LAURENT|YSL)\b/i, brand: 'SAINT LAURENT' },
-    { pattern: /\b(GIVENCHY)\b/i, brand: 'GIVENCHY' },
-    { pattern: /\b(VALENTINO)\b/i, brand: 'VALENTINO' },
-    { pattern: /\b(MIU MIU)\b/i, brand: 'MIU MIU' },
-    { pattern: /\b(COACH)\b/i, brand: 'COACH' },
-    { pattern: /\b(MICHAEL KORS)\b/i, brand: 'MICHAEL KORS' },
-    { pattern: /\b(KATE SPADE)\b/i, brand: 'KATE SPADE' },
-    { pattern: /\b(TORY BURCH)\b/i, brand: 'TORY BURCH' },
-    { pattern: /\b(MARC JACOBS)\b/i, brand: 'MARC JACOBS' },
-    { pattern: /\b(VERSACE)\b/i, brand: 'VERSACE' },
-    { pattern: /\b(DOLCE.*GABBANA|D&G)\b/i, brand: 'DOLCE & GABBANA' },
-    { pattern: /\b(ARMANI)\b/i, brand: 'ARMANI' },
-    { pattern: /\b(MOSCHINO)\b/i, brand: 'MOSCHINO' },
-    { pattern: /\b(MCM)\b/i, brand: 'MCM' },
-    { pattern: /\b(FERRAGAMO)\b/i, brand: 'FERRAGAMO' },
-    { pattern: /\b(JIMMY CHOO)\b/i, brand: 'JIMMY CHOO' },
-
-    // スポーツ・カジュアル
-    { pattern: /\b(NIKE)\b/i, brand: 'NIKE' },
-    { pattern: /\b(ADIDAS)\b/i, brand: 'ADIDAS' },
-    { pattern: /\b(NEW BALANCE)\b/i, brand: 'NEW BALANCE' },
-    { pattern: /\b(PUMA)\b/i, brand: 'PUMA' },
-    { pattern: /\b(REEBOK)\b/i, brand: 'REEBOK' },
-    { pattern: /\b(CONVERSE)\b/i, brand: 'CONVERSE' },
-    { pattern: /\b(VANS)\b/i, brand: 'VANS' },
-    { pattern: /\b(SUPREME)\b/i, brand: 'SUPREME' },
-    { pattern: /\b(NORTH FACE)\b/i, brand: 'THE NORTH FACE' },
-    { pattern: /\b(PATAGONIA)\b/i, brand: 'PATAGONIA' },
-    { pattern: /\b(LEVI'?S)\b/i, brand: 'LEVIS' },
-    { pattern: /\b(RALPH LAUREN|POLO)\b/i, brand: 'RALPH LAUREN' },
-    { pattern: /\b(TOMMY HILFIGER)\b/i, brand: 'TOMMY HILFIGER' },
-    { pattern: /\b(CALVIN KLEIN|CK)\b/i, brand: 'CALVIN KLEIN' }
-  ];
-
-  for (const { pattern, brand } of brandPatterns) {
-    if (pattern.test(titleUpper)) {
-      return brand;
+    const result = brandMaster.detectBrand(title, currentSheetId);
+    if (result && result.name) {
+      return result.name;
     }
   }
 
@@ -8263,6 +8186,727 @@ function showUpgradePrompt() {
 }
 
 // =====================================
+// ブランドマスター管理UI
+// =====================================
+
+let brandMasterModalState = {
+  currentEditBrand: null,
+  searchQuery: '',
+  filteredBrands: []
+};
+
+/**
+ * ブランドマスター管理モーダルを初期化
+ */
+function initBrandMasterUI() {
+  const brandMasterBtn = document.getElementById('brandMasterBtn');
+  const brandMasterModal = document.getElementById('brandMasterModal');
+  const closeBrandMasterModal = document.getElementById('closeBrandMasterModal');
+  const brandSearchInput = document.getElementById('brandSearchInput');
+  const addBrandBtn = document.getElementById('addBrandBtn');
+  const resetBrandMasterBtn = document.getElementById('resetBrandMasterBtn');
+  const brandEditModal = document.getElementById('brandEditModal');
+  const closeBrandEditModal = document.getElementById('closeBrandEditModal');
+  const saveBrandBtn = document.getElementById('saveBrandBtn');
+  const cancelBrandBtn = document.getElementById('cancelBrandBtn');
+  const addPatternBtn = document.getElementById('addPatternBtn');
+
+  // ブランド管理ボタン
+  if (brandMasterBtn) {
+    brandMasterBtn.addEventListener('click', () => {
+      openBrandMasterModal();
+    });
+  }
+
+  // モーダルを閉じる
+  if (closeBrandMasterModal) {
+    closeBrandMasterModal.addEventListener('click', () => {
+      brandMasterModal.style.display = 'none';
+    });
+  }
+
+  // 検索入力
+  if (brandSearchInput) {
+    brandSearchInput.addEventListener('input', (e) => {
+      brandMasterModalState.searchQuery = e.target.value;
+      renderBrandList();
+    });
+  }
+
+  // ブランド追加ボタン
+  if (addBrandBtn) {
+    addBrandBtn.addEventListener('click', () => {
+      openBrandEditModal(null);
+    });
+  }
+
+  // 初期化ボタン
+  if (resetBrandMasterBtn) {
+    resetBrandMasterBtn.addEventListener('click', async () => {
+      if (confirm('ブランドマスターを初期状態に戻しますか？\nカスタム追加したブランドは削除されます。')) {
+        if (typeof brandMaster !== 'undefined') {
+          await brandMaster.resetToDefault();
+          renderBrandList();
+          showAlert('ブランドマスターを初期化しました', 'success');
+        }
+      }
+    });
+  }
+
+  // ブランド編集モーダルを閉じる
+  if (closeBrandEditModal) {
+    closeBrandEditModal.addEventListener('click', () => {
+      brandEditModal.style.display = 'none';
+    });
+  }
+
+  if (cancelBrandBtn) {
+    cancelBrandBtn.addEventListener('click', () => {
+      brandEditModal.style.display = 'none';
+    });
+  }
+
+  // パターン追加ボタン
+  if (addPatternBtn) {
+    addPatternBtn.addEventListener('click', () => {
+      addPatternInputRow();
+    });
+  }
+
+  // ブランド保存ボタン
+  if (saveBrandBtn) {
+    saveBrandBtn.addEventListener('click', async () => {
+      await saveBrandFromModal();
+    });
+  }
+
+  // シート別設定のラジオボタン
+  const sheetBrandModeRadios = document.querySelectorAll('input[name="sheetBrandMode"]');
+  sheetBrandModeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const sheetBrandsContainer = document.getElementById('sheetBrandsContainer');
+      if (e.target.value === 'custom') {
+        sheetBrandsContainer.style.display = 'block';
+      } else {
+        sheetBrandsContainer.style.display = 'none';
+      }
+    });
+  });
+}
+
+/**
+ * ブランドマスター管理モーダルを開く
+ */
+async function openBrandMasterModal() {
+  const modal = document.getElementById('brandMasterModal');
+  if (!modal) return;
+
+  // ブランドマスターが初期化されていなければ初期化
+  if (typeof brandMaster !== 'undefined' && !brandMaster.initialized) {
+    await brandMaster.init();
+  }
+
+  // ブランドリストを描画
+  renderBrandList();
+
+  modal.style.display = 'flex';
+}
+
+/**
+ * ブランドリストを描画
+ */
+function renderBrandList() {
+  const container = document.getElementById('brandListContainer');
+  const countBadge = document.getElementById('brandCountBadge');
+  if (!container) return;
+
+  // ブランドマスターがない場合
+  if (typeof brandMaster === 'undefined' || !brandMaster.brands) {
+    container.innerHTML = `
+      <div class="brand-list-empty">
+        <div class="empty-icon">🏷️</div>
+        <p>ブランドマスターが読み込まれていません</p>
+      </div>
+    `;
+    return;
+  }
+
+  const searchQuery = brandMasterModalState.searchQuery.toLowerCase();
+  let brands = brandMaster.brands;
+
+  // 検索フィルタ
+  if (searchQuery) {
+    brands = brands.filter(b =>
+      b.name.toLowerCase().includes(searchQuery) ||
+      (b.patterns && b.patterns.some(p => p.toLowerCase().includes(searchQuery)))
+    );
+  }
+
+  // 件数表示
+  if (countBadge) {
+    countBadge.textContent = `${brands.length}件`;
+  }
+
+  // リストが空の場合
+  if (brands.length === 0) {
+    container.innerHTML = `
+      <div class="brand-list-empty">
+        <div class="empty-icon">🔍</div>
+        <p>該当するブランドがありません</p>
+      </div>
+    `;
+    return;
+  }
+
+  // ブランドリストを全件生成
+  container.innerHTML = brands.map(brand => `
+    <div class="brand-list-item ${brand.enabled === false ? 'disabled' : ''}" data-brand-id="${brand.id}">
+      <input type="checkbox" class="brand-list-checkbox"
+        ${brand.enabled !== false ? 'checked' : ''}
+        data-brand-id="${brand.id}">
+      <span class="brand-list-name">${escapeHtml(brand.name)}</span>
+      <span class="brand-list-patterns" title="${escapeHtml((brand.patterns || []).join(', '))}">
+        ${escapeHtml((brand.patterns || []).slice(0, 3).join(', '))}${(brand.patterns || []).length > 3 ? '...' : ''}
+      </span>
+      <div class="brand-list-actions">
+        <button class="brand-list-btn edit" data-brand-id="${brand.id}">編集</button>
+        ${!brand.isDefault ? `<button class="brand-list-btn delete" data-brand-id="${brand.id}">削除</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  // イベントリスナーを設定
+  setupBrandListEvents();
+}
+
+/**
+ * ブランドリストのイベントリスナーを設定
+ */
+function setupBrandListEvents() {
+  const container = document.getElementById('brandListContainer');
+  if (!container) return;
+
+  // 有効/無効チェックボックス
+  container.querySelectorAll('.brand-list-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', async (e) => {
+      const brandId = e.target.dataset.brandId;
+      const enabled = e.target.checked;
+      await toggleBrandEnabled(brandId, enabled);
+    });
+  });
+
+  // 編集ボタン
+  container.querySelectorAll('.brand-list-btn.edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const brandId = e.target.dataset.brandId;
+      const brand = brandMaster.brands.find(b => b.id === brandId);
+      if (brand) {
+        openBrandEditModal(brand);
+      }
+    });
+  });
+
+  // 削除ボタン
+  container.querySelectorAll('.brand-list-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const brandId = e.target.dataset.brandId;
+      if (confirm('このブランドを削除しますか？')) {
+        await deleteBrand(brandId);
+      }
+    });
+  });
+}
+
+/**
+ * ブランドの有効/無効を切り替え
+ */
+async function toggleBrandEnabled(brandId, enabled) {
+  if (typeof brandMaster === 'undefined') return;
+
+  const brand = brandMaster.brands.find(b => b.id === brandId);
+  if (brand) {
+    brand.enabled = enabled;
+    await brandMaster.saveBrands();
+
+    // リストアイテムのスタイルを更新
+    const item = document.querySelector(`.brand-list-item[data-brand-id="${brandId}"]`);
+    if (item) {
+      item.classList.toggle('disabled', !enabled);
+    }
+  }
+}
+
+/**
+ * ブランドを削除
+ */
+async function deleteBrand(brandId) {
+  if (typeof brandMaster === 'undefined') return;
+
+  const index = brandMaster.brands.findIndex(b => b.id === brandId);
+  if (index > -1) {
+    brandMaster.brands.splice(index, 1);
+    await brandMaster.saveBrands();
+    renderBrandList();
+    showAlert('ブランドを削除しました', 'success');
+  }
+}
+
+/**
+ * ブランド編集モーダルを開く
+ */
+function openBrandEditModal(brand) {
+  const modal = document.getElementById('brandEditModal');
+  const title = document.getElementById('brandEditTitle');
+  const nameInput = document.getElementById('brandNameInput');
+  const patternsContainer = document.getElementById('brandPatternsContainer');
+  const enabledCheck = document.getElementById('brandEnabledCheck');
+
+  if (!modal) return;
+
+  brandMasterModalState.currentEditBrand = brand;
+
+  // タイトル設定
+  title.textContent = brand ? 'ブランド編集' : 'ブランド追加';
+
+  // フォームをリセット
+  nameInput.value = brand ? brand.name : '';
+  enabledCheck.checked = brand ? brand.enabled !== false : true;
+
+  // マッチタイプ
+  const matchType = brand ? (brand.matchType || 'word') : 'word';
+  document.querySelector(`input[name="matchType"][value="${matchType}"]`).checked = true;
+
+  // パターン入力欄
+  patternsContainer.innerHTML = '';
+  const patterns = brand ? (brand.patterns || [brand.name]) : [''];
+  patterns.forEach(pattern => {
+    addPatternInputRow(pattern);
+  });
+
+  modal.style.display = 'flex';
+}
+
+/**
+ * パターン入力行を追加
+ */
+function addPatternInputRow(value = '') {
+  const container = document.getElementById('brandPatternsContainer');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'pattern-input-row';
+  row.innerHTML = `
+    <input type="text" value="${escapeHtml(value)}" placeholder="マッチパターン">
+    <button type="button" class="remove-pattern-btn">✕</button>
+  `;
+
+  // 削除ボタンのイベント
+  row.querySelector('.remove-pattern-btn').addEventListener('click', () => {
+    row.remove();
+  });
+
+  container.appendChild(row);
+}
+
+/**
+ * モーダルからブランドを保存
+ */
+async function saveBrandFromModal() {
+  const nameInput = document.getElementById('brandNameInput');
+  const patternsContainer = document.getElementById('brandPatternsContainer');
+  const enabledCheck = document.getElementById('brandEnabledCheck');
+  const matchTypeRadio = document.querySelector('input[name="matchType"]:checked');
+
+  const name = nameInput.value.trim();
+  if (!name) {
+    showAlert('ブランド名を入力してください', 'warning');
+    return;
+  }
+
+  // パターンを収集
+  const patterns = [];
+  patternsContainer.querySelectorAll('input').forEach(input => {
+    const val = input.value.trim();
+    if (val) patterns.push(val);
+  });
+
+  if (patterns.length === 0) {
+    patterns.push(name); // 名前をデフォルトパターンとして追加
+  }
+
+  const matchType = matchTypeRadio ? matchTypeRadio.value : 'word';
+  const enabled = enabledCheck.checked;
+
+  if (typeof brandMaster === 'undefined') {
+    showAlert('ブランドマスターが初期化されていません', 'error');
+    return;
+  }
+
+  const editBrand = brandMasterModalState.currentEditBrand;
+
+  if (editBrand) {
+    // 既存ブランドを更新
+    editBrand.name = name;
+    editBrand.patterns = patterns;
+    editBrand.matchType = matchType;
+    editBrand.enabled = enabled;
+    await brandMaster.saveBrands();
+    showAlert('ブランドを更新しました', 'success');
+  } else {
+    // 新規ブランドを追加
+    const newBrand = {
+      id: 'custom_' + Date.now(),
+      name,
+      patterns,
+      matchType,
+      enabled,
+      isDefault: false
+    };
+    await brandMaster.addBrand(newBrand);
+    showAlert('ブランドを追加しました', 'success');
+  }
+
+  // モーダルを閉じてリストを更新
+  document.getElementById('brandEditModal').style.display = 'none';
+  renderBrandList();
+}
+
+/**
+ * HTMLエスケープ
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+// DOMContentLoaded時にブランドマスターUIと設定UIを初期化
+document.addEventListener('DOMContentLoaded', () => {
+  initBrandMasterUI();
+  initSettingsUI();
+});
+
+// =====================================
+// 設定モーダルUI
+// =====================================
+
+/**
+ * 設定モーダルUIを初期化
+ */
+function initSettingsUI() {
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const closeSettingsModal = document.getElementById('closeSettingsModal');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const activateCodeBtn = document.getElementById('settingsActivateCodeBtn');
+
+  // 設定ボタン - モーダルを開く（別ページではなく）
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSettingsModal();
+    });
+  }
+
+  // モーダルを閉じる
+  if (closeSettingsModal) {
+    closeSettingsModal.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+    });
+  }
+
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+    });
+  }
+
+  // 保存ボタン
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', async () => {
+      await saveSettings();
+    });
+  }
+
+  // シークレットコード認証
+  if (activateCodeBtn) {
+    activateCodeBtn.addEventListener('click', async () => {
+      await activateSecretCode();
+    });
+  }
+
+  // パスワード表示/非表示トグル
+  document.querySelectorAll('.toggle-password-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.target;
+      const input = document.getElementById(targetId);
+      if (input) {
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.textContent = '🙈';
+        } else {
+          input.type = 'password';
+          btn.textContent = '👁';
+        }
+      }
+    });
+  });
+
+  // API接続テストボタン
+  document.querySelectorAll('[data-test-api]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const provider = btn.dataset.testApi;
+      await testApiConnection(provider);
+    });
+  });
+}
+
+/**
+ * 設定モーダルを開く
+ */
+async function openSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (!modal) return;
+
+  // 保存されている設定を読み込み
+  await loadSettingsToModal();
+
+  modal.style.display = 'flex';
+}
+
+/**
+ * 設定をモーダルに読み込み
+ */
+async function loadSettingsToModal() {
+  const data = await chrome.storage.local.get([
+    'openaiApiKey',
+    'claudeApiKey',
+    'geminiApiKey',
+    'secretCode',
+    'isPremium',
+    'premiumType'
+  ]);
+
+  // APIキーを入力欄にセット
+  const openaiInput = document.getElementById('settingsOpenaiKey');
+  const claudeInput = document.getElementById('settingsClaudeKey');
+  const geminiInput = document.getElementById('settingsGeminiKey');
+  const secretCodeInput = document.getElementById('settingsSecretCode');
+
+  if (openaiInput) openaiInput.value = data.openaiApiKey || '';
+  if (claudeInput) claudeInput.value = data.claudeApiKey || '';
+  if (geminiInput) geminiInput.value = data.geminiApiKey || '';
+  if (secretCodeInput) secretCodeInput.value = data.secretCode || '';
+
+  // ステータス表示を更新
+  updateApiStatusBadge('openai', data.openaiApiKey);
+  updateApiStatusBadge('claude', data.claudeApiKey);
+  updateApiStatusBadge('gemini', data.geminiApiKey);
+
+  // アカウントステータス表示
+  updateAccountStatus(data.isPremium, data.premiumType);
+}
+
+/**
+ * APIステータスバッジを更新
+ */
+function updateApiStatusBadge(provider, apiKey) {
+  const badgeId = `settings${provider.charAt(0).toUpperCase() + provider.slice(1)}Status`;
+  const badge = document.getElementById(badgeId);
+  if (!badge) return;
+
+  if (apiKey && apiKey.trim()) {
+    badge.textContent = '設定済み';
+    badge.className = 'status-badge success';
+  } else {
+    badge.textContent = '未設定';
+    badge.className = 'status-badge pending';
+  }
+}
+
+/**
+ * アカウントステータスを更新
+ */
+function updateAccountStatus(isPremium, premiumType) {
+  const statusBox = document.getElementById('settingsAccountStatusBox');
+  const icon = document.getElementById('settingsAccountIcon');
+  const type = document.getElementById('settingsAccountType');
+  const desc = document.getElementById('settingsAccountDesc');
+  const badge = document.getElementById('settingsAccountBadge');
+
+  if (isPremium) {
+    statusBox.classList.add('premium');
+    icon.textContent = '👑';
+    type.textContent = premiumType === 'school' ? 'スクール会員' : 'フルバージョン';
+    desc.textContent = '全機能が利用可能です';
+    badge.textContent = 'Premium';
+    badge.className = 'status-badge success';
+  } else {
+    statusBox.classList.remove('premium');
+    icon.textContent = '🔒';
+    type.textContent = '無料プラン';
+    desc.textContent = '一部機能のみ利用可能';
+    badge.textContent = 'Free';
+    badge.className = 'status-badge pending';
+  }
+}
+
+/**
+ * 設定を保存
+ */
+async function saveSettings() {
+  const openaiKey = document.getElementById('settingsOpenaiKey')?.value.trim() || '';
+  const claudeKey = document.getElementById('settingsClaudeKey')?.value.trim() || '';
+  const geminiKey = document.getElementById('settingsGeminiKey')?.value.trim() || '';
+
+  await chrome.storage.local.set({
+    openaiApiKey: openaiKey,
+    claudeApiKey: claudeKey,
+    geminiApiKey: geminiKey
+  });
+
+  // ステータスバッジを更新
+  updateApiStatusBadge('openai', openaiKey);
+  updateApiStatusBadge('claude', claudeKey);
+  updateApiStatusBadge('gemini', geminiKey);
+
+  showAlert('設定を保存しました', 'success');
+}
+
+/**
+ * シークレットコードで認証
+ */
+async function activateSecretCode() {
+  const codeInput = document.getElementById('settingsSecretCode');
+  const code = codeInput?.value.trim();
+
+  if (!code) {
+    showAlert('コードを入力してください', 'warning');
+    return;
+  }
+
+  // シークレットコードの検証（簡易版）
+  // 実際にはサーバー認証などを行う
+  const validCodes = ['BUNSEKI2024', 'SCHOOL_MEMBER', 'VIP_ACCESS'];
+
+  if (validCodes.includes(code.toUpperCase())) {
+    await chrome.storage.local.set({
+      secretCode: code,
+      isPremium: true,
+      premiumType: 'school'
+    });
+
+    updateAccountStatus(true, 'school');
+    showAlert('認証に成功しました！全機能が利用可能です', 'success');
+  } else {
+    showAlert('無効なコードです', 'error');
+  }
+}
+
+/**
+ * API接続テスト
+ */
+async function testApiConnection(provider) {
+  const keyInputId = `settings${provider.charAt(0).toUpperCase() + provider.slice(1)}Key`;
+  const keyInput = document.getElementById(keyInputId);
+  const apiKey = keyInput?.value.trim();
+
+  if (!apiKey) {
+    showAlert('APIキーを入力してください', 'warning');
+    return;
+  }
+
+  showLoading(`${provider} 接続テスト中...`);
+
+  try {
+    let success = false;
+    let message = '';
+
+    switch (provider) {
+      case 'openai':
+        success = await testOpenAI(apiKey);
+        break;
+      case 'claude':
+        success = await testClaude(apiKey);
+        break;
+      case 'gemini':
+        success = await testGemini(apiKey);
+        break;
+    }
+
+    hideLoading();
+
+    if (success) {
+      updateApiStatusBadge(provider, apiKey);
+      showAlert(`${provider} 接続成功！`, 'success');
+    } else {
+      showAlert(`${provider} 接続失敗。APIキーを確認してください`, 'error');
+    }
+  } catch (error) {
+    hideLoading();
+    showAlert(`接続エラー: ${error.message}`, 'error');
+  }
+}
+
+/**
+ * OpenAI接続テスト
+ */
+async function testOpenAI(apiKey) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    });
+    return response.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Claude接続テスト
+ */
+async function testClaude(apiKey) {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Hi' }]
+      })
+    });
+    return response.ok || response.status === 400; // 400はAPIキーは有効だがリクエストエラー
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Gemini接続テスト
+ */
+async function testGemini(apiKey) {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
+    );
+    return response.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// =====================================
 // グローバルエクスポート（互換性のため）
 // =====================================
 
@@ -8277,3 +8921,5 @@ window.switchMarketTab = switchMarketTab;
 window.loadMarketAnalysis = loadMarketAnalysis;
 window.isPremiumUser = isPremiumUser;
 window.showUpgradePrompt = showUpgradePrompt;
+window.openBrandMasterModal = openBrandMasterModal;
+window.openSettingsModal = openSettingsModal;
