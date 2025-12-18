@@ -103,9 +103,62 @@ body {
   border-radius: 10px;
 }
 
+.header-center {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
 .header-right {
   display: flex;
   gap: 8px;
+}
+
+/* シートセレクター */
+.sheet-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-select {
+  padding: 6px 28px 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: rgba(255,255,255,0.95);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  min-width: 80px;
+  max-width: 150px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e8940b' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.sheet-select:hover {
+  background-color: rgba(255,255,255,1);
+}
+
+.sheet-rename-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: rgba(255,255,255,0.3);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-rename-btn:hover {
+  background: rgba(255,255,255,0.5);
 }
 
 .icon-btn {
@@ -1207,6 +1260,10 @@ body {
 
 .modal-container.large {
   max-width: 450px;
+}
+
+.modal-container.small {
+  max-width: 320px;
 }
 
 .modal-header {
@@ -4768,4 +4825,91 @@ body {
   border-radius: 3px;
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* =====================================
+   Sheet Modal Styles
+   ===================================== */
+.sheet-form-group {
+  margin-bottom: 16px;
+}
+
+.sheet-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.sheet-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+}
+
+.sheet-form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.15);
+}
+
+.sheet-form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.sheet-form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* シート削除確認モーダル */
+.delete-sheet-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 16px;
+}
+
+.delete-sheet-warning-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.delete-sheet-warning-text {
+  font-size: 13px;
+  color: #991b1b;
+  line-height: 1.5;
+}
+
+.delete-sheet-warning-text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.delete-sheet-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* 危険ボタン */
+.action-btn.danger {
+  background: var(--danger-color);
+  color: white;
+}
+
+.action-btn.danger:hover {
+  background: #dc2626;
 }

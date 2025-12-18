@@ -104,7 +104,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
 
     case 'saveMarketData':
-      saveMarketDataToDB(request.items)
+      saveMarketDataToDB(request.items, request.sheetId || 'all')
         .then(result => sendResponse({ success: true, ...result }))
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
@@ -1109,26 +1109,97 @@ async function analyzeCategoryWithAI(data, apiKey) {
 
 /**
  * 市場データをIndexedDBに保存
+ * @param {Array} items - 保存する市場データ
+ * @param {string} sheetId - シートID（デフォルト: 'all'）
  */
-async function saveMarketDataToDB(items) {
+async function saveMarketDataToDB(items, sheetId = 'all') {
   if (!items || items.length === 0) {
     return { added: 0, duplicates: 0 };
   }
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('BunsekiKunDB', 5);
+    const request = indexedDB.open('BunsekiKunDB', 9);
 
     request.onerror = () => reject(new Error('IndexedDB接続エラー'));
 
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains('marketData')) {
-        const store = db.createObjectStore('marketData', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('title', 'title', { unique: false });
-        store.createIndex('titleLower', 'titleLower', { unique: true });
-        store.createIndex('brand', 'brand', { unique: false });
-        store.createIndex('capturedAt', 'capturedAt', { unique: false });
+      const oldVersion = event.oldVersion;
+      const tx = event.target.transaction;
+
+      // 出品中データ（Active Listings）
+      if (!db.objectStoreNames.contains('activeListings')) {
+        const activeStore = db.createObjectStore('activeListings', { keyPath: 'id', autoIncrement: true });
+        activeStore.createIndex('title', 'title', { unique: false });
+        activeStore.createIndex('brand', 'brand', { unique: false });
+        activeStore.createIndex('category', 'category', { unique: false });
+        activeStore.createIndex('startDate', 'startDate', { unique: false });
+        activeStore.createIndex('sheetId', 'sheetId', { unique: false });
+      } else if (oldVersion < 6) {
+        const activeStore = tx.objectStore('activeListings');
+        if (!activeStore.indexNames.contains('sheetId')) {
+          activeStore.createIndex('sheetId', 'sheetId', { unique: false });
+        }
       }
+
+      // 販売済データ（Sold Items）
+      if (!db.objectStoreNames.contains('soldItems')) {
+        const soldStore = db.createObjectStore('soldItems', { keyPath: 'id', autoIncrement: true });
+        soldStore.createIndex('title', 'title', { unique: false });
+        soldStore.createIndex('brand', 'brand', { unique: false });
+        soldStore.createIndex('category', 'category', { unique: false });
+        soldStore.createIndex('saleDate', 'saleDate', { unique: false });
+        soldStore.createIndex('sheetId', 'sheetId', { unique: false });
+      } else if (oldVersion < 6) {
+        const soldStore = tx.objectStore('soldItems');
+        if (!soldStore.indexNames.contains('sheetId')) {
+          soldStore.createIndex('sheetId', 'sheetId', { unique: false });
+        }
+      }
+
+      // 市場データ（Market Data）
+      if (!db.objectStoreNames.contains('marketData')) {
+        const marketStore = db.createObjectStore('marketData', { keyPath: 'id', autoIncrement: true });
+        marketStore.createIndex('title', 'title', { unique: false });
+        marketStore.createIndex('titleLower', 'titleLower', { unique: false });
+        marketStore.createIndex('brand', 'brand', { unique: false });
+        marketStore.createIndex('capturedAt', 'capturedAt', { unique: false });
+        marketStore.createIndex('sheetId', 'sheetId', { unique: false });
+      } else if (oldVersion < 6) {
+        const marketStore = tx.objectStore('marketData');
+        if (!marketStore.indexNames.contains('sheetId')) {
+          marketStore.createIndex('sheetId', 'sheetId', { unique: false });
+        }
+      }
+
+      // 分析結果キャッシュ
+      if (!db.objectStoreNames.contains('analysisCache')) {
+        db.createObjectStore('analysisCache', { keyPath: 'key' });
+      }
+
+      // バージョン9へのマイグレーション: 既存データをsheet1に移行
+      if (oldVersion < 9 && oldVersion > 0) {
+        console.log('[background] Migrating data to version 9...');
+        ['activeListings', 'soldItems', 'marketData'].forEach(storeName => {
+          if (db.objectStoreNames.contains(storeName)) {
+            const store = tx.objectStore(storeName);
+            const cursorRequest = store.openCursor();
+            cursorRequest.onsuccess = (e) => {
+              const cursor = e.target.result;
+              if (cursor) {
+                const record = cursor.value;
+                if (!record.sheetId || record.sheetId === 'all') {
+                  record.sheetId = 'sheet1';
+                  cursor.update(record);
+                }
+                cursor.continue();
+              }
+            };
+          }
+        });
+      }
+
+      console.log('[background] IndexedDB schema upgraded to version 9');
     };
 
     request.onsuccess = (event) => {
@@ -1141,18 +1212,20 @@ async function saveMarketDataToDB(items) {
       const capturedAt = new Date().toISOString();
       const seenTitles = new Set();
 
-      // 既存データのタイトルを取得
+      // 既存データのタイトルを取得（該当シートのみ）
       const getAllRequest = store.getAll();
 
       getAllRequest.onsuccess = () => {
         const existingItems = getAllRequest.result || [];
-        existingItems.forEach(item => {
-          if (item.titleLower) {
-            seenTitles.add(item.titleLower);
-          }
-        });
+        existingItems
+          .filter(item => item.sheetId === sheetId || (!item.sheetId && sheetId === 'all'))
+          .forEach(item => {
+            if (item.titleLower) {
+              seenTitles.add(item.titleLower);
+            }
+          });
 
-        console.log('既存市場データ:', existingItems.length, '件');
+        console.log(`既存市場データ (${sheetId}):`, seenTitles.size, '件');
 
         // 新しいデータを追加
         items.forEach(item => {
@@ -1169,6 +1242,7 @@ async function saveMarketDataToDB(items) {
           const record = {
             ...item,
             titleLower,
+            sheetId,
             capturedAt
           };
 
@@ -1185,7 +1259,7 @@ async function saveMarketDataToDB(items) {
 
       tx.oncomplete = () => {
         db.close();
-        console.log(`Market data saved: ${added} added, ${duplicates} duplicates`);
+        console.log(`Market data saved (${sheetId}): ${added} added, ${duplicates} duplicates`);
         resolve({ added, duplicates });
       };
 

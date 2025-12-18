@@ -853,10 +853,14 @@ class BunsekiKunHighlighter {
         source: window.location.href
       }));
 
+      // 現在のシートIDを取得（デフォルトはsheet1）
+      const currentSheetId = localStorage.getItem('currentSheetId') || 'sheet1';
+
       // background scriptに送信して保存
       const result = await chrome.runtime.sendMessage({
         action: 'saveMarketData',
-        items: cleanItems
+        items: cleanItems,
+        sheetId: currentSheetId
       });
 
       console.log('ぶんせき君: 保存結果:', result);

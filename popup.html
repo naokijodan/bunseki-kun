@@ -15,6 +15,23 @@
         <h1 class="app-title">ぶんせき君</h1>
         <span class="version-badge">v4.0</span>
       </div>
+      <div class="header-center">
+        <div class="sheet-selector">
+          <select id="sheetSelect" class="sheet-select">
+            <option value="sheet1">シート1</option>
+            <option value="sheet2">シート2</option>
+            <option value="sheet3">シート3</option>
+            <option value="sheet4">シート4</option>
+            <option value="sheet5">シート5</option>
+            <option value="sheet6">シート6</option>
+            <option value="sheet7">シート7</option>
+            <option value="sheet8">シート8</option>
+            <option value="sheet9">シート9</option>
+            <option value="sheet10">シート10</option>
+          </select>
+          <button id="renameSheetBtn" class="sheet-rename-btn" title="シート名を変更">✏️</button>
+        </div>
+      </div>
       <div class="header-right">
         <button id="settingsBtn" class="icon-btn" title="設定">
           <span>⚙️</span>
@@ -652,6 +669,27 @@
           <button id="modalCloseBtn" class="action-btn secondary">
             閉じる
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- シート名変更モーダル -->
+    <div id="renameSheetModal" class="modal-overlay hidden">
+      <div class="modal-container small">
+        <div class="modal-header">
+          <h2>シート名を変更</h2>
+          <button id="closeRenameSheetModalBtn" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content">
+          <div class="sheet-form-group">
+            <label for="newSheetName">新しいシート名</label>
+            <input type="text" id="newSheetName" class="sheet-form-input" placeholder="例: 時計専用、高額商品">
+            <p class="sheet-form-hint">各シートは独立したデータを持ちます</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="confirmRenameSheet" class="action-btn primary">変更</button>
+          <button id="cancelRenameSheet" class="action-btn secondary">キャンセル</button>
         </div>
       </div>
     </div>

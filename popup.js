@@ -32,6 +32,16 @@ let chatHistory = [];
 // 現在のAI分析結果
 let currentAIResult = null;
 
+// 現在のシートID（sheet1〜sheet10）
+let currentSheetId = 'sheet1';
+
+/**
+ * シート固有のストレージキーを生成
+ */
+function getSheetKey(baseKey) {
+  return `${baseKey}_${currentSheetId}`;
+}
+
 // カラーパレット
 const COLORS = {
   primary: '#f5a623',
@@ -194,6 +204,9 @@ const ANALYSIS_CATEGORIES = {
 // =====================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // シート管理を最初に初期化
+  await initSheetManagement();
+
   initTabs();
   initDataInput();
   initAnalysisButtons();
@@ -212,6 +225,291 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 前回の分析結果を表示
   await restoreAnalysisResults();
 });
+
+// =====================================
+// シート管理（固定10シート方式）
+// =====================================
+
+// デフォルトのシート名
+const DEFAULT_SHEET_NAMES = {
+  sheet1: 'シート1',
+  sheet2: 'シート2',
+  sheet3: 'シート3',
+  sheet4: 'シート4',
+  sheet5: 'シート5',
+  sheet6: 'シート6',
+  sheet7: 'シート7',
+  sheet8: 'シート8',
+  sheet9: 'シート9',
+  sheet10: 'シート10'
+};
+
+/**
+ * シート管理の初期化
+ */
+async function initSheetManagement() {
+  const sheetSelect = document.getElementById('sheetSelect');
+  const renameSheetBtn = document.getElementById('renameSheetBtn');
+  const renameSheetModal = document.getElementById('renameSheetModal');
+
+  if (!sheetSelect) return;
+
+  // 保存されたシート名を読み込んで適用
+  await loadSheetNames();
+
+  // 前回選択していたシートを復元
+  const savedSheetId = localStorage.getItem('currentSheetId') || 'sheet1';
+  if (sheetSelect.querySelector(`option[value="${savedSheetId}"]`)) {
+    sheetSelect.value = savedSheetId;
+    currentSheetId = savedSheetId;
+  }
+
+  // BunsekiDBにも設定
+  if (typeof BunsekiDB !== 'undefined') {
+    BunsekiDB.currentSheetId = currentSheetId;
+  }
+
+  // シート選択変更
+  sheetSelect.addEventListener('change', async (e) => {
+    console.log('シート切替:', e.target.value);
+    await switchSheet(e.target.value);
+  });
+
+  // シート名変更ボタン
+  if (renameSheetBtn) {
+    renameSheetBtn.addEventListener('click', () => {
+      if (renameSheetModal) {
+        const currentName = sheetSelect.options[sheetSelect.selectedIndex].textContent;
+        const input = document.getElementById('newSheetName');
+        if (input) {
+          input.value = currentName;
+          input.select();
+        }
+        renameSheetModal.classList.remove('hidden');
+      }
+    });
+  }
+
+  // シート名変更モーダルのイベント
+  const confirmRenameSheet = document.getElementById('confirmRenameSheet');
+  const cancelRenameSheet = document.getElementById('cancelRenameSheet');
+  const closeRenameSheetModalBtn = document.getElementById('closeRenameSheetModalBtn');
+
+  if (confirmRenameSheet) {
+    confirmRenameSheet.addEventListener('click', async () => {
+      const input = document.getElementById('newSheetName');
+      const name = input?.value?.trim();
+      if (name) {
+        await renameSheet(currentSheetId, name);
+        renameSheetModal.classList.add('hidden');
+      }
+    });
+  }
+
+  if (cancelRenameSheet) {
+    cancelRenameSheet.addEventListener('click', () => {
+      renameSheetModal.classList.add('hidden');
+    });
+  }
+
+  if (closeRenameSheetModalBtn) {
+    closeRenameSheetModalBtn.addEventListener('click', () => {
+      renameSheetModal.classList.add('hidden');
+    });
+  }
+
+  // Enterキーで確定
+  const newSheetNameInput = document.getElementById('newSheetName');
+  if (newSheetNameInput) {
+    newSheetNameInput.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') {
+        const name = newSheetNameInput.value?.trim();
+        if (name) {
+          await renameSheet(currentSheetId, name);
+          renameSheetModal.classList.add('hidden');
+        }
+      }
+    });
+  }
+
+  // モーダル背景クリックで閉じる
+  if (renameSheetModal) {
+    renameSheetModal.addEventListener('click', (e) => {
+      if (e.target === renameSheetModal) {
+        renameSheetModal.classList.add('hidden');
+      }
+    });
+  }
+}
+
+/**
+ * 保存されたシート名を読み込んで適用
+ */
+async function loadSheetNames() {
+  const sheetSelect = document.getElementById('sheetSelect');
+  if (!sheetSelect) return;
+
+  // chrome.storage.localからシート名を取得
+  const result = await chrome.storage.local.get('sheetNames');
+  const sheetNames = result.sheetNames || {};
+
+  // 各optionのテキストを更新
+  for (let i = 1; i <= 10; i++) {
+    const sheetId = `sheet${i}`;
+    const option = sheetSelect.querySelector(`option[value="${sheetId}"]`);
+    if (option) {
+      option.textContent = sheetNames[sheetId] || DEFAULT_SHEET_NAMES[sheetId];
+    }
+  }
+}
+
+/**
+ * シート名を変更
+ */
+async function renameSheet(sheetId, newName) {
+  // 既存のシート名を取得
+  const result = await chrome.storage.local.get('sheetNames');
+  const sheetNames = result.sheetNames || {};
+
+  // シート名を更新
+  sheetNames[sheetId] = newName;
+  await chrome.storage.local.set({ sheetNames });
+
+  // セレクトボックスを更新
+  const sheetSelect = document.getElementById('sheetSelect');
+  if (sheetSelect) {
+    const option = sheetSelect.querySelector(`option[value="${sheetId}"]`);
+    if (option) {
+      option.textContent = newName;
+    }
+  }
+
+  console.log('シート名を変更:', sheetId, '->', newName);
+}
+
+/**
+ * シートを切り替え
+ */
+async function switchSheet(sheetId) {
+  console.log('switchSheet開始:', sheetId);
+  currentSheetId = sheetId;
+  localStorage.setItem('currentSheetId', sheetId);
+
+  // BunsekiDBにも設定
+  if (typeof BunsekiDB !== 'undefined') {
+    BunsekiDB.currentSheetId = sheetId;
+  }
+
+  // analyzerのデータをリセット
+  analyzer.reset();
+  window.aiClassificationResults = {};
+
+  // 表示をリセット
+  resetAnalysisDisplay();
+  resetMarketAnalysisDisplay();
+
+  // シート固有のデータを再読み込み
+  await loadSavedData();
+  await updateMarketDataInfo();
+
+  // 前回の分析結果を復元して表示
+  await restoreAnalysisResults();
+
+  console.log('switchSheet完了:', sheetId);
+}
+
+/**
+ * 分析結果をリセット
+ */
+function resetAnalysisDisplay() {
+  // チャートをクリア
+  Object.keys(chartInstances).forEach(key => {
+    if (chartInstances[key]) {
+      chartInstances[key].destroy();
+      chartInstances[key] = null;
+    }
+  });
+
+  // 分析結果エリアをクリア
+  const resultContainers = [
+    'listingPaceResult',
+    'watchPaceResult',
+    'brandPerformanceResult',
+    'categoryPerformanceResult',
+    'marketComparisonResult',
+    'brandCategoryResult'
+  ];
+
+  resultContainers.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<p class="no-data">分析を実行してください</p>';
+    }
+  });
+
+  // 自分の分析の統計値をリセット
+  const myClassifiedEl = document.getElementById('myClassifiedCount');
+  const myUnclassifiedEl = document.getElementById('myUnclassifiedCount');
+  const myBrandCountEl = document.getElementById('myBrandCount');
+  if (myClassifiedEl) myClassifiedEl.textContent = '0';
+  if (myUnclassifiedEl) myUnclassifiedEl.textContent = '0';
+  if (myBrandCountEl) myBrandCountEl.textContent = '0';
+
+  // ブランド内訳をクリア
+  const myBrandBreakdown = document.getElementById('myBrandBreakdown');
+  if (myBrandBreakdown) {
+    myBrandBreakdown.innerHTML = '';
+  }
+
+  // 自分のデータ分析結果エリアを非表示
+  const myDataAnalysisResult = document.getElementById('myDataAnalysisResult');
+  if (myDataAnalysisResult) {
+    myDataAnalysisResult.style.display = 'none';
+  }
+
+  // AIチャットもクリア
+  const aiChatMessages = document.getElementById('aiChatMessages');
+  if (aiChatMessages) {
+    aiChatMessages.innerHTML = '';
+  }
+  chatHistory = [];
+  currentAIResult = null;
+}
+
+/**
+ * 市場分析の表示をリセット
+ */
+function resetMarketAnalysisDisplay() {
+  // ブランドランキング
+  const brandList = document.getElementById('brandRankingList');
+  if (brandList) {
+    brandList.innerHTML = '<p class="no-data-message">市場データを取り込んで分析を実行してください</p>';
+  }
+
+  // カテゴリランキング
+  const categoryList = document.getElementById('categoryRankingList');
+  if (categoryList) {
+    categoryList.innerHTML = '<p class="no-data-message">市場データを取り込んで分析を実行してください</p>';
+  }
+
+  // ブランド×カテゴリ
+  const brandCategoryList = document.getElementById('brandCategoryRankingList');
+  if (brandCategoryList) {
+    brandCategoryList.innerHTML = '<p class="no-data-message">市場データを取り込んで分析を実行してください</p>';
+  }
+
+  // 比較
+  const comparisonContent = document.getElementById('comparisonContent');
+  if (comparisonContent) {
+    comparisonContent.innerHTML = '<p class="no-data-message">自分のデータと市場データを両方取り込んでください</p>';
+  }
+
+  // 市場データ分析結果
+  const marketDataAnalysisResult = document.getElementById('marketDataAnalysisResult');
+  if (marketDataAnalysisResult) {
+    marketDataAnalysisResult.style.display = 'none';
+  }
+}
 
 /**
  * メインタブ初期化
@@ -633,7 +931,7 @@ async function analyzeMyData() {
     await BunsekiDB.setActiveListings(analyzer.activeListings);
     await BunsekiDB.setSoldItems(analyzer.soldItems);
 
-    // メタデータをChrome Storageに保存
+    // メタデータをChrome Storageに保存（シート固有）
     const metaData = {
       results: analyzer.results,
       savedAt: new Date().toISOString(),
@@ -642,8 +940,8 @@ async function analyzeMyData() {
         sold: analyzer.soldItems.length
       }
     };
-    await chrome.storage.local.set({ savedAnalysisMeta: metaData });
-    console.log('自分のデータをIndexedDBに保存しました');
+    await chrome.storage.local.set({ [getSheetKey('savedAnalysisMeta')]: metaData });
+    console.log('自分のデータをIndexedDBに保存しました (シート:', currentSheetId, ')');
     saveSuccess = true;
     updateLastSavedInfo();
   } catch (error) {
@@ -1023,7 +1321,12 @@ function clearMyData() {
   // IndexedDBからも削除
   BunsekiDB.clearActiveListings();
   BunsekiDB.clearSoldItems();
-  chrome.storage.local.remove(['savedAnalysisMeta']);
+  // シート固有のメタデータを削除
+  chrome.storage.local.remove([
+    getSheetKey('savedAnalysisMeta'),
+    getSheetKey('customBrandRules'),
+    getSheetKey('aiClassificationResults')
+  ]);
 
   // ステータス表示をリセット
   updateDataStatus('activeListingsStatus', 0, false);
@@ -1068,7 +1371,11 @@ function clearMyData() {
  */
 async function updateMarketDataInfo() {
   try {
-    const marketData = await BunsekiDB.getMarketData();
+    const allMarketData = await BunsekiDB.getMarketData();
+    // 現在のシートIDでフィルタ（完全一致のみ）
+    const marketData = allMarketData.filter(item => item.sheetId === currentSheetId);
+
+    console.log(`シート ${currentSheetId}: 市場データ${marketData.length}件`);
 
     const summaryEl = document.getElementById('marketDataSummary');
     const actionsEl = document.getElementById('marketDataActions');
@@ -1108,7 +1415,9 @@ async function updateMarketDataInfo() {
  * 市場データを分析
  */
 async function analyzeMarketData() {
-  const marketData = await BunsekiDB.getMarketData();
+  const allMarketData = await BunsekiDB.getMarketData();
+  // 現在のシートIDでフィルタ（完全一致のみ）
+  const marketData = allMarketData.filter(item => item.sheetId === currentSheetId);
 
   if (!marketData || marketData.length === 0) {
     showAlert('分析する市場データがありません', 'warning');
@@ -1138,10 +1447,10 @@ async function analyzeMarketData() {
     item.category = detectCategoryFromTitle(item.title);
   });
 
-  // 更新した市場データをIndexedDBに保存
+  // 更新した市場データをIndexedDBに保存（現在のシートのみクリアして追加）
   let saveSuccess = false;
   try {
-    await BunsekiDB.clearMarketData();
+    await BunsekiDB.clearMarketDataForCurrentSheet();
     await BunsekiDB.addMarketData(marketData);
     await chrome.storage.local.set({ marketDataSavedAt: new Date().toISOString() });
     saveSuccess = true;
@@ -1709,7 +2018,7 @@ async function saveAllData() {
     // 分析実行
     if (activeListingsData || ordersData) {
       analyzer.reset();
-      await analyzer.loadCustomBrandRules();
+      await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
       const activeItems = activeListingsData ? analyzer.parseActiveListingsCsv(activeListingsData) : [];
       const soldItems = ordersData ? analyzer.parseOrdersCsv(ordersData) : [];
@@ -1730,7 +2039,7 @@ async function saveAllData() {
         }
       };
 
-      await chrome.storage.local.set({ savedAnalysisMeta: metaData });
+      await chrome.storage.local.set({ [getSheetKey('savedAnalysisMeta')]: metaData });
     }
 
     // 保存日時を更新
@@ -1763,7 +2072,7 @@ async function saveMyDataToStorage() {
     await BunsekiDB.setActiveListings(analyzer.activeListings);
     await BunsekiDB.setSoldItems(analyzer.soldItems);
 
-    // メタデータをChrome Storageに保存
+    // メタデータをChrome Storageに保存（シート固有）
     const metaData = {
       results: analyzer.results,
       savedAt: new Date().toISOString(),
@@ -1772,7 +2081,7 @@ async function saveMyDataToStorage() {
         sold: analyzer.soldItems.length
       }
     };
-    await chrome.storage.local.set({ savedAnalysisMeta: metaData });
+    await chrome.storage.local.set({ [getSheetKey('savedAnalysisMeta')]: metaData });
 
     // UI更新
     if (saveInfo) {
@@ -1819,13 +2128,13 @@ async function saveMarketDataToStorage() {
     // 市場データはIndexedDBに既に保存されているので、
     // AI分類結果とカスタムルールを保存
     await chrome.storage.local.set({
-      aiClassificationResults: window.aiClassificationResults || {},
-      marketDataSavedAt: new Date().toISOString()
+      [getSheetKey('aiClassificationResults')]: window.aiClassificationResults || {},
+      [getSheetKey('marketDataSavedAt')]: new Date().toISOString()
     });
 
-    // カスタムブランドルールも保存
+    // カスタムブランドルールも保存（シート固有）
     if (analyzer.customBrandRules && Object.keys(analyzer.customBrandRules).length > 0) {
-      await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+      await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
     }
 
     // UI更新
@@ -1859,17 +2168,36 @@ async function saveMarketDataToStorage() {
  */
 async function loadSavedData() {
   try {
-    // IndexedDBからデータを復元
-    const activeListings = await BunsekiDB.getActiveListings();
-    const soldItems = await BunsekiDB.getSoldItems();
-    const metaData = await chrome.storage.local.get(['savedAnalysisMeta', 'customBrandRules', 'aiClassificationResults']);
+    // IndexedDBからデータを復元（現在のシートでフィルタ）
+    const allActiveListings = await BunsekiDB.getActiveListings();
+    const allSoldItems = await BunsekiDB.getSoldItems();
+
+    // 現在のシートIDでフィルタ（完全一致のみ）
+    const activeListings = allActiveListings.filter(item => item.sheetId === currentSheetId);
+    const soldItems = allSoldItems.filter(item => item.sheetId === currentSheetId);
+
+    console.log(`シート ${currentSheetId}: 出品${activeListings.length}件, 販売${soldItems.length}件`);
+
+    // シート固有のキーでメタデータを取得
+    const metaKeys = [
+      getSheetKey('savedAnalysisMeta'),
+      getSheetKey('customBrandRules'),
+      getSheetKey('aiClassificationResults')
+    ];
+    const metaData = await chrome.storage.local.get(metaKeys);
+
+    // analyzerにデータをセット（0件でもセット）
+    analyzer.activeListings = activeListings;
+    analyzer.soldItems = soldItems;
+
+    // シート固有のデータを復元
+    const savedMeta = metaData[getSheetKey('savedAnalysisMeta')];
+    const savedRules = metaData[getSheetKey('customBrandRules')];
+    const savedClassifications = metaData[getSheetKey('aiClassificationResults')];
 
     if (activeListings.length > 0 || soldItems.length > 0) {
-      analyzer.activeListings = activeListings;
-      analyzer.soldItems = soldItems;
-
-      if (metaData.savedAnalysisMeta?.results) {
-        analyzer.results = metaData.savedAnalysisMeta.results;
+      if (savedMeta?.results) {
+        analyzer.results = savedMeta.results;
       }
 
       // 再計算
@@ -1877,25 +2205,29 @@ async function loadSavedData() {
       analyzer.calculateListingPace();
       analyzer.calculateSummary();
 
-      // UI更新
-      updateDataStatus('activeListingsStatus', activeListings.length, activeListings.length > 0);
-      updateDataStatus('ordersStatus', soldItems.length, soldItems.length > 0);
-      updateMyDataSummary();
-      updateLastSavedInfo();
-
       console.log('保存データを復元しました:', activeListings.length + soldItems.length, '件');
     }
 
-    // AI学習ルールの復元
-    if (metaData.customBrandRules) {
-      analyzer.customBrandRules = metaData.customBrandRules;
+    // UI更新（0件でも更新）
+    updateDataStatus('activeListingsStatus', activeListings.length, activeListings.length > 0);
+    updateDataStatus('ordersStatus', soldItems.length, soldItems.length > 0);
+    updateMyDataSummary();
+    updateLastSavedInfo();
+
+    // AI学習ルールの復元（シート固有）
+    if (savedRules) {
+      analyzer.customBrandRules = savedRules;
       console.log('AI学習ルールを復元しました:', Object.keys(analyzer.customBrandRules).length, '件');
+    } else {
+      analyzer.customBrandRules = {};
     }
 
-    // AI分類結果の復元
-    if (metaData.aiClassificationResults) {
-      window.aiClassificationResults = metaData.aiClassificationResults;
+    // AI分類結果の復元（シート固有）
+    if (savedClassifications) {
+      window.aiClassificationResults = savedClassifications;
       console.log('AI分類結果を復元しました:', Object.keys(window.aiClassificationResults).length, '件');
+    } else {
+      window.aiClassificationResults = {};
     }
 
     // 学習済みルール表示を更新
@@ -1915,6 +2247,34 @@ async function restoreAnalysisResults() {
     const activeListings = analyzer.activeListings || [];
     const soldItems = analyzer.soldItems || [];
     const allMyItems = [...activeListings, ...soldItems];
+
+    // データがない場合は初期状態に戻す
+    if (allMyItems.length === 0) {
+      // 統計値をリセット
+      const myClassifiedEl = document.getElementById('myClassifiedCount');
+      const myUnclassifiedEl = document.getElementById('myUnclassifiedCount');
+      const myBrandCountEl = document.getElementById('myBrandCount');
+      if (myClassifiedEl) myClassifiedEl.textContent = '0';
+      if (myUnclassifiedEl) myUnclassifiedEl.textContent = '0';
+      if (myBrandCountEl) myBrandCountEl.textContent = '0';
+
+      // ブランド・カテゴリ内訳をクリア
+      const myBreakdownEl = document.getElementById('myBrandBreakdown');
+      const myCategoryBreakdownEl = document.getElementById('myCategoryBreakdown');
+      if (myBreakdownEl) myBreakdownEl.innerHTML = '';
+      if (myCategoryBreakdownEl) myCategoryBreakdownEl.innerHTML = '';
+
+      // 分析タブのコンテンツをリセット
+      ['my-listing-pace', 'my-brand-performance', 'my-watch-analysis', 'my-category-performance'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.innerHTML = '<div class="my-analysis-placeholder"><p>データがありません。「自分のデータ」タブでCSVを読み込んでください。</p></div>';
+        }
+      });
+
+      console.log('分析結果をリセットしました（データなし）');
+      return;
+    }
 
     if (allMyItems.length > 0) {
       // ブランド分類を再計算
@@ -2385,10 +2745,13 @@ async function updateLastSavedInfo() {
   if (!infoEl) return;
 
   try {
-    const data = await chrome.storage.local.get(['savedAnalysisMeta']);
-    if (data.savedAnalysisMeta?.savedAt) {
-      const date = new Date(data.savedAnalysisMeta.savedAt);
+    const key = getSheetKey('savedAnalysisMeta');
+    const data = await chrome.storage.local.get([key]);
+    if (data[key]?.savedAt) {
+      const date = new Date(data[key].savedAt);
       infoEl.textContent = `最終保存: ${formatDateTime(date)}`;
+    } else {
+      infoEl.textContent = '';
     }
   } catch (error) {
     console.error('保存日時の取得に失敗:', error);
@@ -2511,25 +2874,30 @@ async function loadMyAnalysisTabContent(tabId) {
 
   // 学習済みルールを読み込む
   try {
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
   } catch (e) {
     // スキップ
   }
 
   let html = '';
-  switch (tabId) {
-    case 'listing-pace':
-      html = generateListingPaceAnalysis(30);
-      break;
-    case 'brand-performance':
-      html = generateBrandPerformanceAnalysis();
-      break;
-    case 'watch-analysis':
-      html = generateWatchAnalysis();
-      break;
-    case 'category-performance':
-      html = generateCategoryPerformanceAnalysis();
-      break;
+  try {
+    switch (tabId) {
+      case 'listing-pace':
+        html = generateListingPaceAnalysis(30);
+        break;
+      case 'brand-performance':
+        html = generateBrandPerformanceAnalysis();
+        break;
+      case 'watch-analysis':
+        html = generateWatchAnalysis();
+        break;
+      case 'category-performance':
+        html = generateCategoryPerformanceAnalysis();
+        break;
+    }
+  } catch (e) {
+    console.error('Error generating content:', e);
+    html = `<div class="error">エラーが発生しました: ${e.message}</div>`;
   }
 
   contentEl.innerHTML = html;
@@ -2575,7 +2943,7 @@ async function loadMyAnalysis() {
 
   try {
     // 学習済みルールを読み込む
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
     // データ確認
     if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
@@ -2622,7 +2990,7 @@ async function reanalyzeMyData() {
 
   try {
     // 学習済みルールを読み込む
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
     // データ確認
     if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
@@ -2684,7 +3052,7 @@ async function runAnalysis(type) {
 
   try {
     // 学習済みルールを読み込む
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
     // データ確認
     if (analyzer.activeListings.length === 0 && analyzer.soldItems.length === 0) {
@@ -5251,8 +5619,8 @@ async function classifyUnknownItemsWithAI(inline = false) {
 
     showAlert(`${classifiedCount}件の商品を分類しました`, 'success');
 
-    // AI分類結果をローカルストレージに保存
-    await chrome.storage.local.set({ aiClassificationResults: window.aiClassificationResults });
+    // AI分類結果をローカルストレージに保存（シート固有）
+    await chrome.storage.local.set({ [getSheetKey('aiClassificationResults')]: window.aiClassificationResults });
 
     // 学習済みルール表示を更新
     updateLearnedRulesDisplay();
@@ -5401,9 +5769,8 @@ async function classifyMarketDataWithAI() {
       }
     }
 
-    // IndexedDBの市場データを更新
-    // 既存データをクリアして新しいデータを追加
-    await BunsekiDB.clearMarketData();
+    // IndexedDBの市場データを更新（現在のシートのみクリアして追加）
+    await BunsekiDB.clearMarketDataForCurrentSheet();
     await BunsekiDB.addMarketData(marketData);
 
     // カスタムブランドルールを永続保存
@@ -5464,14 +5831,14 @@ function getClassifiedCategory(title) {
 // =====================================
 
 /**
- * カスタムブランドルールを永続保存
+ * カスタムブランドルールを永続保存（シート固有）
  */
 async function saveCustomBrandRules() {
   try {
     await chrome.storage.local.set({
-      customBrandRules: analyzer.customBrandRules
+      [getSheetKey('customBrandRules')]: analyzer.customBrandRules
     });
-    console.log('カスタムブランドルール保存:', Object.keys(analyzer.customBrandRules).length, '件');
+    console.log('カスタムブランドルール保存:', Object.keys(analyzer.customBrandRules).length, '件 (シート:', currentSheetId, ')');
   } catch (error) {
     console.error('カスタムブランドルール保存エラー:', error);
   }
@@ -5511,7 +5878,7 @@ async function clearLearnedRules() {
     return false;
   }
   analyzer.customBrandRules = {};
-  await chrome.storage.local.remove(['customBrandRules']);
+  await chrome.storage.local.remove([getSheetKey('customBrandRules')]);
   showAlert('学習済みルールをクリアしました', 'success');
   return true;
 }
@@ -5667,7 +6034,7 @@ async function addManualBrandRule(brand, keywords) {
     analyzer.customBrandRules[brand].keywords.push(brandLower);
   }
 
-  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
   showAlert(`「${brand}」を追加しました`, 'success');
 
   // ルール追加後に分析結果を自動更新
@@ -5685,7 +6052,7 @@ async function deleteLearnedRule(brand) {
   }
 
   delete analyzer.customBrandRules[brand];
-  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
 
   // 分析結果も自動更新
   await restoreAnalysisResults();
@@ -5778,8 +6145,8 @@ async function saveEditedRule(brand, keywordsText) {
   analyzer.customBrandRules[brand].keywords = keywords;
   analyzer.customBrandRules[brand].source = 'manual';
 
-  // 保存
-  await chrome.storage.local.set({ customBrandRules: analyzer.customBrandRules });
+  // 保存（シート固有）
+  await chrome.storage.local.set({ [getSheetKey('customBrandRules')]: analyzer.customBrandRules });
   showAlert(`「${brand}」のルールを更新しました`, 'success');
 
   // 表示を更新
@@ -6001,12 +6368,14 @@ async function loadMarketAnalysis() {
 
   try {
     // 学習済みルールを読み込む
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
-    const marketItems = await analyzer.getMarketDataFromDB();
+    const allMarketItems = await analyzer.getMarketDataFromDB();
+    // 現在のシートでフィルタ
+    const marketItems = allMarketItems.filter(item => item.sheetId === currentSheetId);
 
     if (!marketItems || marketItems.length === 0) {
-      showAlert('市場データがありません。eBayリサーチページでデータを取り込んでください。', 'warning');
+      showAlert('このシートには市場データがありません。eBayリサーチページでデータを取り込んでください。', 'warning');
       hideLoading();
       return;
     }
@@ -6024,9 +6393,12 @@ async function loadMarketAnalysis() {
     renderCategoryRanking(categoryRanking);
     renderBrandCategoryRanking(brandCategoryRanking);
 
-    // 自分のデータとの比較
-    const activeListings = await BunsekiDB.getActiveListings();
-    const soldItems = await BunsekiDB.getSoldItems();
+    // 自分のデータとの比較（シートでフィルタ）
+    const allActiveListings = await BunsekiDB.getActiveListings();
+    const allSoldItems = await BunsekiDB.getSoldItems();
+    const activeListings = allActiveListings.filter(item => item.sheetId === currentSheetId);
+    const soldItems = allSoldItems.filter(item => item.sheetId === currentSheetId);
+
     if (activeListings && activeListings.length > 0) {
       // analyzerに自分のデータをセットして分析
       analyzer.analyze(activeListings, soldItems || []);
@@ -6049,7 +6421,9 @@ async function loadMarketAnalysis() {
  */
 async function restoreMarketAnalysis() {
   try {
-    const marketItems = await analyzer.getMarketDataFromDB();
+    const allMarketItems = await analyzer.getMarketDataFromDB();
+    // 現在のシートでフィルタ
+    const marketItems = allMarketItems.filter(item => item.sheetId === currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
       // 市場データを正規化
@@ -6065,9 +6439,12 @@ async function restoreMarketAnalysis() {
       renderCategoryRanking(categoryRanking);
       renderBrandCategoryRanking(brandCategoryRanking);
 
-      // 自分のデータとの比較
-      const activeListings = await BunsekiDB.getActiveListings();
-      const soldItems = await BunsekiDB.getSoldItems();
+      // 自分のデータとの比較（シートでフィルタ）
+      const allActiveListings = await BunsekiDB.getActiveListings();
+      const allSoldItems = await BunsekiDB.getSoldItems();
+      const activeListings = allActiveListings.filter(item => item.sheetId === currentSheetId);
+      const soldItems = allSoldItems.filter(item => item.sheetId === currentSheetId);
+
       if (activeListings && activeListings.length > 0) {
         analyzer.analyze(activeListings, soldItems || []);
         const comparison = analyzer.compareWithMyListings(normalizedItems);
@@ -6127,7 +6504,7 @@ async function reanalyzeMarketData() {
 
   try {
     // 学習済みルールを読み込む
-    await analyzer.loadCustomBrandRules();
+    await analyzer.loadCustomBrandRules(getSheetKey('customBrandRules'));
 
     const marketItems = await analyzer.getMarketDataFromDB();
 

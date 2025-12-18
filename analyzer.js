@@ -379,12 +379,15 @@ class EbayAnalyzer {
 
   /**
    * カスタムブランドルールをストレージから読み込み
+   * @param {string} storageKey - シート固有のストレージキー（例: 'customBrandRules_sheet1'）
    */
-  async loadCustomBrandRules() {
+  async loadCustomBrandRules(storageKey) {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-      const data = await chrome.storage.local.get(['customBrandRules']);
-      this.customBrandRules = data.customBrandRules || {};
-      console.log('カスタムブランドルール読み込み:', Object.keys(this.customBrandRules).length, '件');
+      // シート固有のキーが指定されていればそれを使う、なければ従来のキーを試す
+      const key = storageKey || 'customBrandRules';
+      const data = await chrome.storage.local.get([key]);
+      this.customBrandRules = data[key] || {};
+      console.log(`カスタムブランドルール読み込み (${key}):`, Object.keys(this.customBrandRules).length, '件');
       // デバッグ: 登録されているブランドを表示
       if (Object.keys(this.customBrandRules).length > 0) {
         console.log('登録ブランド一覧:', Object.keys(this.customBrandRules).slice(0, 10));
@@ -955,6 +958,16 @@ class EbayAnalyzer {
    * 基本集計
    */
   calculateSummary() {
+    // summaryが未初期化の場合に備えて初期化
+    if (!this.results.summary) {
+      this.results.summary = {
+        totalActive: 0,
+        totalSold: 0,
+        totalWatchers: 0,
+        daysSinceLastListing: null,
+        lastListingDate: null
+      };
+    }
     const summary = this.results.summary;
 
     summary.totalActive = this.activeListings.length;
@@ -1567,43 +1580,16 @@ class EbayAnalyzer {
   // ========================================
 
   /**
-   * IndexedDBから市場データを取得
+   * IndexedDBから市場データを取得（BunsekiDB経由）
    * @returns {Promise<Array>} 市場データ配列
    */
   async getMarketDataFromDB() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('BunsekiKunDB', 5);
-
-      request.onerror = () => reject(new Error('IndexedDB接続エラー'));
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('marketData')) {
-          const store = db.createObjectStore('marketData', { keyPath: 'id', autoIncrement: true });
-          store.createIndex('title', 'title', { unique: false });
-          store.createIndex('titleLower', 'titleLower', { unique: true });
-          store.createIndex('brand', 'brand', { unique: false });
-          store.createIndex('capturedAt', 'capturedAt', { unique: false });
-        }
-      };
-
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        const tx = db.transaction(['marketData'], 'readonly');
-        const store = tx.objectStore('marketData');
-        const getAllRequest = store.getAll();
-
-        getAllRequest.onsuccess = () => {
-          db.close();
-          resolve(getAllRequest.result || []);
-        };
-
-        getAllRequest.onerror = () => {
-          db.close();
-          reject(new Error('市場データ取得エラー'));
-        };
-      };
-    });
+    // BunsekiDBが利用可能であればそれを使用
+    if (typeof BunsekiDB !== 'undefined') {
+      return await BunsekiDB.getMarketData();
+    }
+    // フォールバック（BunsekiDBが使えない場合）
+    return [];
   }
 
   /**
