@@ -1763,6 +1763,227 @@ async function refreshMyDataAnalysis() {
 }
 
 /**
+ * 自分のデータのカテゴリ未分類アイテム一覧を読み込む（データ入力タブ用）
+ */
+function loadMyCategoryUnclassifiedItems(container, allItems) {
+  // カテゴリ未分類アイテムをフィルタリング
+  const uncategorizedItems = allItems.filter(item => {
+    let itemCategory;
+    if (item.categoryManual && item.category) {
+      itemCategory = item.category;
+    } else if (item.categoryCleared) {
+      itemCategory = null;
+    } else {
+      itemCategory = detectCategoryFromTitle(item.title);
+    }
+    return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+  });
+
+  // アルファベット順でソート
+  uncategorizedItems.sort((a, b) => {
+    const titleA = (a.title || '').toLowerCase();
+    const titleB = (b.title || '').toLowerCase();
+    return titleA.localeCompare(titleB);
+  });
+
+  if (uncategorizedItems.length === 0) {
+    container.innerHTML = '<p class="no-items">カテゴリ未分類のアイテムはありません</p>';
+    return;
+  }
+
+  let html = `
+    <div class="brand-items-list">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-assign-btn" disabled>📁 カテゴリ割当</button>
+      </div>
+      <table class="items-table with-actions">
+        <thead>
+          <tr>
+            <th class="col-checkbox"></th>
+            <th>タイトル</th>
+            <th class="col-price">価格</th>
+            <th class="col-actions">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  uncategorizedItems.forEach(item => {
+    const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+    const title = item.title || '(タイトルなし)';
+    const itemId = item.id;
+    const source = item.saleDate ? 'sold' : 'active';
+    html += `
+      <tr data-item-id="${itemId}" data-source="${source}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+            <button class="item-action-btn assign-category" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="カテゴリ割当">📁</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMyCategoryUnclassifiedItemActions(container);
+}
+
+/**
+ * 自分のデータのカテゴリ未分類アイテム操作イベントを設定（データ入力タブ用）
+ */
+function setupMyCategoryUnclassifiedItemActions(container) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkAssignBtn = container.querySelector('.bulk-assign-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkAssignBtn) bulkAssignBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const activeIds = [];
+      const soldIds = [];
+      checked.forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        if (cb.dataset.source === 'sold') {
+          soldIds.push(id);
+        } else {
+          activeIds.push(id);
+        }
+      });
+
+      try {
+        if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
+        if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await loadSavedData();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括カテゴリ割当
+  if (bulkAssignBtn) {
+    bulkAssignBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      const newCategory = prompt(`${checked.length}件のカテゴリを設定してください:`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          if (cb.dataset.source === 'sold') {
+            await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+          } else {
+            await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+          }
+        }
+        showAlert(`${checked.length}件を「${newCategory.trim()}」に設定しました`, 'success');
+        await loadSavedData();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.deleteSoldItemById(id);
+        } else {
+          await BunsekiDB.deleteActiveListingById(id);
+        }
+        showAlert('削除しました', 'success');
+        await loadSavedData();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別カテゴリ割当ボタン
+  container.querySelectorAll('.item-action-btn.assign-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`カテゴリを入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        }
+        showAlert(`カテゴリを「${newCategory.trim()}」に設定しました`, 'success');
+        await loadSavedData();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  });
+}
+
+/**
  * 自分のデータのカテゴリ別アイテム一覧を読み込む
  */
 function loadMyCategoryItems(category, container, allItems) {
@@ -4147,6 +4368,45 @@ async function restoreAnalysisResults() {
         }
       }
 
+      // カテゴリ未分類セクションを更新
+      const categoryUncategorizedItems = allMyItems.filter(item => {
+        let itemCategory;
+        if (item.categoryManual && item.category) {
+          itemCategory = item.category;
+        } else if (item.categoryCleared) {
+          itemCategory = null;
+        } else {
+          itemCategory = detectCategoryFromTitle(item.title);
+        }
+        return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+      });
+
+      const categoryUnclassifiedSection = document.getElementById('myCategoryUnclassifiedSection');
+      const categoryUnclassifiedCount2 = document.getElementById('myCategoryUnclassifiedCount2');
+      const categoryUnclassifiedHeader = document.getElementById('myCategoryUnclassifiedHeader');
+      const categoryUnclassifiedList2 = document.getElementById('myCategoryUnclassifiedList2');
+      const categoryUnclassifiedItems2 = document.getElementById('myCategoryUnclassifiedItems2');
+
+      if (categoryUnclassifiedSection && categoryUnclassifiedCount2) {
+        categoryUnclassifiedCount2.textContent = categoryUncategorizedItems.length;
+        categoryUnclassifiedSection.style.display = categoryUncategorizedItems.length > 0 ? 'block' : 'none';
+
+        // ヘッダークリックでトグル
+        if (categoryUnclassifiedHeader && categoryUnclassifiedList2 && categoryUnclassifiedItems2) {
+          categoryUnclassifiedHeader.onclick = () => {
+            const isHidden = categoryUnclassifiedList2.style.display === 'none';
+            categoryUnclassifiedList2.style.display = isHidden ? 'block' : 'none';
+            const icon = categoryUnclassifiedHeader.querySelector('.expand-icon');
+            if (icon) icon.textContent = isHidden ? '▼' : '▶';
+
+            if (isHidden) {
+              // アイテム一覧を読み込み
+              loadMyCategoryUnclassifiedItems(categoryUnclassifiedItems2, allMyItems);
+            }
+          };
+        }
+      }
+
       // AI再判定セクション
       const myAiSection = document.getElementById('myDataAiSection');
       if (myAiSection) {
@@ -5858,7 +6118,12 @@ function setupCategoryUnclassifiedToggle() {
   const listEl = document.getElementById('myCategoryUnclassifiedList');
   const itemsEl = document.getElementById('myCategoryUnclassifiedItems');
 
-  if (!toggleEl || !listEl || !itemsEl) return;
+  console.log('[setupCategoryUnclassifiedToggle] toggleEl:', !!toggleEl, 'listEl:', !!listEl, 'itemsEl:', !!itemsEl);
+
+  if (!toggleEl || !listEl || !itemsEl) {
+    console.log('[setupCategoryUnclassifiedToggle] 要素が見つかりません');
+    return;
+  }
 
   toggleEl.addEventListener('click', async () => {
     if (listEl.style.display === 'none') {
