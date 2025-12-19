@@ -618,6 +618,108 @@ async function restoreMarketDataAnalysisResult(marketData) {
         });
       });
     }
+
+    // カテゴリ分類を計算
+    const categories = {};
+    let categoryClassifiedCount = 0;
+    let categoryUnclassifiedCount = 0;
+
+    marketData.forEach(item => {
+      let category;
+      if (item.categoryManual && item.category) {
+        category = item.category;
+      } else if (item.categoryCleared) {
+        category = null;
+      } else {
+        category = detectCategoryFromTitle(item.title);
+      }
+
+      if (category && category !== '(不明)' && category !== '(未分類)' && category !== null) {
+        categoryClassifiedCount++;
+        categories[category] = (categories[category] || 0) + 1;
+      } else {
+        categoryUnclassifiedCount++;
+        categories['(未分類)'] = (categories['(未分類)'] || 0) + 1;
+      }
+    });
+
+    // カテゴリ内訳を表示
+    const categoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
+    if (categoryBreakdownEl) {
+      const sortedCategories = Object.entries(categories)
+        .filter(([category]) => category !== '(未分類)' && category !== '(不明)')
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      categoryBreakdownEl.innerHTML = sortedCategories.map(([category, count]) => `
+        <div class="breakdown-item expandable" data-category="${escapeHtml(category)}">
+          <div class="breakdown-header">
+            <span class="expand-icon">▶</span>
+            <span class="brand-name">${escapeHtml(category)}</span>
+            <span class="brand-count">${count}件</span>
+          </div>
+          <div class="breakdown-items" style="display: none;">
+            <div class="loading-items">読み込み中...</div>
+          </div>
+        </div>
+      `).join('');
+
+      // 展開クリックイベント
+      categoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+        item.querySelector('.breakdown-header').addEventListener('click', function() {
+          const category = item.dataset.category;
+          const itemsDiv = item.querySelector('.breakdown-items');
+          const expandIcon = item.querySelector('.expand-icon');
+
+          if (itemsDiv.style.display === 'none') {
+            itemsDiv.style.display = 'block';
+            expandIcon.textContent = '▼';
+            item.classList.add('expanded');
+            loadMarketCategoryItems(category, itemsDiv, marketData);
+          } else {
+            itemsDiv.style.display = 'none';
+            expandIcon.textContent = '▶';
+            item.classList.remove('expanded');
+          }
+        });
+      });
+    }
+
+    // カテゴリ未分類セクションを更新
+    const categoryUnclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+    const categoryUnclassifiedCountEl = document.getElementById('marketCategoryUnclassifiedCount');
+    const categoryUnclassifiedItemsEl = document.getElementById('marketCategoryUnclassifiedItems');
+    const categoryUnclassifiedHeader = document.getElementById('marketCategoryUnclassifiedHeader');
+    const categoryUnclassifiedList = document.getElementById('marketCategoryUnclassifiedList');
+
+    if (categoryUnclassifiedSection) {
+      if (categoryUnclassifiedCount > 0) {
+        categoryUnclassifiedSection.style.display = 'block';
+        if (categoryUnclassifiedCountEl) {
+          categoryUnclassifiedCountEl.textContent = categoryUnclassifiedCount;
+        }
+        // 未分類アイテムをロード
+        if (categoryUnclassifiedItemsEl) {
+          loadMarketCategoryUnclassifiedItems(categoryUnclassifiedItemsEl, marketData);
+        }
+      } else {
+        categoryUnclassifiedSection.style.display = 'none';
+      }
+    }
+
+    // カテゴリ未分類ヘッダーの展開/折りたたみイベント
+    if (categoryUnclassifiedHeader && categoryUnclassifiedList) {
+      // 既存のイベントリスナーを削除するためにクローン
+      const newHeader = categoryUnclassifiedHeader.cloneNode(true);
+      categoryUnclassifiedHeader.parentNode.replaceChild(newHeader, categoryUnclassifiedHeader);
+
+      newHeader.addEventListener('click', () => {
+        const isExpanded = categoryUnclassifiedList.style.display !== 'none';
+        categoryUnclassifiedList.style.display = isExpanded ? 'none' : 'block';
+        const icon = newHeader.querySelector('.expand-icon');
+        if (icon) icon.textContent = isExpanded ? '▶' : '▼';
+      });
+    }
   }
 }
 
@@ -1614,6 +1716,14 @@ function setupMyDataItemActions(container, brand, allItems) {
       }
     });
   });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
+    });
+  });
 }
 
 /**
@@ -1981,6 +2091,14 @@ function setupMyCategoryUnclassifiedItemActions(container) {
       }
     });
   });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
+    });
+  });
 }
 
 /**
@@ -2082,6 +2200,38 @@ function setupMyCategoryItemActions(container, category, allItems) {
     if (bulkUncategorizeBtn) bulkUncategorizeBtn.disabled = checkedCount === 0;
   }
 
+  // カテゴリカウント更新のヘルパー関数（階層構造対応）
+  function updateCategoryCountBulk(containerEl, delta) {
+    // 細分類（subcategory-item）のカウントを更新
+    const subcategoryItem = containerEl.closest('.subcategory-item');
+    if (subcategoryItem) {
+      const subCountEl = subcategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+      if (subCountEl) {
+        const currentCount = parseInt(subCountEl.textContent) || 0;
+        subCountEl.textContent = `${currentCount + delta}件`;
+      }
+      // 大分類（category-main）のカウントも更新
+      const mainCategoryItem = subcategoryItem.closest('.category-main');
+      if (mainCategoryItem) {
+        const mainCountEl = mainCategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (mainCountEl) {
+          const mainCurrentCount = parseInt(mainCountEl.textContent) || 0;
+          mainCountEl.textContent = `${mainCurrentCount + delta}件`;
+        }
+      }
+    } else {
+      // 大分類直下の場合
+      const breakdownItem = containerEl.closest('.breakdown-item');
+      if (breakdownItem) {
+        const countEl = breakdownItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + delta}件`;
+        }
+      }
+    }
+  }
+
   // 一括削除
   if (bulkDeleteBtn) {
     bulkDeleteBtn.addEventListener('click', async () => {
@@ -2092,6 +2242,7 @@ function setupMyCategoryItemActions(container, category, allItems) {
 
       const activeIds = [];
       const soldIds = [];
+      const deleteCount = checked.length;
       checked.forEach(cb => {
         const id = parseInt(cb.dataset.id);
         if (cb.dataset.source === 'sold') {
@@ -2104,8 +2255,14 @@ function setupMyCategoryItemActions(container, category, allItems) {
       try {
         if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
         if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
-        showAlert(`${checked.length}件を削除しました`, 'success');
-        await refreshMyDataAnalysis();
+        showAlert(`${deleteCount}件を削除しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateCategoryCountBulk(container, -deleteCount);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -2121,22 +2278,71 @@ function setupMyCategoryItemActions(container, category, allItems) {
 
       if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
 
+      const moveCount = checked.length;
+
       try {
         for (const cb of checked) {
           const id = parseInt(cb.dataset.id);
           if (cb.dataset.source === 'sold') {
-            await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true });
+            await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true, categoryManual: false });
           } else {
-            await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true });
+            await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true, categoryManual: false });
           }
         }
-        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
-        await refreshMyDataAnalysis();
+        showAlert(`${moveCount}件を未分類に移動しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateCategoryCountBulk(container, -moveCount);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('myCategoryUnclassifiedCount2');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + moveCount;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('myCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
       }
     });
+  }
+
+  // カテゴリカウント更新のヘルパー関数（階層構造対応）- 個別用
+  function updateCategoryCount(containerEl, delta) {
+    // 細分類（subcategory-item）のカウントを更新
+    const subcategoryItem = containerEl.closest('.subcategory-item');
+    if (subcategoryItem) {
+      const subCountEl = subcategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+      if (subCountEl) {
+        const currentCount = parseInt(subCountEl.textContent) || 0;
+        subCountEl.textContent = `${currentCount + delta}件`;
+      }
+      // 大分類（category-main）のカウントも更新
+      const mainCategoryItem = subcategoryItem.closest('.category-main');
+      if (mainCategoryItem) {
+        const mainCountEl = mainCategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (mainCountEl) {
+          const mainCurrentCount = parseInt(mainCountEl.textContent) || 0;
+          mainCountEl.textContent = `${mainCurrentCount + delta}件`;
+        }
+      }
+    } else {
+      // 大分類直下の場合
+      const breakdownItem = containerEl.closest('.breakdown-item');
+      if (breakdownItem) {
+        const countEl = breakdownItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + delta}件`;
+        }
+      }
+    }
   }
 
   // 個別削除ボタン
@@ -2155,7 +2361,11 @@ function setupMyCategoryItemActions(container, category, allItems) {
           await BunsekiDB.deleteActiveListingById(id);
         }
         showAlert('削除しました', 'success');
-        await refreshMyDataAnalysis();
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateCategoryCount(container, -1);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -2170,18 +2380,27 @@ function setupMyCategoryItemActions(container, category, allItems) {
       const id = parseInt(btn.dataset.id);
       const source = btn.dataset.source;
 
-      console.log('[カテゴリ未分類移動] ID:', id, 'Source:', source);
-
       try {
         if (source === 'sold') {
           await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true, categoryManual: false });
         } else {
           await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true, categoryManual: false });
         }
-        console.log('[カテゴリ未分類移動] DB更新完了');
         showAlert('未分類に移動しました', 'success');
-        await refreshMyDataAnalysis();
-        console.log('[カテゴリ未分類移動] 再分析完了');
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateCategoryCount(container, -1);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('myCategoryUnclassifiedCount2');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + 1;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('myCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -2206,16 +2425,28 @@ function setupMyCategoryItemActions(container, category, allItems) {
 
       try {
         if (source === 'sold') {
-          await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true });
+          await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
         } else {
-          await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true });
+          await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
         }
         showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
-        await refreshMyDataAnalysis();
+        // 該当行をDOMから削除（別カテゴリに移動したため）
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateCategoryCount(container, -1);
       } catch (e) {
         console.error('変更エラー:', e);
         showAlert('変更に失敗しました', 'error');
       }
+    });
+  });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
     });
   });
 }
@@ -2371,6 +2602,38 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
   const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
   const bulkUncategorizeBtn = container.querySelector('.bulk-uncategorize-btn');
 
+  // カテゴリカウント更新のヘルパー関数（階層構造対応）
+  function updateMarketCategoryCount(containerEl, delta) {
+    // 細分類（subcategory-item）のカウントを更新
+    const subcategoryItem = containerEl.closest('.subcategory-item');
+    if (subcategoryItem) {
+      const subCountEl = subcategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+      if (subCountEl) {
+        const currentCount = parseInt(subCountEl.textContent) || 0;
+        subCountEl.textContent = `${currentCount + delta}件`;
+      }
+      // 大分類（category-main）のカウントも更新
+      const mainCategoryItem = subcategoryItem.closest('.category-main');
+      if (mainCategoryItem) {
+        const mainCountEl = mainCategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (mainCountEl) {
+          const mainCurrentCount = parseInt(mainCountEl.textContent) || 0;
+          mainCountEl.textContent = `${mainCurrentCount + delta}件`;
+        }
+      }
+    } else {
+      // 大分類直下の場合
+      const breakdownItem = containerEl.closest('.breakdown-item');
+      if (breakdownItem) {
+        const countEl = breakdownItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + delta}件`;
+        }
+      }
+    }
+  }
+
   if (selectAllCheckbox) {
     selectAllCheckbox.addEventListener('change', () => {
       itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
@@ -2397,11 +2660,18 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
       if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
 
       const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+      const deleteCount = checked.length;
 
       try {
         await BunsekiDB.deleteMarketDataByIds(ids);
-        showAlert(`${checked.length}件を削除しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        showAlert(`${deleteCount}件を削除しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -deleteCount);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -2417,13 +2687,30 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
 
       if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
 
+      const moveCount = checked.length;
+
       try {
         for (const cb of checked) {
           const id = parseInt(cb.dataset.id);
           await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
         }
-        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        showAlert(`${moveCount}件を未分類に移動しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -moveCount);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('marketCategoryUnclassifiedCount');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + moveCount;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -2442,7 +2729,11 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
       try {
         await BunsekiDB.deleteMarketDataById(id);
         showAlert('削除しました', 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -2459,7 +2750,20 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
       try {
         await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
         showAlert('未分類に移動しました', 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('marketCategoryUnclassifiedCount');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + 1;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -2484,11 +2788,23 @@ function setupMarketCategorySubItemActions(container, mainCategory, subCategory,
       try {
         await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true });
         showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除（別カテゴリに移動したため）
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
       } catch (e) {
         console.error('変更エラー:', e);
         showAlert('変更に失敗しました', 'error');
       }
+    });
+  });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
     });
   });
 }
@@ -2789,6 +3105,14 @@ function setupUnclassifiedItemActions(container, type) {
         console.error('ブランド設定エラー:', e);
         showAlert('ブランド設定に失敗しました', 'error');
       }
+    });
+  });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
     });
   });
 }
@@ -3284,6 +3608,14 @@ function setupMarketDataItemActions(container, brand) {
       }
     });
   });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
+    });
+  });
 }
 
 /**
@@ -3400,6 +3732,38 @@ function setupMarketCategoryItemActions(container, category, marketData) {
   const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
   const bulkUncategorizeBtn = container.querySelector('.bulk-uncategorize-btn');
 
+  // カテゴリカウント更新のヘルパー関数（階層構造対応）
+  function updateMarketCategoryCount(containerEl, delta) {
+    // 細分類（subcategory-item）のカウントを更新
+    const subcategoryItem = containerEl.closest('.subcategory-item');
+    if (subcategoryItem) {
+      const subCountEl = subcategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+      if (subCountEl) {
+        const currentCount = parseInt(subCountEl.textContent) || 0;
+        subCountEl.textContent = `${currentCount + delta}件`;
+      }
+      // 大分類（category-main）のカウントも更新
+      const mainCategoryItem = subcategoryItem.closest('.category-main');
+      if (mainCategoryItem) {
+        const mainCountEl = mainCategoryItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (mainCountEl) {
+          const mainCurrentCount = parseInt(mainCountEl.textContent) || 0;
+          mainCountEl.textContent = `${mainCurrentCount + delta}件`;
+        }
+      }
+    } else {
+      // 大分類直下の場合
+      const breakdownItem = containerEl.closest('.breakdown-item');
+      if (breakdownItem) {
+        const countEl = breakdownItem.querySelector(':scope > .breakdown-header .brand-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + delta}件`;
+        }
+      }
+    }
+  }
+
   if (selectAllCheckbox) {
     selectAllCheckbox.addEventListener('change', () => {
       itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
@@ -3426,11 +3790,18 @@ function setupMarketCategoryItemActions(container, category, marketData) {
       if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
 
       const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+      const deleteCount = checked.length;
 
       try {
         await BunsekiDB.deleteMarketDataByIds(ids);
-        showAlert(`${checked.length}件を削除しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        showAlert(`${deleteCount}件を削除しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -deleteCount);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -3446,13 +3817,30 @@ function setupMarketCategoryItemActions(container, category, marketData) {
 
       if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
 
+      const moveCount = checked.length;
+
       try {
         for (const cb of checked) {
           const id = parseInt(cb.dataset.id);
           await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
         }
-        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        showAlert(`${moveCount}件を未分類に移動しました`, 'success');
+        // 該当行をDOMから削除
+        checked.forEach(cb => {
+          const row = cb.closest('tr');
+          if (row) row.remove();
+        });
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -moveCount);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('marketCategoryUnclassifiedCount');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + moveCount;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -3471,7 +3859,11 @@ function setupMarketCategoryItemActions(container, category, marketData) {
       try {
         await BunsekiDB.deleteMarketDataById(id);
         showAlert('削除しました', 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
       } catch (e) {
         console.error('削除エラー:', e);
         showAlert('削除に失敗しました', 'error');
@@ -3488,7 +3880,20 @@ function setupMarketCategoryItemActions(container, category, marketData) {
       try {
         await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
         showAlert('未分類に移動しました', 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
+        // カテゴリ未分類カウントを更新
+        const categoryUnclassifiedCount = document.getElementById('marketCategoryUnclassifiedCount');
+        if (categoryUnclassifiedCount) {
+          const count = parseInt(categoryUnclassifiedCount.textContent) || 0;
+          categoryUnclassifiedCount.textContent = count + 1;
+        }
+        // 未分類セクションを表示
+        const unclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+        if (unclassifiedSection) unclassifiedSection.style.display = 'block';
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -3513,11 +3918,225 @@ function setupMarketCategoryItemActions(container, category, marketData) {
       try {
         await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true });
         showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
-        await restoreMarketDataAnalysisResult();
+        // 該当行をDOMから削除（別カテゴリに移動したため）
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        // カウントを更新（階層構造対応）
+        updateMarketCategoryCount(container, -1);
       } catch (e) {
         console.error('変更エラー:', e);
         showAlert('変更に失敗しました', 'error');
       }
+    });
+  });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
+    });
+  });
+}
+
+/**
+ * 市場データのカテゴリ未分類アイテムを表示（データ入力タブ用）
+ */
+function loadMarketCategoryUnclassifiedItems(container, marketData) {
+  // カテゴリ未分類アイテムをフィルタリング
+  const uncategorizedItems = marketData.filter(item => {
+    let itemCategory;
+    if (item.categoryManual && item.category) {
+      itemCategory = item.category;
+    } else if (item.categoryCleared) {
+      itemCategory = null;
+    } else {
+      itemCategory = detectCategoryFromTitle(item.title);
+    }
+    return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+  });
+
+  // 売上数順でソート
+  uncategorizedItems.sort((a, b) => (b.sold || 0) - (a.sold || 0));
+
+  if (uncategorizedItems.length === 0) {
+    container.innerHTML = '<p class="no-items">カテゴリ未分類のアイテムはありません</p>';
+    return;
+  }
+
+  let html = `
+    <div class="brand-items-list">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-assign-btn" disabled>📁 カテゴリ割当</button>
+      </div>
+      <table class="items-table with-actions">
+        <thead>
+          <tr>
+            <th class="col-checkbox"></th>
+            <th>タイトル</th>
+            <th class="col-price">価格</th>
+            <th>売上数</th>
+            <th class="col-actions">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  uncategorizedItems.forEach(item => {
+    const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+    const title = item.title || '(タイトルなし)';
+    const itemId = item.id;
+    html += `
+      <tr data-item-id="${itemId}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
+        <td class="item-sold">${item.sold || 0}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" title="削除">🗑️</button>
+            <button class="item-action-btn assign-category" data-id="${itemId}" data-title="${escapeHtml(title)}" title="カテゴリ割当">📁</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMarketCategoryUnclassifiedItemActions(container);
+}
+
+/**
+ * 市場データのカテゴリ未分類アイテム操作イベントを設定（データ入力タブ用）
+ */
+function setupMarketCategoryUnclassifiedItemActions(container) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkAssignBtn = container.querySelector('.bulk-assign-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkAssignBtn) bulkAssignBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+
+      try {
+        await BunsekiDB.deleteMarketDataByIds(ids);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括カテゴリ割当
+  if (bulkAssignBtn) {
+    bulkAssignBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      const newCategory = prompt(`${checked.length}件のカテゴリを設定してください:`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        }
+        showAlert(`${checked.length}件を「${newCategory.trim()}」に設定しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        await BunsekiDB.deleteMarketDataById(id);
+        showAlert('削除しました', 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別カテゴリ割当ボタン
+  container.querySelectorAll('.item-action-btn.assign-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`カテゴリを入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        showAlert(`カテゴリを「${newCategory.trim()}」に設定しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  });
+
+  // タイトルクリックで展開/折りたたみ
+  container.querySelectorAll('.item-title').forEach(titleEl => {
+    titleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      titleEl.classList.toggle('expanded');
     });
   });
 }
@@ -3816,10 +4435,12 @@ async function clearMarketData() {
  * 分析結果をクリア（データは残す）
  */
 async function clearAnalysisResults() {
-  if (!confirm('分析結果をクリアしますか？\n取得したデータは残ります。')) return;
+  if (!confirm('分析結果をクリアしますか？\n取得したデータは残ります。\n（カテゴリ・ブランド判定もリセットされます）')) return;
 
   try {
     await BunsekiDB.clearAnalysisCache();
+    // 市場データのカテゴリ・ブランド判定をリセット
+    await BunsekiDB.resetMarketDataClassification();
 
     // メモリ上の分析結果もクリア
     analyzer.results = {
@@ -3853,9 +4474,13 @@ async function clearAnalysisResults() {
  * 自分のデータの分析結果のみクリア（データは残す）
  */
 async function clearMyAnalysisResults() {
-  if (!confirm('自分のデータの分析結果をクリアしますか？\nCSVデータは残ります。')) return;
+  if (!confirm('自分のデータの分析結果をクリアしますか？\nCSVデータは残ります。\n（カテゴリ・ブランド判定もリセットされます）')) return;
 
   try {
+    // 出品中・販売済データのカテゴリ・ブランド判定をリセット
+    await BunsekiDB.resetActiveListingsClassification();
+    await BunsekiDB.resetSoldItemsClassification();
+
     // メモリ上の分析結果をクリア
     analyzer.results = {
       summary: {},
@@ -4631,6 +5256,45 @@ async function restoreAnalysisResults() {
           };
         } else if (marketCategoryToggle) {
           marketCategoryToggle.style.display = 'none';
+        }
+      }
+
+      // 市場データのカテゴリ未分類セクションを更新
+      const marketCategoryUncategorizedItems = marketItems.filter(item => {
+        let itemCategory;
+        if (item.categoryManual && item.category) {
+          itemCategory = item.category;
+        } else if (item.categoryCleared) {
+          itemCategory = null;
+        } else {
+          itemCategory = detectCategoryFromTitle(item.title);
+        }
+        return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+      });
+
+      const marketCategoryUnclassifiedSection = document.getElementById('marketCategoryUnclassifiedSection');
+      const marketCategoryUnclassifiedCount = document.getElementById('marketCategoryUnclassifiedCount');
+      const marketCategoryUnclassifiedHeader = document.getElementById('marketCategoryUnclassifiedHeader');
+      const marketCategoryUnclassifiedList = document.getElementById('marketCategoryUnclassifiedList');
+      const marketCategoryUnclassifiedItems = document.getElementById('marketCategoryUnclassifiedItems');
+
+      if (marketCategoryUnclassifiedSection && marketCategoryUnclassifiedCount) {
+        marketCategoryUnclassifiedCount.textContent = marketCategoryUncategorizedItems.length;
+        marketCategoryUnclassifiedSection.style.display = marketCategoryUncategorizedItems.length > 0 ? 'block' : 'none';
+
+        // ヘッダークリックでトグル
+        if (marketCategoryUnclassifiedHeader && marketCategoryUnclassifiedList && marketCategoryUnclassifiedItems) {
+          marketCategoryUnclassifiedHeader.onclick = () => {
+            const isHidden = marketCategoryUnclassifiedList.style.display === 'none';
+            marketCategoryUnclassifiedList.style.display = isHidden ? 'block' : 'none';
+            const icon = marketCategoryUnclassifiedHeader.querySelector('.expand-icon');
+            if (icon) icon.textContent = isHidden ? '▼' : '▶';
+
+            if (isHidden) {
+              // アイテム一覧を読み込み
+              loadMarketCategoryUnclassifiedItems(marketCategoryUnclassifiedItems, marketItems);
+            }
+          };
         }
       }
 
@@ -7957,6 +8621,41 @@ function detectCategoryFromTitle(title) {
 
   const titleLower = title.toLowerCase();
 
+  // 複合語の優先ルール（単語の一部が別カテゴリにマッチするのを防ぐ）
+  const priorityRules = [
+    // 「dress watch」「dress wristwatch」「dress watches」は時計
+    { pattern: /dress\s*wristwatch/i, category: '時計・ジュエリー' },
+    { pattern: /dress\s*watch/i, category: '時計・ジュエリー' },
+    // 「wristwatch」を含む場合は時計
+    { pattern: /wristwatch/i, category: '時計・ジュエリー' },
+    // 「formal watch」「luxury watch」なども時計
+    { pattern: /\bwatch\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bwatches\b/i, category: '時計・ジュエリー' },
+    { pattern: /\btimepiece/i, category: '時計・ジュエリー' },
+    { pattern: /\bchronograph/i, category: '時計・ジュエリー' },
+    // 時計ブランド
+    { pattern: /\brolex\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bomega\b/i, category: '時計・ジュエリー' },
+    { pattern: /\btag heuer\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bbreitling\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bpatek/i, category: '時計・ジュエリー' },
+    { pattern: /\baudemars/i, category: '時計・ジュエリー' },
+    { pattern: /\bseiko\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bcitizen\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bcasio\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bg-shock/i, category: '時計・ジュエリー' },
+    { pattern: /\btudor\b/i, category: '時計・ジュエリー' },
+    { pattern: /\blongines\b/i, category: '時計・ジュエリー' },
+    { pattern: /\btissot\b/i, category: '時計・ジュエリー' },
+  ];
+
+  // 優先ルールを先にチェック
+  for (const rule of priorityRules) {
+    if (rule.pattern.test(titleLower)) {
+      return rule.category;
+    }
+  }
+
   for (const [key, category] of Object.entries(ANALYSIS_CATEGORIES)) {
     for (const keyword of category.keywords) {
       if (titleLower.includes(keyword.toLowerCase())) {
@@ -7992,6 +8691,50 @@ function detectCategoryWithSub(title) {
   if (!title) return { main: 'その他', sub: 'その他' };
 
   const titleLower = title.toLowerCase();
+
+  // 時計の優先ルール（「dress watch」などが衣類にマッチするのを防ぐ）
+  const watchPriorityPatterns = [
+    /dress\s*wristwatch/i,
+    /dress\s*watch/i,
+    /wristwatch/i,
+    /\bwatch\b/i,
+    /\bwatches\b/i,
+    /\btimepiece/i,
+    /\bchronograph/i,
+    /\brolex\b/i,
+    /\bomega\b/i,
+    /\btag heuer\b/i,
+    /\bbreitling\b/i,
+    /\bpatek/i,
+    /\baudemars/i,
+    /\bseiko\b/i,
+    /\bcitizen\b/i,
+    /\bcasio\b/i,
+    /\bg-shock/i,
+    /\btudor\b/i,
+    /\blongines\b/i,
+    /\btissot\b/i,
+    /\borient\b/i,
+  ];
+
+  // 時計パターンに一致したら、時計カテゴリとして処理
+  for (const pattern of watchPriorityPatterns) {
+    if (pattern.test(titleLower)) {
+      // 時計の細分類を判定
+      const watchCategory = ANALYSIS_CATEGORIES.watches_jewelry;
+      if (watchCategory && watchCategory.subcategories) {
+        for (const [subKey, subCat] of Object.entries(watchCategory.subcategories)) {
+          for (const subKeyword of subCat.keywords) {
+            if (titleLower.includes(subKeyword.toLowerCase())) {
+              return { main: '時計・ジュエリー', sub: subCat.nameJa };
+            }
+          }
+        }
+      }
+      // 細分類が見つからなければ「腕時計」として返す
+      return { main: '時計・ジュエリー', sub: '腕時計' };
+    }
+  }
 
   // 細分類の優先マッチングルール（earring/keyringをringより先にチェック）
   const prioritySubRules = [

@@ -613,6 +613,104 @@ const BunsekiDB = {
     });
   },
 
+  /**
+   * 市場データのカテゴリ・ブランド判定をリセット
+   */
+  async resetMarketDataClassification() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('marketData', 'readwrite');
+      const store = tx.objectStore('marketData');
+      const cursorRequest = store.openCursor();
+      let resetCount = 0;
+
+      cursorRequest.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const record = cursor.value;
+          // カテゴリとブランドの判定をリセット
+          delete record.category;
+          delete record.brand;
+          delete record.categoryCleared;
+          delete record.brandCleared;
+          delete record.categoryManual;
+          delete record.brandManual;
+          store.put(record);
+          resetCount++;
+          cursor.continue();
+        }
+      };
+
+      tx.oncomplete = () => {
+        console.log(`[BunsekiDB] 市場データ分類リセット完了: ${resetCount}件`);
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 出品中データのカテゴリ・ブランド判定をリセット
+   */
+  async resetActiveListingsClassification() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('activeListings', 'readwrite');
+      const store = tx.objectStore('activeListings');
+      const cursorRequest = store.openCursor();
+
+      cursorRequest.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const record = cursor.value;
+          // カテゴリとブランドの判定をリセット
+          delete record.category;
+          delete record.brand;
+          delete record.categoryCleared;
+          delete record.brandCleared;
+          delete record.categoryManual;
+          delete record.brandManual;
+          store.put(record);
+          cursor.continue();
+        }
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 販売済データのカテゴリ・ブランド判定をリセット
+   */
+  async resetSoldItemsClassification() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('soldItems', 'readwrite');
+      const store = tx.objectStore('soldItems');
+      const cursorRequest = store.openCursor();
+
+      cursorRequest.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const record = cursor.value;
+          // カテゴリとブランドの判定をリセット
+          delete record.category;
+          delete record.brand;
+          delete record.categoryCleared;
+          delete record.brandCleared;
+          delete record.categoryManual;
+          delete record.brandManual;
+          store.put(record);
+          cursor.continue();
+        }
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
   // ========================================
   // ユーティリティ
   // ========================================
