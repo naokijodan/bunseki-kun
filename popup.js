@@ -5529,15 +5529,46 @@ function setupWatchFilterEvents() {
  * 大分類と細分類を別々のセクションで表示
  */
 function generateCategoryPerformanceAnalysis() {
-  // categoryStatsがない場合は分析を実行
-  if ((!analyzer.results.categoryStats || analyzer.results.categoryStats.length === 0) &&
-      (!analyzer.results.byCategory || Object.keys(analyzer.results.byCategory).length === 0)) {
-    if (analyzer.activeListings.length > 0 || analyzer.soldItems.length > 0) {
-      analyzer.analyze();
-    }
-  }
+  // カテゴリ統計を手動フラグを考慮して再計算
+  const categoryStats = {};
 
-  const categories = analyzer.results.categoryStats || Object.values(analyzer.results.byCategory || {});
+  // アイテムのカテゴリを取得するヘルパー関数
+  const getItemCategory = (item) => {
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. 既存カテゴリ 4. タイトル判定
+    if (item.categoryManual && item.category) {
+      return item.category;
+    } else if (item.categoryCleared) {
+      return null; // 未分類
+    } else if (item.categoryMain || item.category) {
+      return item.categoryMain || item.category;
+    } else {
+      return detectCategoryFromTitle(item.title) || null;
+    }
+  };
+
+  // 出品中アイテムからカテゴリを集計
+  analyzer.activeListings.forEach(item => {
+    const category = getItemCategory(item);
+    if (category && category !== '(不明)' && category !== '(未分類)') {
+      if (!categoryStats[category]) {
+        categoryStats[category] = { category, active: 0, sold: 0 };
+      }
+      categoryStats[category].active++;
+    }
+  });
+
+  // 販売済みアイテムからカテゴリを集計
+  analyzer.soldItems.forEach(item => {
+    const category = getItemCategory(item);
+    if (category && category !== '(不明)' && category !== '(未分類)') {
+      if (!categoryStats[category]) {
+        categoryStats[category] = { category, active: 0, sold: 0 };
+      }
+      categoryStats[category].sold += item.quantity || 1;
+    }
+  });
+
+  const categories = Object.values(categoryStats).sort((a, b) => (b.active + b.sold) - (a.active + a.sold));
 
   if (!categories || categories.length === 0) {
     return `
@@ -5559,7 +5590,7 @@ function generateCategoryPerformanceAnalysis() {
 
     // 出品中アイテムからブランドと細分類を集計
     analyzer.activeListings.forEach(item => {
-      const itemCatMain = item.categoryMain || item.category || '(不明)';
+      const itemCatMain = getItemCategory(item);
       if (itemCatMain === cat.category) {
         // カテゴリ全体の出品価格
         totalActivePrice += item.price || 0;
@@ -5598,7 +5629,7 @@ function generateCategoryPerformanceAnalysis() {
 
     // 販売済みアイテムからブランドと細分類を集計
     analyzer.soldItems.forEach(item => {
-      const itemCatMain = item.categoryMain || item.category || '(不明)';
+      const itemCatMain = getItemCategory(item);
       if (itemCatMain === cat.category) {
         // カテゴリ全体の販売価格
         const qty = item.quantity || 1;
@@ -5691,14 +5722,14 @@ function generateCategoryPerformanceAnalysis() {
             const top3Brands = cat.topBrands.slice(0, 3);
 
             let rowHtml = `
-              <tr class="category-main-row ${hasSubcategories ? 'expandable' : ''}" data-cat-idx="${idx}">
+              <tr class="category-main-row ${hasSubcategories ? 'expandable' : ''}" data-cat-idx="${idx}" style="cursor: pointer;">
                 <td class="col-bar">
                   <div class="table-bar-container">
                     <div class="table-bar table-bar-green" style="width: ${barWidth}%"></div>
                   </div>
                 </td>
                 <td class="col-name">
-                  ${hasSubcategories ? '<span class="row-expand-icon">▶</span>' : ''}
+                  <span class="row-expand-icon">▶</span>
                   ${escapeHtml(cat.category)}
                 </td>
                 <td>${cat.active}</td>
@@ -5742,6 +5773,17 @@ function generateCategoryPerformanceAnalysis() {
                 `;
               });
             }
+
+            // アイテム詳細行（展開時にアイテム一覧を表示）
+            rowHtml += `
+              <tr class="category-items-row" data-cat-idx="${idx}" data-category="${escapeHtml(cat.category)}" style="display: none;">
+                <td colspan="8">
+                  <div class="category-items-container">
+                    <div class="loading-items">読み込み中...</div>
+                  </div>
+                </td>
+              </tr>
+            `;
 
             return rowHtml;
           }).join('')}
@@ -6031,8 +6073,8 @@ function setupMyCategoryUnclassifiedActions(container) {
  * カテゴリ展開/折りたたみのイベントリスナーを設定
  */
 function setupCategoryExpandListeners() {
-  const mainRows = document.querySelectorAll('.category-expandable-table .category-main-row.expandable');
-  console.log('setupCategoryExpandListeners: 展開可能な行数:', mainRows.length);
+  const mainRows = document.querySelectorAll('.category-expandable-table .category-main-row');
+  console.log('setupCategoryExpandListeners: カテゴリ行数:', mainRows.length);
 
   mainRows.forEach(row => {
     // イベントリスナーが既に設定されているか確認
@@ -6042,7 +6084,9 @@ function setupCategoryExpandListeners() {
     row.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = row.dataset.catIdx;
+      const hasSubcategories = row.classList.contains('expandable');
       const subRows = document.querySelectorAll(`.category-sub-row[data-parent-cat-idx="${idx}"]`);
+      const itemsRow = document.querySelector(`.category-items-row[data-cat-idx="${idx}"]`);
       const icon = row.querySelector('.row-expand-icon');
       const isExpanded = row.classList.contains('expanded');
 
@@ -6050,10 +6094,23 @@ function setupCategoryExpandListeners() {
         row.classList.remove('expanded');
         if (icon) icon.textContent = '▶';
         subRows.forEach(subRow => subRow.style.display = 'none');
+        if (itemsRow) itemsRow.style.display = 'none';
       } else {
         row.classList.add('expanded');
         if (icon) icon.textContent = '▼';
-        subRows.forEach(subRow => subRow.style.display = 'table-row');
+        if (hasSubcategories) {
+          subRows.forEach(subRow => subRow.style.display = 'table-row');
+        }
+        // アイテム一覧を表示
+        if (itemsRow) {
+          itemsRow.style.display = 'table-row';
+          const container = itemsRow.querySelector('.category-items-container');
+          const category = itemsRow.dataset.category;
+          if (container && category) {
+            const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
+            loadMyCategoryItems(category, container, allItems);
+          }
+        }
       }
     });
   });
