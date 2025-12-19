@@ -1073,9 +1073,13 @@ class EbayAnalyzer {
 
     // 出品中のブランド集計
     for (const item of this.activeListings) {
-      // 既存のbrand値を信頼せず、常にタイトルから再判定
+      // 優先順位: 1. 手動設定(brandManual) 2. 未分類フラグ(brandCleared) 3. AI分類 4. タイトルから判定
       let brand;
-      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+      if (item.brandManual && item.brand) {
+        brand = item.brand;
+      } else if (item.brandCleared) {
+        brand = '(不明)';
+      } else if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
         brand = aiClassifications[item.title].brand;
       } else {
         brand = extractBrand(item.title);
@@ -1115,9 +1119,13 @@ class EbayAnalyzer {
 
     // 売れたブランド集計
     for (const item of this.soldItems) {
-      // 既存のbrand値を信頼せず、常にタイトルから再判定
+      // 優先順位: 1. 手動設定(brandManual) 2. 未分類フラグ(brandCleared) 3. AI分類 4. タイトルから判定
       let brand;
-      if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
+      if (item.brandManual && item.brand) {
+        brand = item.brand;
+      } else if (item.brandCleared) {
+        brand = '(不明)';
+      } else if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
         brand = aiClassifications[item.title].brand;
       } else {
         brand = extractBrand(item.title);

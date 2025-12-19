@@ -529,7 +529,16 @@ function restoreMarketDataAnalysisResult(marketData) {
   let unclassifiedCount = 0;
 
   marketData.forEach(item => {
-    const brand = extractBrandFromTitle(item.title);
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    let brand;
+    if (item.brandManual && item.brand) {
+      brand = item.brand;
+    } else if (item.brandCleared) {
+      brand = null;
+    } else {
+      brand = extractBrandFromTitle(item.title);
+    }
+
     if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== null) {
       classifiedCount++;
       brands[brand] = (brands[brand] || 0) + 1;
@@ -1211,18 +1220,23 @@ async function analyzeMyData() {
   }
 
   // ブランド分類を実行
-  // 優先順位: 1. 既存のitem.brand（AI分類済み） 2. aiClassificationResults 3. extractBrandFromTitle
+  // 優先順位: 1. 手動設定(brandManual) 2. 未分類フラグ(brandCleared) 3. AI分類 4. タイトルから判定
   const brands = {};
   let classifiedCount = 0;
   let unclassifiedCount = 0;
 
   allItems.forEach(item => {
-    // 既存のbrand値を信頼せず、常にタイトルから再判定
-    // （あり得ないブランドが上位に来る問題を防ぐため）
     let brand;
 
-    // AI分類結果があればそれを優先使用
-    if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+    // 優先順位に従ってブランドを決定
+    if (item.brandManual && item.brand) {
+      // 手動でブランドを設定した場合はそれを使用
+      brand = item.brand;
+    } else if (item.brandCleared) {
+      // 明示的に未分類にした場合
+      brand = null;
+    } else if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+      // AI分類結果があればそれを使用
       brand = window.aiClassificationResults[item.title].brand;
     } else {
       // なければextractBrandFromTitle（customBrandRulesも参照）
@@ -1367,8 +1381,17 @@ async function analyzeMyData() {
 function loadMyBrandItems(brand, container, allItems) {
   const brandLower = brand.toLowerCase();
   const brandItems = allItems.filter(item => {
-    // 常にタイトルからブランドを判定（集計時と同じロジック）
-    const itemBrand = extractBrandFromTitle(item.title) || '(未分類)';
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. AI分類 4. タイトルから判定
+    let itemBrand;
+    if (item.brandManual && item.brand) {
+      itemBrand = item.brand;
+    } else if (item.brandCleared) {
+      itemBrand = '(未分類)';
+    } else if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+      itemBrand = window.aiClassificationResults[item.title].brand || '(未分類)';
+    } else {
+      itemBrand = extractBrandFromTitle(item.title) || '(未分類)';
+    }
     return itemBrand.toLowerCase() === brandLower;
   });
 
@@ -1379,11 +1402,21 @@ function loadMyBrandItems(brand, container, allItems) {
 
   let html = `
     <div class="brand-items-list">
-      <table class="items-table">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox" data-brand="${escapeHtml(brand)}">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" data-brand="${escapeHtml(brand)}" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-unclassify-btn" data-brand="${escapeHtml(brand)}" disabled>↩ 未分類に</button>
+      </div>
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
+            <th class="col-price">価格</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1392,25 +1425,349 @@ function loadMyBrandItems(brand, container, allItems) {
   brandItems.forEach(item => {
     const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
     const title = item.title || '(タイトルなし)';
+    const itemId = item.id;
+    const source = item.saleDate ? 'sold' : 'active'; // sold or active
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
-        <td class="item-price">${price}</td>
+      <tr data-item-id="${itemId}" data-source="${source}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+            <button class="item-action-btn unclassify" data-id="${itemId}" data-source="${source}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-brand" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="ブランド変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMyDataItemActions(container, brand, allItems);
+}
+
+/**
+ * 自分のデータのアイテム操作イベントを設定
+ */
+function setupMyDataItemActions(container, brand, allItems) {
+  // 全選択チェックボックス
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkUnclassifyBtn = container.querySelector('.bulk-unclassify-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkUnclassifyBtn) bulkUnclassifyBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const activeIds = [];
+      const soldIds = [];
+      checked.forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        if (cb.dataset.source === 'sold') {
+          soldIds.push(id);
+        } else {
+          activeIds.push(id);
+        }
+      });
+
+      try {
+        if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
+        if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括未分類に移動
+  if (bulkUnclassifyBtn) {
+    bulkUnclassifyBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          if (cb.dataset.source === 'sold') {
+            await BunsekiDB.updateSoldItemById(id, { brand: null, brandCleared: true });
+          } else {
+            await BunsekiDB.updateActiveListingById(id, { brand: null, brandCleared: true });
+          }
+        }
+        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.deleteSoldItemById(id);
+        } else {
+          await BunsekiDB.deleteActiveListingById(id);
+        }
+        showAlert('削除しました', 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別未分類ボタン
+  container.querySelectorAll('.item-action-btn.unclassify').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { brand: null, brandCleared: true });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { brand: null, brandCleared: true });
+        }
+        showAlert('未分類に移動しました', 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  });
+
+  // ブランド変更ボタン
+  container.querySelectorAll('.item-action-btn.change-brand').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+      const title = btn.dataset.title;
+
+      const newBrand = prompt(`新しいブランド名を入力してください:\n\n${title}`, '');
+      if (newBrand === null) return;
+      if (newBrand.trim() === '') {
+        showAlert('ブランド名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { brand: newBrand.trim(), brandManual: true });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { brand: newBrand.trim(), brandManual: true });
+        }
+        showAlert(`ブランドを「${newBrand.trim()}」に変更しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        showAlert('変更に失敗しました', 'error');
+      }
+    });
+  });
+}
+
+/**
+ * 自分のデータの分析を再実行
+ */
+async function refreshMyDataAnalysis() {
+  // IndexedDBから最新データを取得して再分析
+  const activeListings = await BunsekiDB.getActiveListingsForSheet(BunsekiDB.currentSheetId);
+  const soldItems = await BunsekiDB.getSoldItemsForSheet(BunsekiDB.currentSheetId);
+
+  analyzer.activeListings = activeListings;
+  analyzer.soldItems = soldItems;
+
+  // 統計値（分類済み/未分類カウント）を更新
+  const allItems = [...activeListings, ...soldItems];
+  let classifiedCount = 0;
+  let unclassifiedCount = 0;
+  const brands = {};
+
+  allItems.forEach(item => {
+    let brand;
+
+    // 優先順位: 1. 手動設定(brandManual) 2. 未分類フラグ(brandCleared) 3. AI分類 4. タイトルから判定
+    if (item.brandManual && item.brand) {
+      brand = item.brand;
+    } else if (item.brandCleared) {
+      brand = null; // 明示的に未分類
+    } else if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+      brand = window.aiClassificationResults[item.title].brand;
+    } else {
+      brand = extractBrandFromTitle(item.title);
+    }
+
+    if (brand && brand !== '(不明)' && brand !== 'その他' && brand !== '(未分類)' && brand !== null) {
+      classifiedCount++;
+      brands[brand] = (brands[brand] || 0) + 1;
+    } else {
+      unclassifiedCount++;
+    }
+  });
+
+  // UIを更新
+  const myClassifiedEl = document.getElementById('myClassifiedCount');
+  const myUnclassifiedEl = document.getElementById('myUnclassifiedCount');
+  const myBrandCountEl = document.getElementById('myBrandCount');
+  if (myClassifiedEl) myClassifiedEl.textContent = classifiedCount.toLocaleString();
+  if (myUnclassifiedEl) myUnclassifiedEl.textContent = unclassifiedCount.toLocaleString();
+  if (myBrandCountEl) myBrandCountEl.textContent = Object.keys(brands).length.toLocaleString();
+
+  // 展開中のブランドを記録
+  const expandedBrands = [];
+  document.querySelectorAll('#myBrandBreakdown .breakdown-item.expanded').forEach(item => {
+    expandedBrands.push(item.dataset.brand);
+  });
+
+  // analyzerの分析を再実行
+  analyzer.calculateBrandPerformance();
+
+  // 「自分のデータ」タブのブランド内訳を更新
+  const breakdownEl = document.getElementById('myBrandBreakdown');
+  const myBrandToggle = document.getElementById('myBrandToggle');
+  if (breakdownEl) {
+    const sortedBrands = Object.entries(brands)
+      .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
+      .sort((a, b) => b[1] - a[1]);
+    const totalBrandCount = sortedBrands.length;
+
+    // 現在のトグル状態を保持
+    const isCurrentlyExpanded = myBrandToggle && myBrandToggle.dataset.expanded === 'true';
+
+    // 表示用関数
+    const renderBrands = (showAll) => {
+      const displayBrands = showAll ? sortedBrands : sortedBrands.slice(0, 10);
+      breakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+        <div class="breakdown-item expandable" data-brand="${escapeHtml(brand)}">
+          <div class="breakdown-header">
+            <span class="expand-icon">▶</span>
+            <span class="brand-name">${escapeHtml(brand)}</span>
+            <span class="brand-count">${count}件</span>
+          </div>
+          <div class="breakdown-items" style="display: none;">
+            <div class="loading-items">読み込み中...</div>
+          </div>
+        </div>
+      `).join('');
+
+      // 展開クリックイベント
+      breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+        item.querySelector('.breakdown-header').addEventListener('click', function() {
+          const brand = item.dataset.brand;
+          const itemsDiv = item.querySelector('.breakdown-items');
+          const expandIcon = item.querySelector('.expand-icon');
+
+          if (itemsDiv.style.display === 'none') {
+            itemsDiv.style.display = 'block';
+            expandIcon.textContent = '▼';
+            item.classList.add('expanded');
+            loadMyBrandItems(brand, itemsDiv, allItems);
+          } else {
+            itemsDiv.style.display = 'none';
+            expandIcon.textContent = '▶';
+            item.classList.remove('expanded');
+          }
+        });
+      });
+
+      // 展開状態を復元
+      expandedBrands.forEach(brand => {
+        const item = breakdownEl.querySelector(`.breakdown-item[data-brand="${brand}"]`);
+        if (item) {
+          const itemsDiv = item.querySelector('.breakdown-items');
+          const expandIcon = item.querySelector('.expand-icon');
+          if (itemsDiv && expandIcon) {
+            itemsDiv.style.display = 'block';
+            expandIcon.textContent = '▼';
+            item.classList.add('expanded');
+            loadMyBrandItems(brand, itemsDiv, allItems);
+          }
+        }
+      });
+    };
+
+    // 現在の状態で表示
+    renderBrands(isCurrentlyExpanded);
+
+    // トグルボタン設定
+    if (myBrandToggle && totalBrandCount > 10) {
+      myBrandToggle.textContent = isCurrentlyExpanded ? `(上位10件に戻す)` : `(上位10件 - 全${totalBrandCount}件表示)`;
+      myBrandToggle.style.display = 'inline';
+      myBrandToggle.onclick = () => {
+        const isExpanded = myBrandToggle.dataset.expanded === 'true';
+        myBrandToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+        myBrandToggle.textContent = isExpanded ? `(上位10件 - 全${totalBrandCount}件表示)` : `(上位10件に戻す)`;
+        breakdownEl.classList.toggle('expanded', !isExpanded);
+        renderBrands(!isExpanded);
+      };
+    } else if (myBrandToggle) {
+      myBrandToggle.style.display = totalBrandCount > 0 ? 'none' : 'none';
+    }
+  }
+
+  // ブランド分析タブを再読み込み
+  await loadMyAnalysisTabContent('brand-performance');
+
+  // カテゴリ分析タブも再読み込み
+  await loadMyAnalysisTabContent('category-performance');
 }
 
 /**
  * 自分のデータのカテゴリ別アイテム一覧を読み込む
  */
 function loadMyCategoryItems(category, container, allItems) {
+  const categoryLower = category.toLowerCase();
   const categoryItems = allItems.filter(item => {
-    const itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
-    return itemCategory === category;
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    let itemCategory;
+    if (item.categoryManual && item.category) {
+      itemCategory = item.category;
+    } else if (item.categoryCleared) {
+      itemCategory = '(未分類)';
+    } else {
+      itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
+    }
+    return itemCategory.toLowerCase() === categoryLower;
   });
 
   if (categoryItems.length === 0) {
@@ -1420,11 +1777,21 @@ function loadMyCategoryItems(category, container, allItems) {
 
   let html = `
     <div class="brand-items-list">
-      <table class="items-table">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox" data-category="${escapeHtml(category)}">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" data-category="${escapeHtml(category)}" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-uncategorize-btn" data-category="${escapeHtml(category)}" disabled>↩ 未分類に</button>
+      </div>
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
+            <th class="col-price">価格</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1433,16 +1800,189 @@ function loadMyCategoryItems(category, container, allItems) {
   categoryItems.forEach(item => {
     const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
     const title = item.title || '(タイトルなし)';
+    const itemId = item.id;
+    const source = item.saleDate ? 'sold' : 'active';
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
-        <td class="item-price">${price}</td>
+      <tr data-item-id="${itemId}" data-source="${source}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+            <button class="item-action-btn uncategorize" data-id="${itemId}" data-source="${source}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-category" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="カテゴリ変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMyCategoryItemActions(container, category, allItems);
+}
+
+/**
+ * 自分のデータのカテゴリ別アイテム操作イベントを設定
+ */
+function setupMyCategoryItemActions(container, category, allItems) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkUncategorizeBtn = container.querySelector('.bulk-uncategorize-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkUncategorizeBtn) bulkUncategorizeBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const activeIds = [];
+      const soldIds = [];
+      checked.forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        if (cb.dataset.source === 'sold') {
+          soldIds.push(id);
+        } else {
+          activeIds.push(id);
+        }
+      });
+
+      try {
+        if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
+        if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括未分類に移動
+  if (bulkUncategorizeBtn) {
+    bulkUncategorizeBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          if (cb.dataset.source === 'sold') {
+            await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true });
+          } else {
+            await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true });
+          }
+        }
+        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.deleteSoldItemById(id);
+        } else {
+          await BunsekiDB.deleteActiveListingById(id);
+        }
+        showAlert('削除しました', 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別未分類ボタン
+  container.querySelectorAll('.item-action-btn.uncategorize').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true });
+        }
+        showAlert('未分類に移動しました', 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  });
+
+  // カテゴリ変更ボタン
+  container.querySelectorAll('.item-action-btn.change-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`新しいカテゴリ名を入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true });
+        }
+        showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('変更エラー:', e);
+        showAlert('変更に失敗しました', 'error');
+      }
+    });
+  });
 }
 
 /**
@@ -1450,6 +1990,12 @@ function loadMyCategoryItems(category, container, allItems) {
  */
 function loadMyCategorySubItems(mainCategory, subCategory, container, allItems) {
   const categoryItems = allItems.filter(item => {
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    if (item.categoryManual && item.category) {
+      return item.category === subCategory || item.category === mainCategory;
+    } else if (item.categoryCleared) {
+      return false;
+    }
     const { main, sub } = detectCategoryWithSub(item.title);
     return main === mainCategory && sub === subCategory;
   });
@@ -1461,11 +2007,21 @@ function loadMyCategorySubItems(mainCategory, subCategory, container, allItems) 
 
   let html = `
     <div class="brand-items-list">
-      <table class="items-table">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-uncategorize-btn" disabled>↩ 未分類に</button>
+      </div>
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
+            <th class="col-price">価格</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1474,16 +2030,29 @@ function loadMyCategorySubItems(mainCategory, subCategory, container, allItems) 
   categoryItems.forEach(item => {
     const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
     const title = item.title || '(タイトルなし)';
+    const itemId = item.id;
+    const source = item.saleDate ? 'sold' : 'active';
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 60))}${title.length > 60 ? '...' : ''}</td>
-        <td class="item-price">${price}</td>
+      <tr data-item-id="${itemId}" data-source="${source}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+            <button class="item-action-btn uncategorize" data-id="${itemId}" data-source="${source}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-category" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="カテゴリ変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMyCategoryItemActions(container, subCategory, allItems);
 }
 
 /**
@@ -1491,6 +2060,12 @@ function loadMyCategorySubItems(mainCategory, subCategory, container, allItems) 
  */
 function loadMarketCategorySubItems(mainCategory, subCategory, container, allItems) {
   const categoryItems = allItems.filter(item => {
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    if (item.categoryManual && item.category) {
+      return item.category === subCategory || item.category === mainCategory;
+    } else if (item.categoryCleared) {
+      return false;
+    }
     const { main, sub } = detectCategoryWithSub(item.title);
     return main === mainCategory && sub === subCategory;
   });
@@ -1502,12 +2077,22 @@ function loadMarketCategorySubItems(mainCategory, subCategory, container, allIte
 
   let html = `
     <div class="brand-items-list">
-      <table class="items-table">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-uncategorize-btn" disabled>↩ 未分類に</button>
+      </div>
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
+            <th class="col-price">価格</th>
             <th>売上</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1517,17 +2102,160 @@ function loadMarketCategorySubItems(mainCategory, subCategory, container, allIte
     const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
     const title = item.title || '(タイトルなし)';
     const sold = item.sold || '-';
+    const itemId = item.id;
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 50))}${title.length > 50 ? '...' : ''}</td>
-        <td class="item-price">${price}</td>
+      <tr data-item-id="${itemId}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">${price}</td>
         <td class="item-sold">${sold}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" title="削除">🗑️</button>
+            <button class="item-action-btn uncategorize" data-id="${itemId}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-category" data-id="${itemId}" data-title="${escapeHtml(title)}" title="カテゴリ変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMarketCategorySubItemActions(container, mainCategory, subCategory, allItems);
+}
+
+/**
+ * 市場データのカテゴリ細分類アイテム操作イベントを設定
+ */
+function setupMarketCategorySubItemActions(container, mainCategory, subCategory, allItems) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkUncategorizeBtn = container.querySelector('.bulk-uncategorize-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkUncategorizeBtn) bulkUncategorizeBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+
+      try {
+        await BunsekiDB.deleteMarketDataByIds(ids);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括未分類に移動
+  if (bulkUncategorizeBtn) {
+    bulkUncategorizeBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
+        }
+        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        await BunsekiDB.deleteMarketDataById(id);
+        showAlert('削除しました', 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別未分類ボタン
+  container.querySelectorAll('.item-action-btn.uncategorize').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
+        showAlert('未分類に移動しました', 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  });
+
+  // カテゴリ変更ボタン
+  container.querySelectorAll('.item-action-btn.change-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`新しいカテゴリ名を入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true });
+        showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('変更エラー:', e);
+        showAlert('変更に失敗しました', 'error');
+      }
+    });
+  });
 }
 
 /**
@@ -1548,9 +2276,13 @@ async function toggleUnclassifiedList(type) {
     if (type === 'my') {
       const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
       unclassifiedItems = allItems.filter(item => {
-        // 常にタイトルから再判定（item.brandは信頼しない）
+        // 優先順位: 1. 手動設定 2. 未分類フラグ 3. AI分類 4. タイトルから判定
         let brand;
-        if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
+        if (item.brandManual && item.brand) {
+          brand = item.brand;
+        } else if (item.brandCleared) {
+          brand = null;
+        } else if (window.aiClassificationResults && window.aiClassificationResults[item.title]) {
           brand = window.aiClassificationResults[item.title].brand;
         } else {
           brand = extractBrandFromTitle(item.title);
@@ -1558,10 +2290,17 @@ async function toggleUnclassifiedList(type) {
         return !brand || brand === '(不明)' || brand === 'その他' || brand === '(未分類)' || brand === null;
       });
     } else {
-      const marketData = await BunsekiDB.getMarketData();
+      const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
       unclassifiedItems = (marketData || []).filter(item => {
-        // 常にタイトルから再判定（item.brandは信頼しない）
-        const brand = extractBrandFromTitle(item.title);
+        // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+        let brand;
+        if (item.brandManual && item.brand) {
+          brand = item.brand;
+        } else if (item.brandCleared) {
+          brand = null;
+        } else {
+          brand = extractBrandFromTitle(item.title);
+        }
         return !brand || brand === '(不明)' || brand === 'その他' || brand === '(未分類)' || brand === null;
       });
     }
@@ -1569,20 +2308,254 @@ async function toggleUnclassifiedList(type) {
     if (unclassifiedItems.length === 0) {
       itemsEl.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未分類のアイテムはありません</p>';
     } else {
-      // リストを生成（全件表示）
-      itemsEl.innerHTML = unclassifiedItems.map((item, idx) => `
-        <div class="unclassified-item">
-          <span class="item-index">${idx + 1}.</span>
-          <span class="item-title">${escapeHtml(item.title || '(タイトルなし)')}</span>
-          <span class="item-price">${item.price ? '$' + Number(item.price).toLocaleString() : ''}</span>
-        </div>
-      `).join('');
+      // アルファベット順にソート
+      unclassifiedItems.sort((a, b) => {
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+
+      // テーブル形式で表示（操作機能付き）
+      let html = `
+        <div class="unclassified-items-list">
+          <div class="items-bulk-actions">
+            <label class="select-all-label">
+              <input type="checkbox" class="select-all-checkbox">
+              全て選択
+            </label>
+            <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+            <button class="bulk-assign-btn" disabled>✏️ ブランド設定</button>
+            <span class="items-count">${unclassifiedItems.length}件</span>
+          </div>
+          <table class="items-table with-actions">
+            <thead>
+              <tr>
+                <th class="col-checkbox"></th>
+                <th>タイトル</th>
+                <th class="col-price">価格</th>
+                <th class="col-actions">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      unclassifiedItems.forEach(item => {
+        const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+        const title = item.title || '(タイトルなし)';
+        const itemId = item.id;
+        const source = type === 'my' ? (item.saleDate ? 'sold' : 'active') : 'market';
+        html += `
+          <tr data-item-id="${itemId}" data-source="${source}">
+            <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+            <td class="item-title">${escapeHtml(title)}</td>
+            <td class="col-price">${price}</td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+                <button class="item-action-btn assign-brand" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="ブランド設定">✏️</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table></div>';
+      itemsEl.innerHTML = html;
+
+      // イベントリスナー設定
+      setupUnclassifiedItemActions(itemsEl, type);
     }
 
     listEl.style.display = 'flex';
   } else {
     listEl.style.display = 'none';
   }
+}
+
+/**
+ * 未分類リストのアイテム操作イベントを設定
+ */
+function setupUnclassifiedItemActions(container, type) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkAssignBtn = container.querySelector('.bulk-assign-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkAssignBtn) bulkAssignBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      try {
+        if (type === 'my') {
+          const activeIds = [];
+          const soldIds = [];
+          checked.forEach(cb => {
+            const id = parseInt(cb.dataset.id);
+            if (cb.dataset.source === 'sold') {
+              soldIds.push(id);
+            } else {
+              activeIds.push(id);
+            }
+          });
+          if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
+          if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
+          showAlert(`${checked.length}件を削除しました`, 'success');
+          await refreshMyDataAnalysis();
+        } else {
+          const marketIds = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+          await BunsekiDB.deleteMarketDataByIds(marketIds);
+          showAlert(`${checked.length}件を削除しました`, 'success');
+          await refreshMarketDataAnalysis();
+        }
+        // リストを更新
+        const listEl = document.getElementById(type === 'my' ? 'myUnclassifiedList' : 'marketUnclassifiedList');
+        if (listEl) listEl.style.display = 'none';
+        toggleUnclassifiedList(type);
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括ブランド設定
+  if (bulkAssignBtn) {
+    bulkAssignBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      const newBrand = prompt(`${checked.length}件にブランドを設定します。\nブランド名を入力してください:`, '');
+      if (newBrand === null) return;
+      if (newBrand.trim() === '') {
+        showAlert('ブランド名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (type === 'my') {
+          for (const cb of checked) {
+            const id = parseInt(cb.dataset.id);
+            if (cb.dataset.source === 'sold') {
+              await BunsekiDB.updateSoldItemById(id, { brand: newBrand.trim(), brandManual: true });
+            } else {
+              await BunsekiDB.updateActiveListingById(id, { brand: newBrand.trim(), brandManual: true });
+            }
+          }
+          showAlert(`${checked.length}件に「${newBrand.trim()}」を設定しました`, 'success');
+          await refreshMyDataAnalysis();
+        } else {
+          for (const cb of checked) {
+            const id = parseInt(cb.dataset.id);
+            await BunsekiDB.updateMarketDataById(id, { brand: newBrand.trim(), brandManual: true });
+          }
+          showAlert(`${checked.length}件に「${newBrand.trim()}」を設定しました`, 'success');
+          await refreshMarketDataAnalysis();
+        }
+        // リストを更新
+        const listEl = document.getElementById(type === 'my' ? 'myUnclassifiedList' : 'marketUnclassifiedList');
+        if (listEl) listEl.style.display = 'none';
+        toggleUnclassifiedList(type);
+      } catch (e) {
+        console.error('ブランド設定エラー:', e);
+        showAlert('ブランド設定に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.deleteSoldItemById(id);
+        } else if (source === 'active') {
+          await BunsekiDB.deleteActiveListingById(id);
+        } else {
+          await BunsekiDB.deleteMarketDataById(id);
+        }
+        showAlert('削除しました', 'success');
+        if (type === 'my') {
+          await refreshMyDataAnalysis();
+        } else {
+          await refreshMarketDataAnalysis();
+        }
+        // リストを更新
+        const listEl = document.getElementById(type === 'my' ? 'myUnclassifiedList' : 'marketUnclassifiedList');
+        if (listEl) listEl.style.display = 'none';
+        toggleUnclassifiedList(type);
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別ブランド設定ボタン
+  container.querySelectorAll('.item-action-btn.assign-brand').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+      const title = btn.dataset.title;
+
+      const newBrand = prompt(`ブランド名を入力してください:\n\n${title}`, '');
+      if (newBrand === null) return;
+      if (newBrand.trim() === '') {
+        showAlert('ブランド名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { brand: newBrand.trim(), brandManual: true });
+        } else if (source === 'active') {
+          await BunsekiDB.updateActiveListingById(id, { brand: newBrand.trim(), brandManual: true });
+        } else {
+          await BunsekiDB.updateMarketDataById(id, { brand: newBrand.trim(), brandManual: true });
+        }
+        showAlert(`ブランドを「${newBrand.trim()}」に設定しました`, 'success');
+        if (type === 'my') {
+          await refreshMyDataAnalysis();
+        } else {
+          await refreshMarketDataAnalysis();
+        }
+        // リストを更新
+        const listEl = document.getElementById(type === 'my' ? 'myUnclassifiedList' : 'marketUnclassifiedList');
+        if (listEl) listEl.style.display = 'none';
+        toggleUnclassifiedList(type);
+      } catch (e) {
+        console.error('ブランド設定エラー:', e);
+        showAlert('ブランド設定に失敗しました', 'error');
+      }
+    });
+  });
 }
 
 /**
@@ -1876,8 +2849,15 @@ async function analyzeMarketData() {
 function loadMarketBrandItems(brand, container, marketData) {
   const brandLower = brand.toLowerCase();
   const brandItems = marketData.filter(item => {
-    // 常にタイトルからブランドを判定（集計時と同じロジック）
-    const itemBrand = extractBrandFromTitle(item.title) || '(未分類)';
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    let itemBrand;
+    if (item.brandManual && item.brand) {
+      itemBrand = item.brand;
+    } else if (item.brandCleared) {
+      itemBrand = '(未分類)';
+    } else {
+      itemBrand = extractBrandFromTitle(item.title) || '(未分類)';
+    }
     return itemBrand.toLowerCase() === brandLower;
   });
 
@@ -1891,15 +2871,23 @@ function loadMarketBrandItems(brand, container, marketData) {
 
   let html = `
     <div class="brand-items-list">
-      <div class="items-header">
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox" data-brand="${escapeHtml(brand)}">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" data-brand="${escapeHtml(brand)}" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-unclassify-btn" data-brand="${escapeHtml(brand)}" disabled>↩ 未分類に</button>
         <span class="items-count">${brandItems.length}件</span>
       </div>
-      <table class="items-table">
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
-            <th>売上数</th>
+            <th class="col-price">価格</th>
+            <th class="col-sold">売上</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1907,11 +2895,20 @@ function loadMarketBrandItems(brand, container, marketData) {
 
   brandItems.forEach(item => {
     const title = item.title || '';
+    const itemId = item.id;
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 80))}${title.length > 80 ? '...' : ''}</td>
-        <td class="item-price">$${(item.price || 0).toLocaleString()}</td>
-        <td class="item-sold">${item.sold || 0}</td>
+      <tr data-item-id="${itemId}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">$${(item.price || 0).toLocaleString()}</td>
+        <td class="col-sold">${item.sold || 0}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" title="削除">🗑️</button>
+            <button class="item-action-btn unclassify" data-id="${itemId}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-brand" data-id="${itemId}" data-title="${escapeHtml(title)}" title="ブランド変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
@@ -1923,15 +2920,182 @@ function loadMarketBrandItems(brand, container, marketData) {
   `;
 
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMarketDataItemActions(container, brand);
+}
+
+/**
+ * 市場データのアイテム操作イベントを設定
+ */
+function setupMarketDataItemActions(container, brand) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkUnclassifyBtn = container.querySelector('.bulk-unclassify-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkUnclassifyBtn) bulkUnclassifyBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+
+      try {
+        await BunsekiDB.deleteMarketDataByIds(ids);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await refreshMarketDataAnalysis();
+      } catch (e) {
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括未分類に移動
+  if (bulkUnclassifyBtn) {
+    bulkUnclassifyBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          await BunsekiDB.updateMarketDataById(id, { brand: null, brandCleared: true });
+        }
+        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
+        await refreshMarketDataAnalysis();
+      } catch (e) {
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        await BunsekiDB.deleteMarketDataById(id);
+        showAlert('削除しました', 'success');
+        await refreshMarketDataAnalysis();
+      } catch (e) {
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別未分類ボタン
+  container.querySelectorAll('.item-action-btn.unclassify').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { brand: null, brandCleared: true });
+        showAlert('未分類に移動しました', 'success');
+        await refreshMarketDataAnalysis();
+      } catch (e) {
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  });
+
+  // ブランド変更ボタン
+  container.querySelectorAll('.item-action-btn.change-brand').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const title = btn.dataset.title;
+
+      const newBrand = prompt(`新しいブランド名を入力してください:\n\n${title}`, '');
+      if (newBrand === null) return;
+      if (newBrand.trim() === '') {
+        showAlert('ブランド名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { brand: newBrand.trim(), brandManual: true });
+        showAlert(`ブランドを「${newBrand.trim()}」に変更しました`, 'success');
+        await refreshMarketDataAnalysis();
+      } catch (e) {
+        showAlert('変更に失敗しました', 'error');
+      }
+    });
+  });
+}
+
+/**
+ * 市場データの分析を再実行
+ */
+async function refreshMarketDataAnalysis() {
+  // 展開中のブランドを記録
+  const expandedBrands = [];
+  document.querySelectorAll('#marketBrandBreakdown .breakdown-item.expanded').forEach(item => {
+    expandedBrands.push(item.dataset.brand);
+  });
+
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
+  restoreMarketDataAnalysisResult(marketData);
+
+  // 展開状態を復元
+  expandedBrands.forEach(brand => {
+    const item = document.querySelector(`#marketBrandBreakdown .breakdown-item[data-brand="${brand}"]`);
+    if (item) {
+      const itemsDiv = item.querySelector('.breakdown-items');
+      const expandIcon = item.querySelector('.expand-icon');
+      if (itemsDiv && expandIcon) {
+        itemsDiv.style.display = 'block';
+        expandIcon.textContent = '▼';
+        item.classList.add('expanded');
+        loadMarketBrandItems(brand, itemsDiv, marketData);
+      }
+    }
+  });
 }
 
 /**
  * 市場データのカテゴリ別アイテム一覧を読み込む
  */
 function loadMarketCategoryItems(category, container, marketData) {
+  const categoryLower = category.toLowerCase();
   const categoryItems = marketData.filter(item => {
-    const itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
-    return itemCategory === category;
+    // 優先順位: 1. 手動設定 2. 未分類フラグ 3. タイトルから判定
+    let itemCategory;
+    if (item.categoryManual && item.category) {
+      itemCategory = item.category;
+    } else if (item.categoryCleared) {
+      itemCategory = '(未分類)';
+    } else {
+      itemCategory = detectCategoryFromTitle(item.title) || '(未分類)';
+    }
+    return itemCategory.toLowerCase() === categoryLower;
   });
 
   if (categoryItems.length === 0) {
@@ -1944,15 +3108,22 @@ function loadMarketCategoryItems(category, container, marketData) {
 
   let html = `
     <div class="brand-items-list">
-      <div class="items-header">
-        <span class="items-count">${categoryItems.length}件</span>
+      <div class="items-bulk-actions">
+        <label class="select-all-label">
+          <input type="checkbox" class="select-all-checkbox" data-category="${escapeHtml(category)}">
+          全て選択
+        </label>
+        <button class="bulk-delete-btn" data-category="${escapeHtml(category)}" disabled>🗑️ 選択を削除</button>
+        <button class="bulk-uncategorize-btn" data-category="${escapeHtml(category)}" disabled>↩ 未分類に</button>
       </div>
-      <table class="items-table">
+      <table class="items-table with-actions">
         <thead>
           <tr>
+            <th class="col-checkbox"></th>
             <th>タイトル</th>
-            <th>価格</th>
+            <th class="col-price">価格</th>
             <th>売上数</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -1960,22 +3131,160 @@ function loadMarketCategoryItems(category, container, marketData) {
 
   categoryItems.forEach(item => {
     const title = item.title || '';
+    const itemId = item.id;
     html += `
-      <tr>
-        <td class="item-title" title="${escapeHtml(title)}">${escapeHtml(title.substring(0, 80))}${title.length > 80 ? '...' : ''}</td>
-        <td class="item-price">$${(item.price || 0).toLocaleString()}</td>
+      <tr data-item-id="${itemId}">
+        <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}"></td>
+        <td class="item-title">${escapeHtml(title)}</td>
+        <td class="col-price">$${(item.price || 0).toLocaleString()}</td>
         <td class="item-sold">${item.sold || 0}</td>
+        <td class="col-actions">
+          <div class="action-buttons">
+            <button class="item-action-btn delete" data-id="${itemId}" title="削除">🗑️</button>
+            <button class="item-action-btn uncategorize" data-id="${itemId}" title="未分類に移動">↩</button>
+            <button class="item-action-btn change-category" data-id="${itemId}" data-title="${escapeHtml(title)}" title="カテゴリ変更">✏️</button>
+          </div>
+        </td>
       </tr>
     `;
   });
 
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
-
+  html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // イベントリスナー設定
+  setupMarketCategoryItemActions(container, category, marketData);
+}
+
+/**
+ * 市場データのカテゴリ別アイテム操作イベントを設定
+ */
+function setupMarketCategoryItemActions(container, category, marketData) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkUncategorizeBtn = container.querySelector('.bulk-uncategorize-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkUncategorizeBtn) bulkUncategorizeBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+
+      try {
+        await BunsekiDB.deleteMarketDataByIds(ids);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括未分類に移動
+  if (bulkUncategorizeBtn) {
+    bulkUncategorizeBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件を未分類に移動しますか？`)) return;
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
+        }
+        showAlert(`${checked.length}件を未分類に移動しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        await BunsekiDB.deleteMarketDataById(id);
+        showAlert('削除しました', 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別未分類ボタン
+  container.querySelectorAll('.item-action-btn.uncategorize').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { category: null, categoryCleared: true });
+        showAlert('未分類に移動しました', 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('移動エラー:', e);
+        showAlert('移動に失敗しました', 'error');
+      }
+    });
+  });
+
+  // カテゴリ変更ボタン
+  container.querySelectorAll('.item-action-btn.change-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`新しいカテゴリ名を入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        await BunsekiDB.updateMarketDataById(id, { category: newCategory.trim(), categoryManual: true });
+        showAlert(`カテゴリを「${newCategory.trim()}」に変更しました`, 'success');
+        await restoreMarketDataAnalysisResult();
+      } catch (e) {
+        console.error('変更エラー:', e);
+        showAlert('変更に失敗しました', 'error');
+      }
+    });
+  });
 }
 
 /**
@@ -3572,8 +4881,14 @@ function generateBrandPerformanceAnalysis() {
     const brandNameNoSpace = brandNameLower.replace(/\s+/g, '');
     let matchCount = 0;
 
-    // ブランド判定関数（AI分類を優先）
+    // ブランド判定関数（手動設定 > 未分類フラグ > AI分類 > タイトル判定）
     const getItemBrand = (item) => {
+      if (item.brandManual && item.brand) {
+        return item.brand;
+      }
+      if (item.brandCleared) {
+        return '(不明)';
+      }
       if (aiClassifications[item.title] && aiClassifications[item.title].brand) {
         return aiClassifications[item.title].brand;
       }
@@ -4435,12 +5750,281 @@ function generateCategoryPerformanceAnalysis() {
     </div>
   `;
 
+  // カテゴリ未分類アイテムを計算
+  const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
+  const uncategorizedItems = allItems.filter(item => {
+    let itemCategory;
+    if (item.categoryManual && item.category) {
+      itemCategory = item.category;
+    } else if (item.categoryCleared) {
+      itemCategory = null;
+    } else {
+      itemCategory = detectCategoryFromTitle(item.title);
+    }
+    return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+  });
+
+  // 未分類セクションを追加
+  html += `
+    <div class="unclassified-section" style="margin-top: 20px;">
+      <h4>
+        <span class="unclassified-toggle" id="myCategoryUnclassifiedToggle" style="cursor: pointer;">
+          ▶ カテゴリ未分類 (<span id="myCategoryUnclassifiedCount">${uncategorizedItems.length}</span>件)
+        </span>
+      </h4>
+      <div id="myCategoryUnclassifiedList" style="display: none;">
+        <div id="myCategoryUnclassifiedItems">
+          <div class="loading-items">読み込み中...</div>
+        </div>
+      </div>
+    </div>
+  `;
+
   // 展開イベントリスナーを設定
   setTimeout(() => {
     setupCategoryExpandListeners();
+    setupCategoryUnclassifiedToggle();
   }, 50);
 
   return html;
+}
+
+/**
+ * カテゴリ未分類トグルのイベントリスナーを設定
+ */
+function setupCategoryUnclassifiedToggle() {
+  const toggleEl = document.getElementById('myCategoryUnclassifiedToggle');
+  const listEl = document.getElementById('myCategoryUnclassifiedList');
+  const itemsEl = document.getElementById('myCategoryUnclassifiedItems');
+
+  if (!toggleEl || !listEl || !itemsEl) return;
+
+  toggleEl.addEventListener('click', async () => {
+    if (listEl.style.display === 'none') {
+      listEl.style.display = 'block';
+      toggleEl.textContent = toggleEl.textContent.replace('▶', '▼');
+
+      // 未分類アイテムを読み込み
+      const allItems = [...(analyzer.activeListings || []), ...(analyzer.soldItems || [])];
+      const uncategorizedItems = allItems.filter(item => {
+        let itemCategory;
+        if (item.categoryManual && item.category) {
+          itemCategory = item.category;
+        } else if (item.categoryCleared) {
+          itemCategory = null;
+        } else {
+          itemCategory = detectCategoryFromTitle(item.title);
+        }
+        return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
+      });
+
+      // アルファベット順でソート
+      uncategorizedItems.sort((a, b) => {
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+
+      if (uncategorizedItems.length === 0) {
+        itemsEl.innerHTML = '<p class="no-items">未分類のアイテムはありません</p>';
+        return;
+      }
+
+      let html = `
+        <div class="brand-items-list">
+          <div class="items-bulk-actions">
+            <label class="select-all-label">
+              <input type="checkbox" class="select-all-checkbox">
+              全て選択
+            </label>
+            <button class="bulk-delete-btn" disabled>🗑️ 選択を削除</button>
+            <button class="bulk-assign-btn" disabled>📁 カテゴリ割当</button>
+          </div>
+          <table class="items-table with-actions">
+            <thead>
+              <tr>
+                <th class="col-checkbox"></th>
+                <th>タイトル</th>
+                <th class="col-price">価格</th>
+                <th class="col-actions">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      uncategorizedItems.forEach(item => {
+        const price = item.price ? '$' + Number(item.price).toLocaleString() : '-';
+        const title = item.title || '(タイトルなし)';
+        const itemId = item.id;
+        const source = item.saleDate ? 'sold' : 'active';
+        html += `
+          <tr data-item-id="${itemId}" data-source="${source}">
+            <td class="col-checkbox"><input type="checkbox" class="item-checkbox" data-id="${itemId}" data-source="${source}"></td>
+            <td class="item-title">${escapeHtml(title)}</td>
+            <td class="col-price">${price}</td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <button class="item-action-btn delete" data-id="${itemId}" data-source="${source}" title="削除">🗑️</button>
+                <button class="item-action-btn assign-category" data-id="${itemId}" data-source="${source}" data-title="${escapeHtml(title)}" title="カテゴリ割当">📁</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table></div>';
+      itemsEl.innerHTML = html;
+
+      // イベントリスナー設定
+      setupMyCategoryUnclassifiedActions(itemsEl);
+    } else {
+      listEl.style.display = 'none';
+      toggleEl.textContent = toggleEl.textContent.replace('▼', '▶');
+    }
+  });
+}
+
+/**
+ * 自分のデータのカテゴリ未分類アイテム操作イベントを設定
+ */
+function setupMyCategoryUnclassifiedActions(container) {
+  const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+  const itemCheckboxes = container.querySelectorAll('.item-checkbox');
+  const bulkDeleteBtn = container.querySelector('.bulk-delete-btn');
+  const bulkAssignBtn = container.querySelector('.bulk-assign-btn');
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      itemCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+      updateBulkButtonState();
+    });
+  }
+
+  itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkButtonState);
+  });
+
+  function updateBulkButtonState() {
+    const checkedCount = container.querySelectorAll('.item-checkbox:checked').length;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = checkedCount === 0;
+    if (bulkAssignBtn) bulkAssignBtn.disabled = checkedCount === 0;
+  }
+
+  // 一括削除
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      if (!confirm(`${checked.length}件のデータを削除しますか？`)) return;
+
+      const activeIds = [];
+      const soldIds = [];
+      checked.forEach(cb => {
+        const id = parseInt(cb.dataset.id);
+        if (cb.dataset.source === 'sold') {
+          soldIds.push(id);
+        } else {
+          activeIds.push(id);
+        }
+      });
+
+      try {
+        if (activeIds.length > 0) await BunsekiDB.deleteActiveListingsByIds(activeIds);
+        if (soldIds.length > 0) await BunsekiDB.deleteSoldItemsByIds(soldIds);
+        showAlert(`${checked.length}件を削除しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 一括カテゴリ割当
+  if (bulkAssignBtn) {
+    bulkAssignBtn.addEventListener('click', async () => {
+      const checked = container.querySelectorAll('.item-checkbox:checked');
+      if (checked.length === 0) return;
+
+      const newCategory = prompt(`${checked.length}件のカテゴリを設定してください:`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        for (const cb of checked) {
+          const id = parseInt(cb.dataset.id);
+          if (cb.dataset.source === 'sold') {
+            await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+          } else {
+            await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+          }
+        }
+        showAlert(`${checked.length}件を「${newCategory.trim()}」に設定しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  }
+
+  // 個別削除ボタン
+  container.querySelectorAll('.item-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+
+      if (!confirm('このデータを削除しますか？')) return;
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.deleteSoldItemById(id);
+        } else {
+          await BunsekiDB.deleteActiveListingById(id);
+        }
+        showAlert('削除しました', 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('削除エラー:', e);
+        showAlert('削除に失敗しました', 'error');
+      }
+    });
+  });
+
+  // 個別カテゴリ割当ボタン
+  container.querySelectorAll('.item-action-btn.assign-category').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const source = btn.dataset.source;
+      const title = btn.dataset.title;
+
+      const newCategory = prompt(`カテゴリを入力してください:\n\n${title}`, '');
+      if (newCategory === null) return;
+      if (newCategory.trim() === '') {
+        showAlert('カテゴリ名を入力してください', 'warning');
+        return;
+      }
+
+      try {
+        if (source === 'sold') {
+          await BunsekiDB.updateSoldItemById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        } else {
+          await BunsekiDB.updateActiveListingById(id, { category: newCategory.trim(), categoryManual: true, categoryCleared: false });
+        }
+        showAlert(`カテゴリを「${newCategory.trim()}」に設定しました`, 'success');
+        await refreshMyDataAnalysis();
+      } catch (e) {
+        console.error('割当エラー:', e);
+        showAlert('割当に失敗しました', 'error');
+      }
+    });
+  });
 }
 
 /**

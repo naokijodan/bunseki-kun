@@ -913,6 +913,163 @@ const BunsekiDB = {
     });
   },
 
+  // ========================================
+  // 個別データ操作（削除・更新）
+  // ========================================
+
+  /**
+   * 個別データを削除（activeListings）
+   */
+  async deleteActiveListingById(id) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('activeListings', 'readwrite');
+      const store = tx.objectStore('activeListings');
+      store.delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 個別データを削除（soldItems）
+   */
+  async deleteSoldItemById(id) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('soldItems', 'readwrite');
+      const store = tx.objectStore('soldItems');
+      store.delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 個別データを削除（marketData）
+   */
+  async deleteMarketDataById(id) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('marketData', 'readwrite');
+      const store = tx.objectStore('marketData');
+      store.delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 個別データを更新（activeListings）
+   */
+  async updateActiveListingById(id, updates) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('activeListings', 'readwrite');
+      const store = tx.objectStore('activeListings');
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result;
+        if (record) {
+          const updatedRecord = { ...record, ...updates };
+          store.put(updatedRecord);
+        }
+      };
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 個別データを更新（soldItems）
+   */
+  async updateSoldItemById(id, updates) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('soldItems', 'readwrite');
+      const store = tx.objectStore('soldItems');
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result;
+        if (record) {
+          const updatedRecord = { ...record, ...updates };
+          store.put(updatedRecord);
+        }
+      };
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 個別データを更新（marketData）
+   */
+  async updateMarketDataById(id, updates) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('marketData', 'readwrite');
+      const store = tx.objectStore('marketData');
+      const getRequest = store.get(id);
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result;
+        if (record) {
+          const updatedRecord = { ...record, ...updates };
+          store.put(updatedRecord);
+        }
+      };
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 複数のデータを一括削除（activeListings）
+   */
+  async deleteActiveListingsByIds(ids) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('activeListings', 'readwrite');
+      const store = tx.objectStore('activeListings');
+      ids.forEach(id => store.delete(id));
+      tx.oncomplete = () => resolve(ids.length);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 複数のデータを一括削除（soldItems）
+   */
+  async deleteSoldItemsByIds(ids) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('soldItems', 'readwrite');
+      const store = tx.objectStore('soldItems');
+      ids.forEach(id => store.delete(id));
+      tx.oncomplete = () => resolve(ids.length);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  /**
+   * 複数のデータを一括削除（marketData）
+   */
+  async deleteMarketDataByIds(ids) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.getTransaction('marketData', 'readwrite');
+      const store = tx.objectStore('marketData');
+      ids.forEach(id => store.delete(id));
+      tx.oncomplete = () => resolve(ids.length);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
   /**
    * 指定シートのデータを全て削除
    */
