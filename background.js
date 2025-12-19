@@ -1118,7 +1118,7 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
   }
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('BunsekiKunDB', 9);
+    const request = indexedDB.open('BunsekiKunDB', 10);
 
     request.onerror = () => reject(new Error('IndexedDB接続エラー'));
 
@@ -1172,6 +1172,20 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
         }
       }
 
+      // バージョン10: titleLowerインデックスをunique: falseに再作成
+      if (oldVersion < 10 && oldVersion > 0) {
+        console.log('[background] Upgrading to version 10: fixing titleLower index...');
+        if (db.objectStoreNames.contains('marketData')) {
+          const marketStore = tx.objectStore('marketData');
+          // 古いインデックスを削除して再作成
+          if (marketStore.indexNames.contains('titleLower')) {
+            marketStore.deleteIndex('titleLower');
+          }
+          marketStore.createIndex('titleLower', 'titleLower', { unique: false });
+          console.log('[background] titleLower index recreated with unique: false');
+        }
+      }
+
       // 分析結果キャッシュ
       if (!db.objectStoreNames.contains('analysisCache')) {
         db.createObjectStore('analysisCache', { keyPath: 'key' });
@@ -1199,7 +1213,7 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
         });
       }
 
-      console.log('[background] IndexedDB schema upgraded to version 9');
+      console.log('[background] IndexedDB schema upgraded to version 10');
     };
 
     request.onsuccess = (event) => {

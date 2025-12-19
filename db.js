@@ -5,7 +5,7 @@
 
 const BunsekiDB = {
   dbName: 'BunsekiKunDB',
-  dbVersion: 9,  // バージョン9: シート独立データ強化
+  dbVersion: 10,  // バージョン10: titleLowerインデックスをunique: falseに修正
   db: null,
   currentSheetId: 'sheet1',  // 現在選択中のシート
 
@@ -25,7 +25,7 @@ const BunsekiDB = {
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('IndexedDB initialized (version 9)');
+        console.log('IndexedDB initialized (version 10)');
         resolve(this.db);
       };
 
@@ -113,7 +113,21 @@ const BunsekiDB = {
           });
         }
 
-        console.log('IndexedDB schema upgraded to version 9');
+        // バージョン10: titleLowerインデックスをunique: falseに再作成
+        if (oldVersion < 10 && oldVersion > 0) {
+          console.log('[BunsekiDB] Upgrading to version 10: fixing titleLower index...');
+          if (db.objectStoreNames.contains('marketData')) {
+            const marketStore = tx.objectStore('marketData');
+            // 古いインデックスを削除して再作成
+            if (marketStore.indexNames.contains('titleLower')) {
+              marketStore.deleteIndex('titleLower');
+            }
+            marketStore.createIndex('titleLower', 'titleLower', { unique: false });
+            console.log('[BunsekiDB] titleLower index recreated with unique: false');
+          }
+        }
+
+        console.log('IndexedDB schema upgraded to version 10');
       };
     });
   },

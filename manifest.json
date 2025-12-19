@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ぶんせき君",
   "short_name": "ぶんせき君",
-  "version": "4.5.2",
+  "version": "4.5.3",
   "description": "eBay出品データを分析し、市場比較・競合分析・AI提案を行う統合ツール（OpenAI, Claude, Gemini対応）",
   "permissions": [
     "storage",
