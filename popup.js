@@ -8633,6 +8633,10 @@ function detectCategoryFromTitle(title) {
     { pattern: /\bwatches\b/i, category: '時計・ジュエリー' },
     { pattern: /\btimepiece/i, category: '時計・ジュエリー' },
     { pattern: /\bchronograph/i, category: '時計・ジュエリー' },
+    { pattern: /\bautomatic\s+\d+mm/i, category: '時計・ジュエリー' },
+    { pattern: /\bquartz\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bself[- ]?winding/i, category: '時計・ジュエリー' },
+    { pattern: /\bmanual[- ]?wind/i, category: '時計・ジュエリー' },
     // 時計ブランド
     { pattern: /\brolex\b/i, category: '時計・ジュエリー' },
     { pattern: /\bomega\b/i, category: '時計・ジュエリー' },
@@ -8647,6 +8651,50 @@ function detectCategoryFromTitle(title) {
     { pattern: /\btudor\b/i, category: '時計・ジュエリー' },
     { pattern: /\blongines\b/i, category: '時計・ジュエリー' },
     { pattern: /\btissot\b/i, category: '時計・ジュエリー' },
+    { pattern: /\borient\b/i, category: '時計・ジュエリー' },
+    { pattern: /\brado\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bhamilton\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bmovado\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bfossil\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bbulova\b/i, category: '時計・ジュエリー' },
+    { pattern: /\binvicta\b/i, category: '時計・ジュエリー' },
+    { pattern: /\biwc\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bzenith\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bhublot\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bpanerai\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bjaeger[- ]?lecoultre/i, category: '時計・ジュエリー' },
+    { pattern: /\bvacheron/i, category: '時計・ジュエリー' },
+    { pattern: /\bbreguet\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bblancpain\b/i, category: '時計・ジュエリー' },
+    { pattern: /\boris\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bmido\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bcertina\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bdoxa\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bfrederick constant/i, category: '時計・ジュエリー' },
+    { pattern: /\bmontblanc/i, category: '時計・ジュエリー' },
+    { pattern: /\bbell\s*&?\s*ross/i, category: '時計・ジュエリー' },
+    // ジュエリーキーワード
+    { pattern: /\bnecklace\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bpendant\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bbracelet\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bbangle\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bearring/i, category: '時計・ジュエリー' },
+    { pattern: /\bbrooch\b/i, category: '時計・ジュエリー' },
+    { pattern: /\b18k\b/i, category: '時計・ジュエリー' },
+    { pattern: /\b14k\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bsterling\s*silver/i, category: '時計・ジュエリー' },
+    { pattern: /\bdiamond\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bpearl\b/i, category: '時計・ジュエリー' },
+    // ジュエリーブランド
+    { pattern: /\btiffany/i, category: '時計・ジュエリー' },
+    { pattern: /\bcartier\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bbvlgari\b/i, category: '時計・ジュエリー' },
+    { pattern: /\bvan\s*cleef/i, category: '時計・ジュエリー' },
+    { pattern: /\bvivienne\s*westwood/i, category: '時計・ジュエリー' },
+    { pattern: /\bswarovski\b/i, category: '時計・ジュエリー' },
+    // 衣類アクセサリー（時計・ジュエリーより後に判定）
+    { pattern: /\bnecktie\b/i, category: '衣類・靴・アクセサリー' },
+    { pattern: /\bscarf\b/i, category: '衣類・靴・アクセサリー' },
   ];
 
   // 優先ルールを先にチェック
@@ -8692,6 +8740,10 @@ function detectCategoryWithSub(title) {
 
   const titleLower = title.toLowerCase();
 
+  // ========================================
+  // 優先ルール: 時計・ジュエリーを衣類より先に判定
+  // ========================================
+
   // 時計の優先ルール（「dress watch」などが衣類にマッチするのを防ぐ）
   const watchPriorityPatterns = [
     /dress\s*wristwatch/i,
@@ -8701,6 +8753,11 @@ function detectCategoryWithSub(title) {
     /\bwatches\b/i,
     /\btimepiece/i,
     /\bchronograph/i,
+    /\bautomatic\s+\d+mm/i,  // "Automatic 37mm" などの時計パターン
+    /\bquartz\b/i,           // クォーツ時計
+    /\bself[- ]?winding/i,   // 自動巻き
+    /\bmanual[- ]?wind/i,    // 手巻き
+    // 時計ブランド
     /\brolex\b/i,
     /\bomega\b/i,
     /\btag heuer\b/i,
@@ -8715,24 +8772,149 @@ function detectCategoryWithSub(title) {
     /\blongines\b/i,
     /\btissot\b/i,
     /\borient\b/i,
+    /\brado\b/i,
+    /\bhamilton\b/i,
+    /\bmovado\b/i,
+    /\bfossil\b/i,
+    /\bbulova\b/i,
+    /\binvicta\b/i,
+    /\biwc\b/i,
+    /\bzenith\b/i,
+    /\bhublot\b/i,
+    /\bpanerai\b/i,
+    /\bjaeger[- ]?lecoultre/i,
+    /\bvacheron/i,
+    /\bbreguet\b/i,
+    /\bblancpain\b/i,
+    /\boris\b/i,
+    /\bmido\b/i,
+    /\bcertina\b/i,
+    /\bdoxa\b/i,
+    /\bfrederick constant/i,
+    /\bmontblanc/i,
+    /\bbell\s*&?\s*ross/i,
   ];
 
   // 時計パターンに一致したら、時計カテゴリとして処理
   for (const pattern of watchPriorityPatterns) {
     if (pattern.test(titleLower)) {
-      // 時計の細分類を判定
-      const watchCategory = ANALYSIS_CATEGORIES.watches_jewelry;
-      if (watchCategory && watchCategory.subcategories) {
-        for (const [subKey, subCat] of Object.entries(watchCategory.subcategories)) {
-          for (const subKeyword of subCat.keywords) {
-            if (titleLower.includes(subKeyword.toLowerCase())) {
-              return { main: '時計・ジュエリー', sub: subCat.nameJa };
-            }
+      return { main: '時計・ジュエリー', sub: '腕時計' };
+    }
+  }
+
+  // ジュエリーの優先ルール（「Fashion Accessory」などで衣類にマッチするのを防ぐ）
+  const jewelryPriorityPatterns = [
+    // ジュエリーアイテム
+    { pattern: /\bnecklace\b/i, sub: 'ネックレス・ペンダント' },
+    { pattern: /\bpendant\b/i, sub: 'ネックレス・ペンダント' },
+    { pattern: /\bchain\b/i, sub: 'ネックレス・ペンダント', excludes: ['key chain', 'keychain', 'wallet chain'] },
+    { pattern: /\bchoker\b/i, sub: 'ネックレス・ペンダント' },
+    { pattern: /\bbracelet\b/i, sub: 'ブレスレット・バングル' },
+    { pattern: /\bbangle\b/i, sub: 'ブレスレット・バングル' },
+    { pattern: /\bcuff\b/i, sub: 'ブレスレット・バングル', excludes: ['cufflink', 'cuff link', 'ear cuff'] },
+    { pattern: /\bearring/i, sub: 'ピアス・イヤリング' },
+    { pattern: /\bear\s*ring/i, sub: 'ピアス・イヤリング' },
+    { pattern: /\bstud\b/i, sub: 'ピアス・イヤリング' },
+    { pattern: /\bhoop\b/i, sub: 'ピアス・イヤリング' },
+    { pattern: /\bbrooch\b/i, sub: 'ブローチ・ピン' },
+    { pattern: /\blapel\s*pin/i, sub: 'ブローチ・ピン' },
+    { pattern: /\b(?:engagement|wedding|cocktail|signet|diamond|gold|silver|platinum)\s*ring/i, sub: 'リング・指輪' },
+    // 素材・宝石キーワード（ジュエリーの可能性が高い）
+    { pattern: /\b18k\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\b14k\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\b10k\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bsterling\s*silver/i, sub: 'ファインジュエリー' },
+    { pattern: /\b925\s*silver/i, sub: 'ファインジュエリー' },
+    { pattern: /\bdiamond\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bpearl\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bruby\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bsapphire\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bemerald\b/i, sub: 'ファインジュエリー' },
+    // ジュエリーブランド
+    { pattern: /\btiffany/i, sub: 'ファインジュエリー' },
+    { pattern: /\bcartier\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bbvlgari\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bbulgari\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bvan\s*cleef/i, sub: 'ファインジュエリー' },
+    { pattern: /\bharry\s*winston/i, sub: 'ファインジュエリー' },
+    { pattern: /\bdavid\s*yurman/i, sub: 'ファインジュエリー' },
+    { pattern: /\bmikimoto\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bpandora\b/i, sub: 'ブレスレット・バングル' },
+    { pattern: /\bswarovski\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bchopard\b/i, sub: 'ファインジュエリー' },
+    { pattern: /\bvivienne\s*westwood/i, sub: 'ファインジュエリー' },
+  ];
+
+  for (const rule of jewelryPriorityPatterns) {
+    if (rule.pattern.test(titleLower)) {
+      // 除外パターンがあればチェック
+      if (rule.excludes) {
+        let excluded = false;
+        for (const exc of rule.excludes) {
+          if (titleLower.includes(exc.toLowerCase())) {
+            excluded = true;
+            break;
           }
         }
+        if (excluded) continue;
       }
-      // 細分類が見つからなければ「腕時計」として返す
-      return { main: '時計・ジュエリー', sub: '腕時計' };
+      return { main: '時計・ジュエリー', sub: rule.sub };
+    }
+  }
+
+  // 衣類・アクセサリーの優先細分類ルール
+  const clothingPriorityRules = [
+    // ネクタイは衣類アクセサリー
+    { pattern: /\bnecktie\b/i, sub: 'アクセサリー' },
+    { pattern: /\btie\b/i, sub: 'アクセサリー', excludes: ['bowtie'] },
+    { pattern: /\bbow\s*tie\b/i, sub: 'アクセサリー' },
+    // スカーフ・ストール
+    { pattern: /\bscarf\b/i, sub: 'アクセサリー' },
+    { pattern: /\bscarves\b/i, sub: 'アクセサリー' },
+    { pattern: /\bstole\b/i, sub: 'アクセサリー' },
+    { pattern: /\bshawl\b/i, sub: 'アクセサリー' },
+    // ベルト
+    { pattern: /\bbelt\b/i, sub: 'アクセサリー' },
+    // 帽子
+    { pattern: /\bhat\b/i, sub: 'アクセサリー' },
+    { pattern: /\bcap\b/i, sub: 'アクセサリー' },
+    { pattern: /\bbeanie\b/i, sub: 'アクセサリー' },
+    // サングラス・メガネ
+    { pattern: /\bsunglasses\b/i, sub: 'アクセサリー' },
+    { pattern: /\beyeglasses\b/i, sub: 'アクセサリー' },
+    { pattern: /\bglasses\b/i, sub: 'アクセサリー' },
+    // 手袋
+    { pattern: /\bgloves\b/i, sub: 'アクセサリー' },
+    // キーリング・キーチェーン
+    { pattern: /\bkeyring\b/i, sub: '財布・小物' },
+    { pattern: /\bkey\s*ring\b/i, sub: '財布・小物' },
+    { pattern: /\bkey\s*chain\b/i, sub: '財布・小物' },
+    { pattern: /\bkeychain\b/i, sub: '財布・小物' },
+    { pattern: /\bkey\s*holder\b/i, sub: '財布・小物' },
+    { pattern: /\bkey\s*case\b/i, sub: '財布・小物' },
+    // カードケース
+    { pattern: /\bcard\s*case\b/i, sub: '財布・小物' },
+    { pattern: /\bcard\s*holder\b/i, sub: '財布・小物' },
+    // コインケース
+    { pattern: /\bcoin\s*purse\b/i, sub: '財布・小物' },
+    { pattern: /\bcoin\s*case\b/i, sub: '財布・小物' },
+  ];
+
+  // 衣類・アクセサリー優先ルールを適用
+  for (const rule of clothingPriorityRules) {
+    if (rule.pattern.test(titleLower)) {
+      // 除外パターンがあればチェック
+      if (rule.excludes) {
+        let excluded = false;
+        for (const exc of rule.excludes) {
+          if (titleLower.includes(exc.toLowerCase())) {
+            excluded = true;
+            break;
+          }
+        }
+        if (excluded) continue;
+      }
+      return { main: '衣類・靴・アクセサリー', sub: rule.sub };
     }
   }
 
