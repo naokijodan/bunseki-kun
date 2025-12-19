@@ -1942,21 +1942,25 @@ function setupMyCategoryItemActions(container, category, allItems) {
     });
   });
 
-  // 個別未分類ボタン
+  // 個別未分類ボタン（カテゴリ）
   container.querySelectorAll('.item-action-btn.uncategorize').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = parseInt(btn.dataset.id);
       const source = btn.dataset.source;
 
+      console.log('[カテゴリ未分類移動] ID:', id, 'Source:', source);
+
       try {
         if (source === 'sold') {
-          await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true });
+          await BunsekiDB.updateSoldItemById(id, { category: null, categoryCleared: true, categoryManual: false });
         } else {
-          await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true });
+          await BunsekiDB.updateActiveListingById(id, { category: null, categoryCleared: true, categoryManual: false });
         }
+        console.log('[カテゴリ未分類移動] DB更新完了');
         showAlert('未分類に移動しました', 'success');
         await refreshMyDataAnalysis();
+        console.log('[カテゴリ未分類移動] 再分析完了');
       } catch (e) {
         console.error('移動エラー:', e);
         showAlert('移動に失敗しました', 'error');
@@ -5815,6 +5819,11 @@ function generateCategoryPerformanceAnalysis() {
     }
     return !itemCategory || itemCategory === '(不明)' || itemCategory === '(未分類)' || itemCategory === null;
   });
+
+  console.log('[カテゴリ分析] 全アイテム数:', allItems.length, 'カテゴリ未分類数:', uncategorizedItems.length);
+  // categoryCleared=trueのアイテム数をログ
+  const clearedItems = allItems.filter(item => item.categoryCleared === true);
+  console.log('[カテゴリ分析] categoryCleared=trueのアイテム数:', clearedItems.length);
 
   // 未分類セクションを追加
   html += `
