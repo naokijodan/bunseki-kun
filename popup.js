@@ -4184,8 +4184,10 @@ async function captureMarketDataFromUrl() {
 
       while (retries > 0) {
         try {
+          console.log('[popup.js] captureMarketDataFromUrl sending sheetId:', currentSheetId);
           response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'captureMarketData'
+            action: 'captureMarketData',
+            sheetId: currentSheetId
           });
           break;
         } catch (e) {
@@ -4286,10 +4288,12 @@ async function fetchMarketDataFromCurrentTab() {
       return;
     }
 
+    console.log('[popup.js] fetchMarketDataFromCurrentTab sending sheetId:', currentSheetId);
     const response = await chrome.tabs.sendMessage(tabs[0].id, {
       action: 'captureMarketData',
       sheetId: currentSheetId
     });
+    console.log('[popup.js] fetchMarketDataFromCurrentTab response:', response);
 
     if (response && response.success) {
       const added = response.added || response.count || 0;

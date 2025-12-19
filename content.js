@@ -1234,12 +1234,14 @@ class BunsekiKunHighlighter {
 
       // sheetIdは引数から受け取る（popup.jsから渡される）
       const targetSheetId = sheetId || 'sheet1';
+      console.log('[content.js] captureMarketData sheetId:', sheetId, '-> targetSheetId:', targetSheetId);
 
       const result = await chrome.runtime.sendMessage({
         action: 'saveMarketData',
         items: cleanItems,
         sheetId: targetSheetId
       });
+      console.log('[content.js] saveMarketData result:', result);
 
       if (result && result.success) {
         return {

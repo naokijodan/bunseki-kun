@@ -1217,17 +1217,19 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
 
       getAllRequest.onsuccess = () => {
         const existingItems = getAllRequest.result || [];
-        existingItems
-          .filter(item => item.sheetId === sheetId || (!item.sheetId && sheetId === 'all'))
-          .forEach(item => {
-            if (item.titleLower) {
-              seenTitles.add(item.titleLower);
-            }
-          });
+        console.log(`[background] saveMarketDataToDB: sheetId=${sheetId}, 全データ=${existingItems.length}件`);
 
-        console.log(`既存市場データ (${sheetId}):`, seenTitles.size, '件');
+        const filteredItems = existingItems.filter(item => item.sheetId === sheetId);
+        filteredItems.forEach(item => {
+          if (item.titleLower) {
+            seenTitles.add(item.titleLower);
+          }
+        });
+
+        console.log(`[background] 既存市場データ (${sheetId}): ${seenTitles.size}件 (フィルタ後: ${filteredItems.length}件)`);
 
         // 新しいデータを追加
+        console.log(`[background] 追加予定アイテム数: ${items.length}件`);
         items.forEach(item => {
           const titleLower = (item.title || '').toLowerCase().trim();
 
@@ -1247,8 +1249,11 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
           };
 
           const addReq = store.add(record);
-          addReq.onsuccess = () => added++;
+          addReq.onsuccess = () => {
+            added++;
+          };
           addReq.onerror = (e) => {
+            console.error('[background] addReq error:', e.target.error);
             if (e.target.error?.name === 'ConstraintError') {
               duplicates++;
             }
