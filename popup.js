@@ -8614,105 +8614,14 @@ function extractBrandFromTitle(title) {
 window.extractBrandFromTitle = extractBrandFromTitle;
 
 /**
- * タイトルからカテゴリを検出
+ * タイトルから大分類カテゴリのみを取得
+ * detectCategoryWithSubを内部で使用し、大分類のみを返す
+ * @param {string} title - 商品タイトル
+ * @returns {string} - 大分類カテゴリ名
  */
 function detectCategoryFromTitle(title) {
-  if (!title) return 'その他';
-
-  const titleLower = title.toLowerCase();
-
-  // 複合語の優先ルール（単語の一部が別カテゴリにマッチするのを防ぐ）
-  const priorityRules = [
-    // 「dress watch」「dress wristwatch」「dress watches」は時計
-    { pattern: /dress\s*wristwatch/i, category: '時計・ジュエリー' },
-    { pattern: /dress\s*watch/i, category: '時計・ジュエリー' },
-    // 「wristwatch」を含む場合は時計
-    { pattern: /wristwatch/i, category: '時計・ジュエリー' },
-    // 「formal watch」「luxury watch」なども時計
-    { pattern: /\bwatch\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bwatches\b/i, category: '時計・ジュエリー' },
-    { pattern: /\btimepiece/i, category: '時計・ジュエリー' },
-    { pattern: /\bchronograph/i, category: '時計・ジュエリー' },
-    { pattern: /\bautomatic\s+\d+mm/i, category: '時計・ジュエリー' },
-    { pattern: /\bquartz\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bself[- ]?winding/i, category: '時計・ジュエリー' },
-    { pattern: /\bmanual[- ]?wind/i, category: '時計・ジュエリー' },
-    // 時計ブランド
-    { pattern: /\brolex\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bomega\b/i, category: '時計・ジュエリー' },
-    { pattern: /\btag heuer\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bbreitling\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bpatek/i, category: '時計・ジュエリー' },
-    { pattern: /\baudemars/i, category: '時計・ジュエリー' },
-    { pattern: /\bseiko\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bcitizen\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bcasio\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bg-shock/i, category: '時計・ジュエリー' },
-    { pattern: /\btudor\b/i, category: '時計・ジュエリー' },
-    { pattern: /\blongines\b/i, category: '時計・ジュエリー' },
-    { pattern: /\btissot\b/i, category: '時計・ジュエリー' },
-    { pattern: /\borient\b/i, category: '時計・ジュエリー' },
-    { pattern: /\brado\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bhamilton\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bmovado\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bfossil\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bbulova\b/i, category: '時計・ジュエリー' },
-    { pattern: /\binvicta\b/i, category: '時計・ジュエリー' },
-    { pattern: /\biwc\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bzenith\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bhublot\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bpanerai\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bjaeger[- ]?lecoultre/i, category: '時計・ジュエリー' },
-    { pattern: /\bvacheron/i, category: '時計・ジュエリー' },
-    { pattern: /\bbreguet\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bblancpain\b/i, category: '時計・ジュエリー' },
-    { pattern: /\boris\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bmido\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bcertina\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bdoxa\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bfrederick constant/i, category: '時計・ジュエリー' },
-    { pattern: /\bmontblanc/i, category: '時計・ジュエリー' },
-    { pattern: /\bbell\s*&?\s*ross/i, category: '時計・ジュエリー' },
-    // ジュエリーキーワード
-    { pattern: /\bnecklace\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bpendant\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bbracelet\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bbangle\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bearring/i, category: '時計・ジュエリー' },
-    { pattern: /\bbrooch\b/i, category: '時計・ジュエリー' },
-    { pattern: /\b18k\b/i, category: '時計・ジュエリー' },
-    { pattern: /\b14k\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bsterling\s*silver/i, category: '時計・ジュエリー' },
-    { pattern: /\bdiamond\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bpearl\b/i, category: '時計・ジュエリー' },
-    // ジュエリーブランド
-    { pattern: /\btiffany/i, category: '時計・ジュエリー' },
-    { pattern: /\bcartier\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bbvlgari\b/i, category: '時計・ジュエリー' },
-    { pattern: /\bvan\s*cleef/i, category: '時計・ジュエリー' },
-    { pattern: /\bvivienne\s*westwood/i, category: '時計・ジュエリー' },
-    { pattern: /\bswarovski\b/i, category: '時計・ジュエリー' },
-    // 衣類アクセサリー（時計・ジュエリーより後に判定）
-    { pattern: /\bnecktie\b/i, category: '衣類・靴・アクセサリー' },
-    { pattern: /\bscarf\b/i, category: '衣類・靴・アクセサリー' },
-  ];
-
-  // 優先ルールを先にチェック
-  for (const rule of priorityRules) {
-    if (rule.pattern.test(titleLower)) {
-      return rule.category;
-    }
-  }
-
-  for (const [key, category] of Object.entries(ANALYSIS_CATEGORIES)) {
-    for (const keyword of category.keywords) {
-      if (titleLower.includes(keyword.toLowerCase())) {
-        return category.nameJa;
-      }
-    }
-  }
-
-  return 'その他';
+  const result = detectCategoryWithSub(title);
+  return result.main;
 }
 
 /**
@@ -8731,251 +8640,307 @@ function matchKeywordWithBoundary(text, keyword) {
 }
 
 /**
- * タイトルからカテゴリと細分類を検出
+ * タイトルからカテゴリと細分類を検出（v4.5.0 - 体系的なルールベース判定）
+ *
+ * 設計方針:
+ * 1. 確信度の高いアイテムキーワードから判定
+ * 2. ブランドのみでの判定は補助的に使用
+ * 3. 細分類が特定できない場合は「未分類」へ（各カテゴリの「その他」ではなく）
+ * 4. 単語境界を使った厳密なマッチング
+ *
  * @param {string} title - 商品タイトル
  * @returns {{ main: string, sub: string }} - 大分類と細分類
  */
 function detectCategoryWithSub(title) {
-  if (!title) return { main: 'その他', sub: 'その他' };
+  if (!title) return { main: '未分類', sub: '未分類' };
 
   const titleLower = title.toLowerCase();
 
-  // ========================================
-  // 優先ルール: 時計・ジュエリーを衣類より先に判定
-  // ========================================
+  // 単語境界でマッチするかチェックするヘルパー
+  const wordMatch = (text, word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(text);
+  };
 
-  // 時計の優先ルール（「dress watch」などが衣類にマッチするのを防ぐ）
-  const watchPriorityPatterns = [
-    /dress\s*wristwatch/i,
-    /dress\s*watch/i,
-    /wristwatch/i,
-    /\bwatch\b/i,
-    /\bwatches\b/i,
-    /\btimepiece/i,
-    /\bchronograph/i,
-    /\bautomatic\s+\d+mm/i,  // "Automatic 37mm" などの時計パターン
-    /\bquartz\b/i,           // クォーツ時計
-    /\bself[- ]?winding/i,   // 自動巻き
-    /\bmanual[- ]?wind/i,    // 手巻き
-    // 時計ブランド
-    /\brolex\b/i,
-    /\bomega\b/i,
-    /\btag heuer\b/i,
-    /\bbreitling\b/i,
-    /\bpatek/i,
-    /\baudemars/i,
-    /\bseiko\b/i,
-    /\bcitizen\b/i,
-    /\bcasio\b/i,
-    /\bg-shock/i,
-    /\btudor\b/i,
-    /\blongines\b/i,
-    /\btissot\b/i,
-    /\borient\b/i,
-    /\brado\b/i,
-    /\bhamilton\b/i,
-    /\bmovado\b/i,
-    /\bfossil\b/i,
-    /\bbulova\b/i,
-    /\binvicta\b/i,
-    /\biwc\b/i,
-    /\bzenith\b/i,
-    /\bhublot\b/i,
-    /\bpanerai\b/i,
-    /\bjaeger[- ]?lecoultre/i,
-    /\bvacheron/i,
-    /\bbreguet\b/i,
-    /\bblancpain\b/i,
-    /\boris\b/i,
-    /\bmido\b/i,
-    /\bcertina\b/i,
-    /\bdoxa\b/i,
-    /\bfrederick constant/i,
-    /\bmontblanc/i,
-    /\bbell\s*&?\s*ross/i,
+  // 複数キーワードのいずれかにマッチするかチェック
+  const anyWordMatch = (text, words) => words.some(w => wordMatch(text, w));
+
+  // 除外キーワードを含むかチェック
+  const hasExclude = (text, excludes) => excludes && excludes.some(e => text.includes(e.toLowerCase()));
+
+  // =====================================
+  // カテゴリ判定ルール（確信度順）
+  // =====================================
+
+  // --------------------------------------------------
+  // 1. 時計（高確信度キーワード）
+  // --------------------------------------------------
+  const watchKeywords = ['watch', 'watches', 'wristwatch', 'timepiece', 'chronograph', 'chronometer'];
+  const watchMechanisms = ['quartz', 'automatic', 'self-winding', 'manual wind', 'mechanical'];
+  const watchBrands = [
+    'rolex', 'omega', 'tag heuer', 'breitling', 'patek philippe', 'audemars piguet',
+    'seiko', 'citizen', 'casio', 'g-shock', 'tudor', 'longines', 'tissot', 'orient',
+    'rado', 'hamilton', 'movado', 'fossil', 'bulova', 'invicta', 'iwc', 'zenith',
+    'hublot', 'panerai', 'jaeger-lecoultre', 'vacheron constantin', 'breguet',
+    'blancpain', 'oris', 'mido', 'certina', 'doxa', 'frederique constant',
+    'montblanc', 'bell & ross', 'glashutte', 'ulysse nardin', 'girard perregaux',
+    'franck muller', 'a. lange & sohne', 'grand seiko', 'sinn', 'nomos'
   ];
 
-  // 時計パターンに一致したら、時計カテゴリとして処理
-  for (const pattern of watchPriorityPatterns) {
-    if (pattern.test(titleLower)) {
-      return { main: '時計・ジュエリー', sub: '腕時計' };
-    }
+  // 時計キーワードがあれば時計
+  if (anyWordMatch(titleLower, watchKeywords)) {
+    return { main: '時計・ジュエリー', sub: '時計' };
   }
 
-  // ジュエリーの優先ルール（「Fashion Accessory」などで衣類にマッチするのを防ぐ）
-  const jewelryPriorityPatterns = [
-    // ジュエリーアイテム
-    { pattern: /\bnecklace\b/i, sub: 'ネックレス・ペンダント' },
-    { pattern: /\bpendant\b/i, sub: 'ネックレス・ペンダント' },
-    { pattern: /\bchain\b/i, sub: 'ネックレス・ペンダント', excludes: ['key chain', 'keychain', 'wallet chain'] },
-    { pattern: /\bchoker\b/i, sub: 'ネックレス・ペンダント' },
-    { pattern: /\bbracelet\b/i, sub: 'ブレスレット・バングル' },
-    { pattern: /\bbangle\b/i, sub: 'ブレスレット・バングル' },
-    { pattern: /\bcuff\b/i, sub: 'ブレスレット・バングル', excludes: ['cufflink', 'cuff link', 'ear cuff'] },
-    { pattern: /\bearring/i, sub: 'ピアス・イヤリング' },
-    { pattern: /\bear\s*ring/i, sub: 'ピアス・イヤリング' },
-    { pattern: /\bstud\b/i, sub: 'ピアス・イヤリング' },
-    { pattern: /\bhoop\b/i, sub: 'ピアス・イヤリング' },
-    { pattern: /\bbrooch\b/i, sub: 'ブローチ・ピン' },
-    { pattern: /\blapel\s*pin/i, sub: 'ブローチ・ピン' },
-    { pattern: /\b(?:engagement|wedding|cocktail|signet|diamond|gold|silver|platinum)\s*ring/i, sub: 'リング・指輪' },
-    // 素材・宝石キーワード（ジュエリーの可能性が高い）
-    { pattern: /\b18k\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\b14k\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\b10k\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bsterling\s*silver/i, sub: 'ファインジュエリー' },
-    { pattern: /\b925\s*silver/i, sub: 'ファインジュエリー' },
-    { pattern: /\bdiamond\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bpearl\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bruby\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bsapphire\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bemerald\b/i, sub: 'ファインジュエリー' },
-    // ジュエリーブランド
-    { pattern: /\btiffany/i, sub: 'ファインジュエリー' },
-    { pattern: /\bcartier\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bbvlgari\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bbulgari\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bvan\s*cleef/i, sub: 'ファインジュエリー' },
-    { pattern: /\bharry\s*winston/i, sub: 'ファインジュエリー' },
-    { pattern: /\bdavid\s*yurman/i, sub: 'ファインジュエリー' },
-    { pattern: /\bmikimoto\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bpandora\b/i, sub: 'ブレスレット・バングル' },
-    { pattern: /\bswarovski\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bchopard\b/i, sub: 'ファインジュエリー' },
-    { pattern: /\bvivienne\s*westwood/i, sub: 'ファインジュエリー' },
+  // 時計ブランド + メカニズムキーワード（quartz, automatic等）
+  if (anyWordMatch(titleLower, watchBrands) && anyWordMatch(titleLower, watchMechanisms)) {
+    return { main: '時計・ジュエリー', sub: '時計' };
+  }
+
+  // 時計ブランド + サイズ表記（XXmm）
+  if (anyWordMatch(titleLower, watchBrands) && /\b\d{2}mm\b/i.test(titleLower)) {
+    return { main: '時計・ジュエリー', sub: '時計' };
+  }
+
+  // --------------------------------------------------
+  // 2. ジュエリー（高確信度アイテムキーワード）
+  // --------------------------------------------------
+  // ネックレス・ペンダント
+  if (anyWordMatch(titleLower, ['necklace', 'pendant', 'choker', 'lariat'])) {
+    return { main: '時計・ジュエリー', sub: 'ネックレス・ペンダント' };
+  }
+  // チェーン（キーチェーン除外）
+  if (wordMatch(titleLower, 'chain') && !hasExclude(titleLower, ['key chain', 'keychain', 'wallet chain', 'chain saw'])) {
+    return { main: '時計・ジュエリー', sub: 'ネックレス・ペンダント' };
+  }
+
+  // ブレスレット・バングル
+  if (anyWordMatch(titleLower, ['bracelet', 'bangle'])) {
+    return { main: '時計・ジュエリー', sub: 'ブレスレット・バングル' };
+  }
+
+  // ピアス・イヤリング
+  if (anyWordMatch(titleLower, ['earring', 'earrings', 'ear ring', 'stud earring', 'hoop earring', 'drop earring'])) {
+    return { main: '時計・ジュエリー', sub: 'ピアス・イヤリング' };
+  }
+
+  // ブローチ
+  if (anyWordMatch(titleLower, ['brooch', 'lapel pin'])) {
+    return { main: '時計・ジュエリー', sub: 'ブローチ・ピン' };
+  }
+
+  // リング（earring, keyring等を除外）
+  if (wordMatch(titleLower, 'ring') && !hasExclude(titleLower, ['earring', 'keyring', 'key ring', 'spring', 'string', 'o-ring', 'boxing ring'])) {
+    return { main: '時計・ジュエリー', sub: 'リング・指輪' };
+  }
+
+  // ジュエリーブランド + ジュエリー素材
+  const jewelryBrands = ['tiffany', 'cartier', 'bvlgari', 'bulgari', 'van cleef', 'harry winston', 'mikimoto', 'pandora', 'swarovski', 'chopard', 'david yurman'];
+  const jewelryMaterials = ['18k', '14k', '10k', 'sterling silver', '925', 'gold', 'platinum', 'diamond', 'pearl', 'ruby', 'sapphire', 'emerald'];
+  if (anyWordMatch(titleLower, jewelryBrands)) {
+    return { main: '時計・ジュエリー', sub: 'ファインジュエリー' };
+  }
+
+  // 素材キーワード + ジュエリーアイテム暗示
+  if (anyWordMatch(titleLower, ['18k', '14k', '10k']) ||
+      (wordMatch(titleLower, 'sterling') && wordMatch(titleLower, 'silver')) ||
+      wordMatch(titleLower, '925')) {
+    return { main: '時計・ジュエリー', sub: 'ファインジュエリー' };
+  }
+
+  // --------------------------------------------------
+  // 3. バッグ・財布（高確信度）
+  // --------------------------------------------------
+  const bagKeywords = ['bag', 'handbag', 'shoulder bag', 'tote bag', 'backpack', 'clutch', 'crossbody', 'satchel', 'hobo bag', 'messenger bag', 'duffle', 'briefcase'];
+  if (anyWordMatch(titleLower, bagKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: 'バッグ' };
+  }
+
+  const walletKeywords = ['wallet', 'billfold', 'card case', 'card holder', 'coin purse', 'coin case', 'money clip'];
+  if (anyWordMatch(titleLower, walletKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: '財布・小物' };
+  }
+
+  // キーケース・キーリング
+  if (anyWordMatch(titleLower, ['keyring', 'key ring', 'keychain', 'key chain', 'key holder', 'key case'])) {
+    return { main: '衣類・靴・アクセサリー', sub: '財布・小物' };
+  }
+
+  // --------------------------------------------------
+  // 4. 靴（高確信度）
+  // --------------------------------------------------
+  const shoeKeywords = ['shoes', 'sneakers', 'boots', 'heels', 'pumps', 'sandals', 'loafers', 'flats', 'oxford', 'mules', 'slides', 'espadrilles', 'moccasin', 'derby', 'brogue'];
+  if (anyWordMatch(titleLower, shoeKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: '靴' };
+  }
+
+  // --------------------------------------------------
+  // 5. 衣類（高確信度）
+  // --------------------------------------------------
+  // トップス
+  const topKeywords = ['shirt', 'blouse', 'sweater', 'cardigan', 'hoodie', 't-shirt', 'tee', 'tank top', 'polo', 'knit', 'pullover', 'turtleneck'];
+  if (anyWordMatch(titleLower, topKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: 'トップス' };
+  }
+
+  // アウター
+  const outerKeywords = ['jacket', 'coat', 'blazer', 'parka', 'trench', 'bomber', 'leather jacket', 'denim jacket', 'down jacket', 'windbreaker', 'peacoat'];
+  if (anyWordMatch(titleLower, outerKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アウター' };
+  }
+
+  // ボトムス
+  const bottomKeywords = ['pants', 'jeans', 'skirt', 'shorts', 'trousers', 'leggings', 'culottes', 'chinos', 'slacks'];
+  if (anyWordMatch(titleLower, bottomKeywords)) {
+    return { main: '衣類・靴・アクセサリー', sub: 'ボトムス' };
+  }
+
+  // ドレス（dress watchを除外済みなので安全）
+  if (anyWordMatch(titleLower, ['dress', 'gown', 'maxi dress', 'midi dress', 'cocktail dress', 'evening dress'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'ドレス・ワンピース' };
+  }
+
+  // --------------------------------------------------
+  // 6. 衣類アクセサリー（ジュエリーではないアクセサリー）
+  // --------------------------------------------------
+  // ネクタイ
+  if (anyWordMatch(titleLower, ['necktie', 'bow tie', 'bowtie']) ||
+      (wordMatch(titleLower, 'tie') && !hasExclude(titleLower, ['tiered', 'tied']))) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // スカーフ・ストール
+  if (anyWordMatch(titleLower, ['scarf', 'scarves', 'stole', 'shawl', 'muffler'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // ベルト
+  if (wordMatch(titleLower, 'belt') && !hasExclude(titleLower, ['seat belt', 'belt sander', 'conveyor belt'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // 帽子
+  if (anyWordMatch(titleLower, ['hat', 'cap', 'beanie', 'beret', 'fedora', 'bucket hat'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // サングラス・メガネ
+  if (anyWordMatch(titleLower, ['sunglasses', 'eyeglasses', 'eyewear'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // 手袋
+  if (wordMatch(titleLower, 'gloves') && !hasExclude(titleLower, ['boxing gloves', 'work gloves', 'gardening gloves'])) {
+    return { main: '衣類・靴・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // --------------------------------------------------
+  // 7. 電子機器・ガジェット
+  // --------------------------------------------------
+  // スマートフォン
+  if (anyWordMatch(titleLower, ['iphone', 'smartphone', 'cell phone', 'android phone', 'galaxy'])) {
+    return { main: '携帯電話・アクセサリー', sub: '携帯電話' };
+  }
+  if (anyWordMatch(titleLower, ['phone case', 'screen protector', 'phone charger', 'phone holder'])) {
+    return { main: '携帯電話・アクセサリー', sub: 'アクセサリー' };
+  }
+
+  // PC・タブレット
+  if (anyWordMatch(titleLower, ['laptop', 'macbook', 'ipad', 'tablet', 'chromebook', 'surface pro'])) {
+    return { main: 'PC・タブレット', sub: 'PC・タブレット' };
+  }
+
+  // カメラ
+  if (anyWordMatch(titleLower, ['camera', 'dslr', 'mirrorless', 'lens', 'tripod'])) {
+    return { main: 'カメラ・写真', sub: 'カメラ・写真' };
+  }
+
+  // ゲーム
+  if (anyWordMatch(titleLower, ['playstation', 'xbox', 'nintendo', 'switch', 'ps5', 'ps4', 'game console', 'video game'])) {
+    return { main: 'ゲーム', sub: 'ゲーム' };
+  }
+
+  // オーディオ
+  if (anyWordMatch(titleLower, ['headphones', 'earbuds', 'airpods', 'speaker', 'amplifier'])) {
+    return { main: '家電・電子機器', sub: 'オーディオ' };
+  }
+
+  // --------------------------------------------------
+  // 8. コレクティブル・アート
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['vintage', 'antique', 'collectible', 'memorabilia', 'autograph', 'signed'])) {
+    return { main: 'コレクティブル', sub: 'コレクティブル' };
+  }
+
+  if (anyWordMatch(titleLower, ['painting', 'sculpture', 'art print', 'lithograph', 'artwork'])) {
+    return { main: 'アート', sub: 'アート' };
+  }
+
+  // --------------------------------------------------
+  // 9. トイ・ホビー
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['action figure', 'lego', 'model kit', 'diecast', 'plush', 'board game', 'puzzle', 'rc car', 'drone'])) {
+    return { main: 'トイ・ホビー', sub: 'トイ・ホビー' };
+  }
+
+  // --------------------------------------------------
+  // 10. 書籍・音楽
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['book', 'novel', 'textbook', 'comic', 'manga', 'magazine'])) {
+    return { main: '書籍・雑誌', sub: '書籍・雑誌' };
+  }
+
+  if (anyWordMatch(titleLower, ['vinyl', 'record', 'cd', 'cassette', 'album', 'lp'])) {
+    return { main: '音楽', sub: '音楽' };
+  }
+
+  // --------------------------------------------------
+  // 11. ホーム・キッチン（plateはここ）
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['plate', 'dish', 'bowl', 'cup', 'mug', 'glass', 'vase', 'dinnerware', 'tableware', 'kitchenware', 'cookware', 'cutlery'])) {
+    return { main: 'ホーム＆ガーデン', sub: 'キッチン・食器' };
+  }
+
+  if (anyWordMatch(titleLower, ['furniture', 'chair', 'table', 'sofa', 'bed', 'desk', 'shelf', 'cabinet', 'lamp', 'rug', 'curtain', 'pillow', 'blanket'])) {
+    return { main: 'ホーム＆ガーデン', sub: '家具・インテリア' };
+  }
+
+  // --------------------------------------------------
+  // 12. スポーツ用品
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['golf', 'tennis', 'basketball', 'baseball', 'football', 'soccer', 'cycling', 'fishing', 'camping', 'hiking', 'yoga', 'fitness', 'gym'])) {
+    return { main: 'スポーツ用品', sub: 'スポーツ用品' };
+  }
+
+  // --------------------------------------------------
+  // 13. ヘルス＆ビューティー
+  // --------------------------------------------------
+  if (anyWordMatch(titleLower, ['perfume', 'fragrance', 'cologne', 'makeup', 'lipstick', 'mascara', 'skincare', 'serum', 'cream', 'lotion'])) {
+    return { main: 'ヘルス＆ビューティー', sub: 'ヘルス＆ビューティー' };
+  }
+
+  // --------------------------------------------------
+  // 14. ファッションブランドのみの場合（補助的判定）
+  // 確信度が低いため、ブランドだけでは細分類を「未分類」にする
+  // --------------------------------------------------
+  const fashionBrands = [
+    'louis vuitton', 'lv', 'gucci', 'chanel', 'hermes', 'prada', 'burberry', 'fendi', 'dior',
+    'celine', 'balenciaga', 'bottega', 'loewe', 'saint laurent', 'ysl', 'givenchy', 'valentino',
+    'miu miu', 'coach', 'michael kors', 'kate spade', 'tory burch', 'marc jacobs', 'versace',
+    'dolce & gabbana', 'armani', 'moschino', 'mcm', 'ferragamo', 'jimmy choo', 'louboutin',
+    'vivienne westwood'
   ];
 
-  for (const rule of jewelryPriorityPatterns) {
-    if (rule.pattern.test(titleLower)) {
-      // 除外パターンがあればチェック
-      if (rule.excludes) {
-        let excluded = false;
-        for (const exc of rule.excludes) {
-          if (titleLower.includes(exc.toLowerCase())) {
-            excluded = true;
-            break;
-          }
-        }
-        if (excluded) continue;
-      }
-      return { main: '時計・ジュエリー', sub: rule.sub };
-    }
+  if (anyWordMatch(titleLower, fashionBrands)) {
+    // ブランドはあるが、具体的なアイテムが判別できない
+    // バッグ・財布・服・靴・ジュエリーのいずれか不明
+    return { main: '衣類・靴・アクセサリー', sub: '未分類（要確認）' };
   }
 
-  // 衣類・アクセサリーの優先細分類ルール
-  const clothingPriorityRules = [
-    // ネクタイは衣類アクセサリー
-    { pattern: /\bnecktie\b/i, sub: 'アクセサリー' },
-    { pattern: /\btie\b/i, sub: 'アクセサリー', excludes: ['bowtie'] },
-    { pattern: /\bbow\s*tie\b/i, sub: 'アクセサリー' },
-    // スカーフ・ストール
-    { pattern: /\bscarf\b/i, sub: 'アクセサリー' },
-    { pattern: /\bscarves\b/i, sub: 'アクセサリー' },
-    { pattern: /\bstole\b/i, sub: 'アクセサリー' },
-    { pattern: /\bshawl\b/i, sub: 'アクセサリー' },
-    // ベルト
-    { pattern: /\bbelt\b/i, sub: 'アクセサリー' },
-    // 帽子
-    { pattern: /\bhat\b/i, sub: 'アクセサリー' },
-    { pattern: /\bcap\b/i, sub: 'アクセサリー' },
-    { pattern: /\bbeanie\b/i, sub: 'アクセサリー' },
-    // サングラス・メガネ
-    { pattern: /\bsunglasses\b/i, sub: 'アクセサリー' },
-    { pattern: /\beyeglasses\b/i, sub: 'アクセサリー' },
-    { pattern: /\bglasses\b/i, sub: 'アクセサリー' },
-    // 手袋
-    { pattern: /\bgloves\b/i, sub: 'アクセサリー' },
-    // キーリング・キーチェーン
-    { pattern: /\bkeyring\b/i, sub: '財布・小物' },
-    { pattern: /\bkey\s*ring\b/i, sub: '財布・小物' },
-    { pattern: /\bkey\s*chain\b/i, sub: '財布・小物' },
-    { pattern: /\bkeychain\b/i, sub: '財布・小物' },
-    { pattern: /\bkey\s*holder\b/i, sub: '財布・小物' },
-    { pattern: /\bkey\s*case\b/i, sub: '財布・小物' },
-    // カードケース
-    { pattern: /\bcard\s*case\b/i, sub: '財布・小物' },
-    { pattern: /\bcard\s*holder\b/i, sub: '財布・小物' },
-    // コインケース
-    { pattern: /\bcoin\s*purse\b/i, sub: '財布・小物' },
-    { pattern: /\bcoin\s*case\b/i, sub: '財布・小物' },
-  ];
-
-  // 衣類・アクセサリー優先ルールを適用
-  for (const rule of clothingPriorityRules) {
-    if (rule.pattern.test(titleLower)) {
-      // 除外パターンがあればチェック
-      if (rule.excludes) {
-        let excluded = false;
-        for (const exc of rule.excludes) {
-          if (titleLower.includes(exc.toLowerCase())) {
-            excluded = true;
-            break;
-          }
-        }
-        if (excluded) continue;
-      }
-      return { main: '衣類・靴・アクセサリー', sub: rule.sub };
-    }
-  }
-
-  // 細分類の優先マッチングルール（earring/keyringをringより先にチェック）
-  const prioritySubRules = [
-    { main: '時計・ジュエリー', sub: 'ピアス・イヤリング', keywords: ['earring', 'earrings', 'stud', 'hoop earring', 'drop earring', 'dangle', 'clip-on', 'ear ring'] },
-    { main: '衣類・靴・アクセサリー', sub: 'アクセサリー', keywords: ['keyring', 'key ring', 'key chain', 'keychain'] },
-    { main: '時計・ジュエリー', sub: 'リング・指輪', keywords: ['ring', 'rings', 'band', 'engagement ring', 'wedding ring', 'cocktail ring', 'signet ring'],
-      excludes: ['earring', 'keyring', 'key ring', 'spring', 'string', 'o-ring', 'boxing ring'] },
-  ];
-
-  for (const [key, category] of Object.entries(ANALYSIS_CATEGORIES)) {
-    // まず大分類にマッチするか確認
-    let mainMatched = false;
-    for (const keyword of category.keywords) {
-      if (titleLower.includes(keyword.toLowerCase())) {
-        mainMatched = true;
-        break;
-      }
-    }
-
-    if (mainMatched) {
-      // 優先ルールを先にチェック
-      for (const rule of prioritySubRules) {
-        if (rule.main === category.nameJa) {
-          // 除外キーワードがあれば先にチェック
-          if (rule.excludes) {
-            let excluded = false;
-            for (const exc of rule.excludes) {
-              if (titleLower.includes(exc)) {
-                excluded = true;
-                break;
-              }
-            }
-            if (excluded) continue;
-          }
-          // キーワードマッチ
-          for (const kw of rule.keywords) {
-            if (matchKeywordWithBoundary(titleLower, kw)) {
-              return { main: category.nameJa, sub: rule.sub };
-            }
-          }
-        }
-      }
-
-      // 通常の細分類マッチング
-      if (category.subcategories) {
-        for (const [subKey, subCat] of Object.entries(category.subcategories)) {
-          for (const subKeyword of subCat.keywords) {
-            if (subKeyword && matchKeywordWithBoundary(titleLower, subKeyword)) {
-              return { main: category.nameJa, sub: subCat.nameJa };
-            }
-          }
-        }
-      }
-      // 細分類が見つからなければ「その他」
-      return { main: category.nameJa, sub: 'その他' };
-    }
-  }
-
-  return { main: 'その他', sub: 'その他' };
+  // --------------------------------------------------
+  // 判定できない場合は「未分類」
+  // --------------------------------------------------
+  return { main: '未分類', sub: '未分類' };
 }
 
 // グローバルに公開（analyzer.jsから参照するため）
