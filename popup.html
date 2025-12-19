@@ -37,6 +37,10 @@
           <span class="btn-icon">🏷️</span>
           <span class="btn-label">ブランド</span>
         </button>
+        <button id="keywordBtn" class="header-btn with-label" title="キーワード管理">
+          <span class="btn-icon">🔑</span>
+          <span class="btn-label">キーワード</span>
+        </button>
         <button id="settingsBtn" class="header-btn with-label" title="設定">
           <span class="btn-icon">⚙️</span>
           <span class="btn-label">設定</span>
@@ -836,6 +840,95 @@
         <div class="modal-footer">
           <button id="saveBrandBtn" class="action-btn primary">保存</button>
           <button id="cancelBrandBtn" class="action-btn secondary">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- キーワード管理モーダル -->
+    <div id="keywordModal" class="modal-overlay" style="display: none;">
+      <div class="modal keyword-modal">
+        <div class="modal-header">
+          <h2>キーワード管理</h2>
+          <button id="closeKeywordModal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-content keyword-content">
+          <!-- タブ -->
+          <div class="keyword-tabs">
+            <button class="keyword-tab active" data-keyword-tab="watched">
+              <span class="tab-icon">⭐</span>
+              <span>注目</span>
+              <span class="keyword-count" id="watchedCountBadge">0</span>
+            </button>
+            <button class="keyword-tab" data-keyword-tab="excluded">
+              <span class="tab-icon">🚫</span>
+              <span>除外</span>
+              <span class="keyword-count" id="excludedCountBadge">0</span>
+            </button>
+          </div>
+
+          <!-- 注目キーワードセクション -->
+          <div id="watchedKeywordsSection" class="keyword-section active">
+            <div class="keyword-add-form">
+              <input type="text" id="watchedKeywordInput" class="keyword-input" placeholder="キーワードを追加...">
+              <button id="addWatchedKeywordBtn" class="action-btn primary small">追加</button>
+            </div>
+            <p class="keyword-hint">ページ上で選択して追加することもできます</p>
+            <div class="keyword-list" id="watchedKeywordList">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 除外キーワードセクション -->
+          <div id="excludedKeywordsSection" class="keyword-section" style="display: none;">
+            <div class="keyword-add-form">
+              <input type="text" id="excludedKeywordInput" class="keyword-input" placeholder="除外キーワードを追加...">
+              <button id="addExcludedKeywordBtn" class="action-btn primary small">追加</button>
+            </div>
+            <p class="keyword-hint">除外キーワードを含むタイトルはグレーアウトされます</p>
+            <div class="keyword-list" id="excludedKeywordList">
+              <!-- 動的に生成 -->
+            </div>
+          </div>
+
+          <!-- 凡例 -->
+          <div class="keyword-legend">
+            <h4>ハイライト凡例</h4>
+            <div class="legend-items">
+              <div class="legend-item">
+                <span class="legend-color brand-strong"></span>
+                <span>強いブランド（緑）</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-color brand-opportunity"></span>
+                <span>チャンス（黄色）</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-color brand-registered"></span>
+                <span>登録ブランド（青）</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-color keyword-watched"></span>
+                <span>注目キーワード（ピンク）</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-color excluded"></span>
+                <span>除外（グレーアウト）</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- インポート/エクスポート -->
+          <div class="keyword-actions">
+            <button id="exportKeywordsBtn" class="action-btn secondary small">
+              <span class="btn-icon">📤</span>
+              エクスポート
+            </button>
+            <button id="importKeywordsBtn" class="action-btn secondary small">
+              <span class="btn-icon">📥</span>
+              インポート
+            </button>
+            <input type="file" id="keywordImportFile" accept=".json" hidden>
+          </div>
         </div>
       </div>
     </div>

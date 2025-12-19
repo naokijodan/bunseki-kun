@@ -6037,3 +6037,220 @@ body {
   font-size: 12px;
   padding: 8px 10px;
 }
+
+/* =====================================
+   キーワード管理モーダル
+   ===================================== */
+.keyword-modal {
+  width: 380px;
+  max-height: 90vh;
+  background: #fff !important;
+}
+
+.keyword-content {
+  padding: 16px;
+  background: #fff !important;
+}
+
+/* キーワードタブ */
+.keyword-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.keyword-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: none;
+  background: #f0f0f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.keyword-tab:hover {
+  background: #e8e8e8;
+}
+
+.keyword-tab.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.keyword-tab .tab-icon {
+  font-size: 14px;
+}
+
+.keyword-count {
+  background: rgba(0,0,0,0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.keyword-tab.active .keyword-count {
+  background: rgba(255,255,255,0.3);
+}
+
+/* キーワードセクション */
+.keyword-section {
+  display: none;
+}
+
+.keyword-section.active {
+  display: block;
+}
+
+/* キーワード追加フォーム */
+.keyword-add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.keyword-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.keyword-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.keyword-hint {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.keyword-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.keyword-item:last-child {
+  border-bottom: none;
+}
+
+.keyword-item-text {
+  font-size: 13px;
+  color: #333;
+}
+
+.keyword-item-delete {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.keyword-item-delete:hover {
+  color: #ef4444;
+}
+
+.keyword-empty {
+  padding: 24px;
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+}
+
+/* キーワード凡例 */
+.keyword-legend {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.keyword-legend h4 {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.legend-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-color.brand-strong {
+  background: linear-gradient(135deg, #a5d6a7 0%, #81c784 100%);
+  border-bottom: 2px solid #4caf50;
+}
+
+.legend-color.brand-opportunity {
+  background: linear-gradient(135deg, #fff59d 0%, #ffee58 100%);
+  border-bottom: 2px solid #ffc107;
+}
+
+.legend-color.brand-registered {
+  background: rgba(100, 181, 246, 0.3);
+  border-bottom: 1px solid #42a5f5;
+}
+
+.legend-color.keyword-watched {
+  background: linear-gradient(135deg, #f8bbd9 0%, #f48fb1 100%);
+  border-bottom: 2px solid #e91e63;
+}
+
+.legend-color.excluded {
+  background: #ccc;
+  opacity: 0.5;
+}
+
+/* キーワードアクション */
+.keyword-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.keyword-actions button {
+  flex: 1;
+}

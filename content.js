@@ -1,34 +1,45 @@
 /**
- * ぶんせき君 v2.1.0 - Content Script
- * eBayページでリアルタイム市場分析・ハイライト
+ * ぶんせき君 v4.2.0 - Content Script
+ * eBayページでリアルタイム市場分析・部分ハイライト
+ *
+ * 改善点:
+ * - ブランド名のみ部分ハイライト（タイトル全体ではなく）
+ * - 注目キーワードのハイライト対応
+ * - テキスト選択時にミニボタン表示（+注目/×除外）
+ * - ハイライト以外の部分はクリック可能（商品ページへジャンプ）
  */
 
 class BunsekiKunHighlighter {
   constructor() {
     // 自分のデータ（Storageから読み込み）
-    this.myBrands = {};           // { brandName: { active: 10, sold: 5, avgPrice: 50, sellRate: 50 } }
-    this.myActiveListings = [];   // 自分の出品中タイトル
-    this.excludedBrands = [];     // 除外ブランド
+    this.myBrands = {};
+    this.myActiveListings = [];
+    this.excludedBrands = [];
 
     // 分析結果
-    this.strongBrands = [];       // 自分が強いブランド
-    this.opportunityBrands = [];  // チャンス（売れてるが自分は出品なし）
-    this.pricingAlerts = {};      // 価格アラート { brand: { myAvg, marketAvg, diff } }
+    this.strongBrands = [];
+    this.opportunityBrands = [];
+    this.pricingAlerts = {};
 
     // ブランドマスター（chrome.storageから読み込み）
     this.brandMasterData = null;
-    this.brandPatternCache = [];  // プリコンパイル済み正規表現
+    this.brandPatternCache = [];
+
+    // 注目キーワード・除外キーワード
+    this.watchedKeywords = [];
+    this.excludedKeywords = [];
 
     // 処理済み要素の追跡
     this.processedElements = new WeakSet();
 
-    // ツールチップ
+    // ツールチップ・選択ポップアップ
     this.tooltip = null;
+    this.selectionPopup = null;
 
     // 設定
     this.settings = {
       highlightEnabled: true,
-      priceAlertThreshold: 20  // 20%以上の差で警告
+      priceAlertThreshold: 20
     };
 
     this.init();
@@ -39,6 +50,7 @@ class BunsekiKunHighlighter {
     this.observeDOM();
     this.highlightPage();
     this.setupTooltip();
+    this.setupSelectionPopup();
     this.setupMessageListener();
 
     // Storage変更を監視
@@ -63,7 +75,16 @@ class BunsekiKunHighlighter {
         this.processedElements = new WeakSet();
         this.highlightPage();
       }
-      // ブランドマスター変更を監視
+      if (changes.watchedKeywords) {
+        this.watchedKeywords = changes.watchedKeywords.newValue || [];
+        this.processedElements = new WeakSet();
+        this.highlightPage();
+      }
+      if (changes.excludedKeywords) {
+        this.excludedKeywords = changes.excludedKeywords.newValue || [];
+        this.processedElements = new WeakSet();
+        this.highlightPage();
+      }
       if (changes.brandMaster) {
         console.log('ぶんせき君: ブランドマスター更新検知');
         this.loadBrandMaster(changes.brandMaster.newValue).then(() => {
@@ -83,7 +104,9 @@ class BunsekiKunHighlighter {
       'bunsekiSettings',
       'excludedBrands',
       'highlightEnabled',
-      'brandMaster'
+      'brandMaster',
+      'watchedKeywords',
+      'excludedKeywords'
     ]);
 
     if (data.bunsekiData) {
@@ -98,12 +121,11 @@ class BunsekiKunHighlighter {
       this.settings = { ...this.settings, ...data.bunsekiSettings };
     }
 
-    // ハイライト有効/無効
     this.settings.highlightEnabled = data.highlightEnabled !== false;
-
     this.excludedBrands = (data.excludedBrands || []).map(b => b.toLowerCase());
+    this.watchedKeywords = data.watchedKeywords || [];
+    this.excludedKeywords = data.excludedKeywords || [];
 
-    // ブランドマスターを読み込み・パターンをプリコンパイル
     await this.loadBrandMaster(data.brandMaster);
   }
 
@@ -122,7 +144,6 @@ class BunsekiKunHighlighter {
     const brands = brandMaster.brands.filter(b => b.enabled !== false);
     console.log('ぶんせき君: ブランドマスター読み込み:', brands.length, '件');
 
-    // 各ブランドのパターンをプリコンパイル
     for (const brand of brands) {
       if (!brand.patterns || brand.patterns.length === 0) continue;
 
@@ -131,17 +152,14 @@ class BunsekiKunHighlighter {
         try {
           switch (brand.matchType) {
             case 'exact':
-              // 完全一致（大文字小文字無視）
               regex = new RegExp(`^${this.escapeRegex(pattern)}$`, 'i');
               break;
             case 'contains':
-              // 部分一致
-              regex = new RegExp(this.escapeRegex(pattern), 'i');
+              regex = new RegExp(this.escapeRegex(pattern), 'gi');
               break;
             case 'word':
             default:
-              // 単語境界マッチ（デフォルト）
-              regex = new RegExp(`\\b${this.escapeRegex(pattern)}\\b`, 'i');
+              regex = new RegExp(`\\b${this.escapeRegex(pattern)}\\b`, 'gi');
               break;
           }
 
@@ -209,7 +227,7 @@ class BunsekiKunHighlighter {
           }).catch(error => {
             sendResponse({ success: false, error: error.message });
           });
-          return true; // 非同期レスポンスのため
+          return true;
 
         default:
           sendResponse({ success: false, error: 'Unknown action' });
@@ -223,20 +241,19 @@ class BunsekiKunHighlighter {
    * すべてのハイライトを削除
    */
   removeAllHighlights() {
-    const highlighted = document.querySelectorAll('.bunseki-highlight');
-    highlighted.forEach(el => {
-      el.classList.remove(
-        'bunseki-highlight',
-        'bunseki-strong',
-        'bunseki-opportunity',
-        'bunseki-price-alert',
-        'bunseki-owned',
-        'bunseki-excluded',
-        'bunseki-unknown'
-      );
-      delete el.dataset.bunsekiType;
-      delete el.dataset.bunsekiBrand;
+    // 部分ハイライトspan要素を元に戻す
+    const brandSpans = document.querySelectorAll('.bunseki-brand, .bunseki-keyword');
+    brandSpans.forEach(span => {
+      const text = document.createTextNode(span.textContent);
+      span.parentNode.replaceChild(text, span);
     });
+
+    // 除外クラスを削除
+    const excluded = document.querySelectorAll('.bunseki-excluded-title');
+    excluded.forEach(el => {
+      el.classList.remove('bunseki-excluded-title');
+    });
+
     this.processedElements = new WeakSet();
   }
 
@@ -279,37 +296,30 @@ class BunsekiKunHighlighter {
    */
   extractTerapeakData() {
     const items = [];
-    const seenTitles = new Set(); // 重複防止用
+    const seenTitles = new Set();
 
-    // 方法1: span[data-item-id]から直接取得（キーワードみつけるくんと同じ方式）
     const titleSpans = document.querySelectorAll('span[data-item-id]');
-
-    console.log('ぶんせき君: Terapeak span[data-item-id] found:', titleSpans.length);
 
     titleSpans.forEach(titleSpan => {
       const title = titleSpan.textContent.trim();
       if (!title) return;
 
-      // 重複チェック
       const titleKey = title.toLowerCase();
       if (seenTitles.has(titleKey)) return;
       seenTitles.add(titleKey);
 
       const brand = this.extractBrandFromTitle(title);
 
-      // 親要素から価格・販売数を探す
       const row = titleSpan.closest('tr') || titleSpan.closest('[class*="row"]') || titleSpan.parentElement?.parentElement?.parentElement;
       let price = null;
       let sold = 0;
 
       if (row) {
-        // 価格を探す（$マークを含むテキスト）
         const priceMatch = row.textContent.match(/\$[\d,.]+/);
         if (priceMatch) {
           price = this.parsePrice(priceMatch[0]);
         }
 
-        // 販売数を探す（"sold"の前の数字）
         const soldMatch = row.textContent.match(/(\d+)\s*sold/i);
         if (soldMatch) {
           sold = parseInt(soldMatch[1]) || 0;
@@ -325,10 +335,8 @@ class BunsekiKunHighlighter {
       });
     });
 
-    // 方法2: テーブル構造の場合（フォールバック）
     if (items.length === 0) {
       const rows = document.querySelectorAll('table tbody tr');
-      console.log('ぶんせき君: Fallback table rows found:', rows.length);
 
       rows.forEach(row => {
         const titleEl = row.querySelector('span[data-item-id]') || row.querySelector('td:first-child');
@@ -336,7 +344,6 @@ class BunsekiKunHighlighter {
           const title = titleEl.textContent.trim();
           if (!title || title.length < 5) return;
 
-          // 重複チェック
           const titleKey = title.toLowerCase();
           if (seenTitles.has(titleKey)) return;
           seenTitles.add(titleKey);
@@ -368,38 +375,6 @@ class BunsekiKunHighlighter {
       });
     }
 
-    // 方法3: 汎用的なリスト要素（さらなるフォールバック）
-    if (items.length === 0) {
-      const listItems = document.querySelectorAll('[class*="listing"], [class*="product"], [class*="item"]');
-      console.log('ぶんせき君: Generic list items found:', listItems.length);
-
-      listItems.forEach(item => {
-        const titleEl = item.querySelector('[class*="title"], h3, h4, a');
-        if (titleEl) {
-          const title = titleEl.textContent.trim();
-          if (!title || title.length < 10) return;
-
-          // 重複チェック
-          const titleKey = title.toLowerCase();
-          if (seenTitles.has(titleKey)) return;
-          seenTitles.add(titleKey);
-
-          const brand = this.extractBrandFromTitle(title);
-          const priceMatch = item.textContent.match(/\$[\d,.]+/);
-          const price = priceMatch ? this.parsePrice(priceMatch[0]) : null;
-
-          items.push({
-            title,
-            brand,
-            price,
-            sold: 0,
-            element: titleEl
-          });
-        }
-      });
-    }
-
-    console.log('ぶんせき君: Total items extracted:', items.length, '(after dedup)');
     return items;
   }
 
@@ -408,26 +383,21 @@ class BunsekiKunHighlighter {
    */
   extractSearchData() {
     const items = [];
-
-    // 検索結果の商品
     const searchItems = document.querySelectorAll('.s-item');
 
     searchItems.forEach(item => {
       const titleEl = item.querySelector('.s-item__title');
       const priceEl = item.querySelector('.s-item__price');
-      const watchersEl = item.querySelector('.s-item__watchCount, .s-item__hotness');
 
       if (titleEl && !titleEl.textContent.includes('Shop on eBay')) {
         const title = titleEl.textContent.trim();
         const brand = this.extractBrandFromTitle(title);
         const price = priceEl ? this.parsePrice(priceEl.textContent) : null;
-        const watchers = watchersEl ? parseInt(watchersEl.textContent.replace(/[^0-9]/g, '')) || 0 : 0;
 
         items.push({
           title,
           brand,
           price,
-          watchers,
           element: titleEl
         });
       }
@@ -437,12 +407,11 @@ class BunsekiKunHighlighter {
   }
 
   /**
-   * タイトルからブランドを抽出（ブランドマスター使用）
+   * タイトルからブランドを抽出
    */
   extractBrandFromTitle(title) {
     if (!title) return null;
 
-    // 1. ブランドマスターのプリコンパイル済みパターンを使用（545ブランド）
     if (this.brandPatternCache && this.brandPatternCache.length > 0) {
       for (const { regex, brandName } of this.brandPatternCache) {
         if (regex.test(title)) {
@@ -451,7 +420,6 @@ class BunsekiKunHighlighter {
       }
     }
 
-    // 2. フォールバック: ブランドマスターがまだ読み込まれていない場合の基本パターン
     const fallbackPatterns = [
       { pattern: /\b(CHANEL)\b/i, brand: 'CHANEL' },
       { pattern: /\b(HERMES|HERMÈS)\b/i, brand: 'HERMES' },
@@ -525,65 +493,190 @@ class BunsekiKunHighlighter {
   }
 
   /**
-   * 要素をハイライト
+   * 要素を部分ハイライト（ブランド名・キーワードのみ）
    */
   highlightElement(element) {
-    const title = element.textContent.trim();
-    const brand = this.extractBrandFromTitle(title);
-    const lowerTitle = title.toLowerCase();
+    const originalText = element.textContent.trim();
+    const lowerText = originalText.toLowerCase();
 
-    // 除外ブランドチェック
-    if (brand && this.excludedBrands.includes(brand.toLowerCase())) {
-      element.classList.add('bunseki-excluded');
+    // 除外キーワードを含む場合はタイトル全体をグレーアウト
+    const hasExcluded = this.excludedKeywords.some(keyword =>
+      lowerText.includes(keyword.toLowerCase())
+    );
+
+    if (hasExcluded) {
+      element.classList.add('bunseki-excluded-title');
       return;
     }
 
-    // ブランドが判定できた場合
-    if (brand) {
-      const brandLower = brand.toLowerCase();
-      const myBrandData = this.myBrands[brand] || this.myBrands[brandLower];
-
-      // 自分が強いブランド（緑）
-      if (this.strongBrands.map(b => b.toLowerCase()).includes(brandLower)) {
-        this.applyHighlight(element, 'strong', brand);
-        return;
-      }
-
-      // チャンスブランド（黄色）- 市場で売れてるが自分は出品なし
-      if (!myBrandData || myBrandData.active === 0) {
-        this.applyHighlight(element, 'opportunity', brand);
-        return;
-      }
-
-      // 価格アラート（オレンジ）
-      if (this.pricingAlerts[brand]) {
-        this.applyHighlight(element, 'price-alert', brand);
-        return;
-      }
-
-      // 自分も扱っているブランド（薄い緑）
-      if (myBrandData && myBrandData.active > 0) {
-        this.applyHighlight(element, 'owned', brand);
-        return;
-      }
-    }
-
-    // ブランド不明 - 新しいキーワードとして黄色
-    // (ただし一般的すぎるタイトルは除く)
-    if (!brand && title.length > 10) {
-      this.applyHighlight(element, 'unknown', null);
-    }
+    // テキストノードを処理
+    this.highlightTextNodes(element);
   }
 
   /**
-   * ハイライトを適用
+   * テキストノードを走査してハイライト
    */
-  applyHighlight(element, type, brand) {
-    element.classList.add('bunseki-highlight', `bunseki-${type}`);
-    element.dataset.bunsekiType = type;
-    if (brand) {
-      element.dataset.bunsekiBrand = brand;
+  highlightTextNodes(element) {
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    const textNodes = [];
+    let node;
+    while (node = walker.nextNode()) {
+      if (node.textContent.trim()) {
+        textNodes.push(node);
+      }
     }
+
+    textNodes.forEach(textNode => {
+      const text = textNode.textContent;
+      const fragments = this.createHighlightedFragments(text);
+
+      if (fragments) {
+        textNode.parentNode.replaceChild(fragments, textNode);
+      }
+    });
+  }
+
+  /**
+   * ハイライト済みフラグメントを作成
+   */
+  createHighlightedFragments(text) {
+    const matches = [];
+
+    // 1. ブランドマスターからマッチを検索
+    for (const { regex, brandName, pattern } of this.brandPatternCache) {
+      // regexをリセット（globalフラグがある場合）
+      regex.lastIndex = 0;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        // 除外ブランドはスキップ
+        if (this.excludedBrands.includes(brandName.toLowerCase())) {
+          continue;
+        }
+
+        matches.push({
+          text: match[0],
+          index: match.index,
+          length: match[0].length,
+          type: 'brand',
+          brandName: brandName,
+          highlightClass: this.getBrandHighlightClass(brandName)
+        });
+
+        // exactマッチの場合は1回だけ
+        if (!regex.global) break;
+      }
+    }
+
+    // 2. 注目キーワードからマッチを検索
+    for (const keyword of this.watchedKeywords) {
+      const regex = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'gi');
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        // 既存のマッチと重複しないか確認
+        const overlaps = matches.some(m =>
+          (match.index >= m.index && match.index < m.index + m.length) ||
+          (m.index >= match.index && m.index < match.index + match[0].length)
+        );
+        if (!overlaps) {
+          matches.push({
+            text: match[0],
+            index: match.index,
+            length: match[0].length,
+            type: 'keyword',
+            keyword: keyword,
+            highlightClass: 'bunseki-keyword-watched'
+          });
+        }
+      }
+    }
+
+    if (matches.length === 0) return null;
+
+    // インデックス順にソート
+    matches.sort((a, b) => a.index - b.index);
+
+    // 重複を除去（後から追加されたものを優先）
+    const filteredMatches = [];
+    for (const match of matches) {
+      const overlaps = filteredMatches.some(m =>
+        (match.index >= m.index && match.index < m.index + m.length) ||
+        (m.index >= match.index && m.index < match.index + match.length)
+      );
+      if (!overlaps) {
+        filteredMatches.push(match);
+      }
+    }
+
+    // フラグメントを構築
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+
+    filteredMatches.forEach(match => {
+      // マッチ前のテキスト
+      if (match.index > lastIndex) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+      }
+
+      // ハイライトspan
+      const span = document.createElement('span');
+      span.className = `bunseki-${match.type} ${match.highlightClass}`;
+      span.textContent = match.text;
+
+      if (match.type === 'brand') {
+        span.dataset.brand = match.brandName;
+        span.dataset.type = match.highlightClass.replace('bunseki-brand-', '');
+      } else {
+        span.dataset.keyword = match.keyword;
+      }
+
+      fragment.appendChild(span);
+
+      lastIndex = match.index + match.length;
+    });
+
+    // 残りのテキスト
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+    }
+
+    return fragment;
+  }
+
+  /**
+   * ブランドのハイライトクラスを決定
+   */
+  getBrandHighlightClass(brandName) {
+    const brandLower = brandName.toLowerCase();
+    const myBrandData = this.myBrands[brandName] || this.myBrands[brandLower];
+
+    // 自分が強いブランド（緑）
+    if (this.strongBrands.map(b => b.toLowerCase()).includes(brandLower)) {
+      return 'bunseki-brand-strong';
+    }
+
+    // チャンスブランド（黄色）
+    if (!myBrandData || myBrandData.active === 0) {
+      return 'bunseki-brand-opportunity';
+    }
+
+    // 価格アラート（オレンジ）
+    if (this.pricingAlerts[brandName]) {
+      return 'bunseki-brand-price-alert';
+    }
+
+    // 自分も扱っているブランド（薄い緑）
+    if (myBrandData && myBrandData.active > 0) {
+      return 'bunseki-brand-owned';
+    }
+
+    // デフォルト（青 - マスター登録済み）
+    return 'bunseki-brand-registered';
   }
 
   /**
@@ -612,42 +705,52 @@ class BunsekiKunHighlighter {
   }
 
   /**
-   * ツールチップ設定
+   * ツールチップ設定（ブランド名・キーワードクリック時）
    */
   setupTooltip() {
     document.addEventListener('click', (e) => {
-      const highlighted = e.target.closest('.bunseki-highlight');
+      const brandSpan = e.target.closest('.bunseki-brand');
+      const keywordSpan = e.target.closest('.bunseki-keyword');
 
-      if (highlighted) {
+      if (brandSpan) {
         e.preventDefault();
         e.stopPropagation();
-        this.showTooltip(highlighted, e);
-      } else if (!e.target.closest('.bunseki-tooltip')) {
+        this.showBrandTooltip(brandSpan, e);
+      } else if (keywordSpan) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.showKeywordTooltip(keywordSpan, e);
+      } else if (!e.target.closest('.bunseki-tooltip') && !e.target.closest('.bunseki-selection-popup')) {
         this.hideTooltip();
+        this.hideSelectionPopup();
       }
     });
 
-    document.addEventListener('scroll', () => this.hideTooltip(), true);
+    document.addEventListener('scroll', () => {
+      this.hideTooltip();
+      this.hideSelectionPopup();
+    }, true);
   }
 
   /**
-   * ツールチップ表示
+   * ブランドツールチップ表示
    */
-  showTooltip(element, event) {
+  showBrandTooltip(element, event) {
     this.hideTooltip();
+    this.hideSelectionPopup();
 
-    const type = element.dataset.bunsekiType;
-    const brand = element.dataset.bunsekiBrand;
+    const brand = element.dataset.brand;
+    const type = element.dataset.type;
     const rect = element.getBoundingClientRect();
 
     this.tooltip = document.createElement('div');
     this.tooltip.className = 'bunseki-tooltip';
 
     let content = '';
+    const myBrandData = this.myBrands[brand] || this.myBrands[brand?.toLowerCase()];
 
     switch (type) {
       case 'strong':
-        const strongData = this.myBrands[brand];
         content = `
           <div class="bunseki-tooltip-header strong">
             <span class="icon">💪</span>
@@ -655,11 +758,11 @@ class BunsekiKunHighlighter {
           </div>
           <div class="bunseki-tooltip-body">
             <p>あなたが強いブランドです</p>
-            ${strongData ? `
+            ${myBrandData ? `
               <div class="bunseki-stats">
-                <span>出品中: ${strongData.active}件</span>
-                <span>販売済: ${strongData.sold}件</span>
-                <span>売上率: ${strongData.sellRate || '-'}%</span>
+                <span>出品中: ${myBrandData.active}件</span>
+                <span>販売済: ${myBrandData.sold}件</span>
+                <span>売上率: ${myBrandData.sellRate || '-'}%</span>
               </div>
             ` : ''}
           </div>
@@ -673,7 +776,7 @@ class BunsekiKunHighlighter {
         content = `
           <div class="bunseki-tooltip-header opportunity">
             <span class="icon">✨</span>
-            <strong>${brand || '新しいキーワード'}</strong>
+            <strong>${brand}</strong>
           </div>
           <div class="bunseki-tooltip-body">
             <p>市場で売れていますが、あなたは出品していません</p>
@@ -709,7 +812,6 @@ class BunsekiKunHighlighter {
         break;
 
       case 'owned':
-        const ownedData = this.myBrands[brand];
         content = `
           <div class="bunseki-tooltip-header owned">
             <span class="icon">📦</span>
@@ -717,10 +819,10 @@ class BunsekiKunHighlighter {
           </div>
           <div class="bunseki-tooltip-body">
             <p>取り扱い中のブランド</p>
-            ${ownedData ? `
+            ${myBrandData ? `
               <div class="bunseki-stats">
-                <span>出品中: ${ownedData.active}件</span>
-                <span>販売済: ${ownedData.sold}件</span>
+                <span>出品中: ${myBrandData.active}件</span>
+                <span>販売済: ${myBrandData.sold}件</span>
               </div>
             ` : ''}
           </div>
@@ -730,31 +832,17 @@ class BunsekiKunHighlighter {
         `;
         break;
 
-      case 'excluded':
-        content = `
-          <div class="bunseki-tooltip-header excluded">
-            <span class="icon">🚫</span>
-            <strong>${brand || 'このキーワード'}</strong>
-          </div>
-          <div class="bunseki-tooltip-body">
-            <p>除外リストに登録済み</p>
-          </div>
-          <div class="bunseki-tooltip-actions">
-            <button class="unexclude-btn">除外を解除</button>
-          </div>
-        `;
-        break;
-
       default:
         content = `
-          <div class="bunseki-tooltip-header unknown">
-            <span class="icon">❓</span>
-            <strong>未分類</strong>
+          <div class="bunseki-tooltip-header registered">
+            <span class="icon">🏷️</span>
+            <strong>${brand}</strong>
           </div>
           <div class="bunseki-tooltip-body">
-            <p>ブランドが特定できませんでした</p>
+            <p>ブランドマスター登録済み</p>
           </div>
           <div class="bunseki-tooltip-actions">
+            <button class="watch-btn">注目に追加</button>
             <button class="exclude-btn">除外に追加</button>
           </div>
         `;
@@ -762,7 +850,6 @@ class BunsekiKunHighlighter {
 
     this.tooltip.innerHTML = content;
 
-    // 位置
     const tooltipX = Math.min(rect.left + window.scrollX, window.innerWidth - 280);
     const tooltipY = rect.bottom + window.scrollY + 8;
     this.tooltip.style.left = `${tooltipX}px`;
@@ -770,89 +857,291 @@ class BunsekiKunHighlighter {
 
     document.body.appendChild(this.tooltip);
 
-    // ボタンイベント
-    this.setupTooltipButtons(element, brand);
+    this.setupTooltipButtons(element, brand, 'brand');
+  }
+
+  /**
+   * キーワードツールチップ表示
+   */
+  showKeywordTooltip(element, event) {
+    this.hideTooltip();
+    this.hideSelectionPopup();
+
+    const keyword = element.dataset.keyword;
+    const rect = element.getBoundingClientRect();
+
+    this.tooltip = document.createElement('div');
+    this.tooltip.className = 'bunseki-tooltip';
+
+    this.tooltip.innerHTML = `
+      <div class="bunseki-tooltip-header keyword">
+        <span class="icon">🔑</span>
+        <strong>"${keyword}"</strong>
+      </div>
+      <div class="bunseki-tooltip-body">
+        <p>注目キーワード</p>
+      </div>
+      <div class="bunseki-tooltip-actions">
+        <button class="remove-btn">注目から削除</button>
+        <button class="exclude-btn">除外に移動</button>
+      </div>
+    `;
+
+    const tooltipX = Math.min(rect.left + window.scrollX, window.innerWidth - 280);
+    const tooltipY = rect.bottom + window.scrollY + 8;
+    this.tooltip.style.left = `${tooltipX}px`;
+    this.tooltip.style.top = `${tooltipY}px`;
+
+    document.body.appendChild(this.tooltip);
+
+    this.setupTooltipButtons(element, keyword, 'keyword');
   }
 
   /**
    * ツールチップボタンのイベント設定
    */
-  setupTooltipButtons(element, brand) {
+  setupTooltipButtons(element, value, type) {
     const watchBtn = this.tooltip.querySelector('.watch-btn');
     const excludeBtn = this.tooltip.querySelector('.exclude-btn');
-    const unexcludeBtn = this.tooltip.querySelector('.unexclude-btn');
+    const removeBtn = this.tooltip.querySelector('.remove-btn');
 
     if (watchBtn) {
       watchBtn.addEventListener('click', () => {
-        this.addToWatchList(brand);
+        if (type === 'brand') {
+          this.addToWatchList(value);
+        } else {
+          this.addToWatchedKeywords(value);
+        }
         this.hideTooltip();
       });
     }
 
     if (excludeBtn) {
       excludeBtn.addEventListener('click', () => {
-        this.addToExcludeList(brand || element.textContent.trim());
-        element.classList.remove('bunseki-strong', 'bunseki-opportunity', 'bunseki-owned', 'bunseki-unknown');
-        element.classList.add('bunseki-excluded');
+        if (type === 'brand') {
+          this.addToExcludeList(value);
+        } else {
+          this.removeFromWatchedKeywords(value);
+          this.addToExcludedKeywords(value);
+        }
         this.hideTooltip();
+        // 再描画
+        this.processedElements = new WeakSet();
+        this.removeAllHighlights();
+        this.highlightPage();
       });
     }
 
-    if (unexcludeBtn) {
-      unexcludeBtn.addEventListener('click', () => {
-        this.removeFromExcludeList(brand);
-        element.classList.remove('bunseki-excluded');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        this.removeFromWatchedKeywords(value);
         this.hideTooltip();
-        // 再ハイライト
-        this.processedElements.delete(element);
-        this.highlightElement(element);
+        this.processedElements = new WeakSet();
+        this.removeAllHighlights();
+        this.highlightPage();
       });
     }
   }
 
   /**
-   * 注目リストに追加
+   * テキスト選択時のミニボタン設定
    */
-  async addToWatchList(keyword) {
-    if (!keyword) return;
+  setupSelectionPopup() {
+    // 通常のドラッグ選択
+    document.addEventListener('mouseup', (e) => {
+      // ツールチップやポップアップ内でのクリックは無視
+      if (e.target.closest('.bunseki-tooltip') || e.target.closest('.bunseki-selection-popup')) {
+        return;
+      }
 
-    const data = await chrome.storage.local.get(['watchedBrands']);
-    const list = data.watchedBrands || [];
+      // Shift+クリックは別処理
+      if (e.shiftKey) {
+        return;
+      }
 
-    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
-      list.push(keyword);
-      await chrome.storage.local.set({ watchedBrands: list });
-    }
+      setTimeout(() => {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        if (selectedText && selectedText.length >= 2 && selectedText.length <= 50) {
+          // タイトル要素内での選択かチェック
+          const anchorNode = selection.anchorNode;
+          const titleElement = anchorNode?.parentElement?.closest('span[data-item-id], .s-item__title');
+
+          if (titleElement || this.isInTitleArea(anchorNode)) {
+            this.showSelectionPopup(selectedText, e);
+          }
+        } else {
+          this.hideSelectionPopup();
+        }
+      }, 10);
+    });
+
+    // Shift+クリックで単語選択
+    document.addEventListener('click', (e) => {
+      if (!e.shiftKey) return;
+
+      // ハイライト済み要素やツールチップは無視
+      if (e.target.closest('.bunseki-brand') ||
+          e.target.closest('.bunseki-keyword') ||
+          e.target.closest('.bunseki-tooltip') ||
+          e.target.closest('.bunseki-selection-popup')) {
+        return;
+      }
+
+      // タイトルエリア内かチェック
+      if (!this.isInTitleArea(e.target)) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // クリック位置の単語を取得
+      const word = this.getWordAtPoint(e.clientX, e.clientY);
+
+      if (word && word.length >= 2 && word.length <= 50) {
+        this.showSelectionPopup(word, e);
+      }
+    }, true);
   }
 
   /**
-   * 除外リストに追加
+   * クリック位置の単語を取得
    */
-  async addToExcludeList(keyword) {
-    if (!keyword) return;
+  getWordAtPoint(x, y) {
+    // caretPositionFromPoint または caretRangeFromPoint を使用
+    let range;
 
-    const data = await chrome.storage.local.get(['excludedBrands']);
-    const list = data.excludedBrands || [];
+    if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (!pos || !pos.offsetNode) return null;
 
-    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
-      list.push(keyword);
-      await chrome.storage.local.set({ excludedBrands: list });
-      this.excludedBrands.push(keyword.toLowerCase());
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.setEnd(pos.offsetNode, pos.offset);
+    } else if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(x, y);
+      if (!range) return null;
+    } else {
+      return null;
     }
+
+    // テキストノードでなければ終了
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return null;
+
+    const text = node.textContent;
+    const offset = range.startOffset;
+
+    // 単語の境界を探す
+    let start = offset;
+    let end = offset;
+
+    // 単語文字: アルファベット、数字、一部の記号
+    const isWordChar = (char) => /[\w\u00C0-\u024F\u0400-\u04FF\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(char);
+
+    // 開始位置を探す
+    while (start > 0 && isWordChar(text[start - 1])) {
+      start--;
+    }
+
+    // 終了位置を探す
+    while (end < text.length && isWordChar(text[end])) {
+      end++;
+    }
+
+    if (start === end) return null;
+
+    const word = text.substring(start, end).trim();
+
+    // 単語をハイライト表示（視覚的フィードバック）
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    const wordRange = document.createRange();
+    wordRange.setStart(node, start);
+    wordRange.setEnd(node, end);
+    selection.addRange(wordRange);
+
+    return word;
   }
 
   /**
-   * 除外リストから削除
+   * タイトルエリア内かどうかをチェック
    */
-  async removeFromExcludeList(keyword) {
-    if (!keyword) return;
+  isInTitleArea(node) {
+    if (!node) return false;
+    let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    while (element) {
+      if (element.matches && element.matches('span[data-item-id], .s-item__title, .s-item__link')) {
+        return true;
+      }
+      element = element.parentElement;
+    }
+    return false;
+  }
 
-    const data = await chrome.storage.local.get(['excludedBrands']);
-    const list = data.excludedBrands || [];
-    const filtered = list.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+  /**
+   * 選択テキスト用ミニポップアップ表示
+   */
+  showSelectionPopup(selectedText, event) {
+    this.hideSelectionPopup();
+    this.hideTooltip();
 
-    await chrome.storage.local.set({ excludedBrands: filtered });
-    this.excludedBrands = this.excludedBrands.filter(k => k !== keyword.toLowerCase());
+    this.selectionPopup = document.createElement('div');
+    this.selectionPopup.className = 'bunseki-selection-popup';
+    this.selectionPopup.innerHTML = `
+      <button class="watch-btn" title="注目キーワードに追加">+注目</button>
+      <button class="exclude-btn" title="除外キーワードに追加">×除外</button>
+    `;
+
+    // 選択範囲の位置を取得
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      const popupX = Math.min(rect.left + window.scrollX, window.innerWidth - 150);
+      const popupY = rect.top + window.scrollY - 40;
+
+      this.selectionPopup.style.left = `${popupX}px`;
+      this.selectionPopup.style.top = `${popupY}px`;
+    }
+
+    document.body.appendChild(this.selectionPopup);
+
+    // ボタンイベント
+    this.selectionPopup.querySelector('.watch-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.addToWatchedKeywords(selectedText);
+      this.hideSelectionPopup();
+      window.getSelection().removeAllRanges();
+      // 再描画
+      this.processedElements = new WeakSet();
+      this.removeAllHighlights();
+      this.highlightPage();
+    });
+
+    this.selectionPopup.querySelector('.exclude-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.addToExcludedKeywords(selectedText);
+      this.hideSelectionPopup();
+      window.getSelection().removeAllRanges();
+      // 再描画
+      this.processedElements = new WeakSet();
+      this.removeAllHighlights();
+      this.highlightPage();
+    });
+  }
+
+  /**
+   * 選択ポップアップを非表示
+   */
+  hideSelectionPopup() {
+    if (this.selectionPopup) {
+      this.selectionPopup.remove();
+      this.selectionPopup = null;
+    }
   }
 
   /**
@@ -865,34 +1154,76 @@ class BunsekiKunHighlighter {
     }
   }
 
+  // ========================================
+  // キーワード管理メソッド
+  // ========================================
+
+  async addToWatchList(keyword) {
+    if (!keyword) return;
+    const data = await chrome.storage.local.get(['watchedBrands']);
+    const list = data.watchedBrands || [];
+    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
+      list.push(keyword);
+      await chrome.storage.local.set({ watchedBrands: list });
+    }
+  }
+
+  async addToExcludeList(keyword) {
+    if (!keyword) return;
+    const data = await chrome.storage.local.get(['excludedBrands']);
+    const list = data.excludedBrands || [];
+    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
+      list.push(keyword);
+      await chrome.storage.local.set({ excludedBrands: list });
+      this.excludedBrands.push(keyword.toLowerCase());
+    }
+  }
+
+  async addToWatchedKeywords(keyword) {
+    if (!keyword) return;
+    const data = await chrome.storage.local.get(['watchedKeywords']);
+    const list = data.watchedKeywords || [];
+    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
+      list.push(keyword);
+      await chrome.storage.local.set({ watchedKeywords: list });
+      this.watchedKeywords = list;
+    }
+  }
+
+  async removeFromWatchedKeywords(keyword) {
+    if (!keyword) return;
+    const data = await chrome.storage.local.get(['watchedKeywords']);
+    const list = data.watchedKeywords || [];
+    const filtered = list.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+    await chrome.storage.local.set({ watchedKeywords: filtered });
+    this.watchedKeywords = filtered;
+  }
+
+  async addToExcludedKeywords(keyword) {
+    if (!keyword) return;
+    const data = await chrome.storage.local.get(['excludedKeywords']);
+    const list = data.excludedKeywords || [];
+    if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
+      list.push(keyword);
+      await chrome.storage.local.set({ excludedKeywords: list });
+      this.excludedKeywords = list;
+    }
+  }
+
   /**
-   * 市場データをキャプチャしてbackground経由でIndexedDBに保存
+   * 市場データをキャプチャ
    */
   async captureMarketData() {
     try {
-      console.log('ぶんせき君: captureMarketData開始');
-      console.log('ぶんせき君: 現在のURL:', window.location.href);
-
       const pageData = this.extractPageData();
-      console.log('ぶんせき君: pageType:', pageData.pageType);
-      console.log('ぶんせき君: 抽出アイテム数:', pageData.items?.length || 0);
 
       if (!pageData.items || pageData.items.length === 0) {
-        // デバッグ情報を追加
-        const debugInfo = {
-          pageType: pageData.pageType,
-          spanCount: document.querySelectorAll('span[data-item-id]').length,
-          tableRowCount: document.querySelectorAll('table tbody tr').length,
-          sItemCount: document.querySelectorAll('.s-item').length
-        };
-        console.log('ぶんせき君: デバッグ情報:', debugInfo);
         return {
           success: false,
-          error: `データが見つかりませんでした (pageType: ${pageData.pageType}, spans: ${debugInfo.spanCount}, rows: ${debugInfo.tableRowCount})`
+          error: `データが見つかりませんでした`
         };
       }
 
-      // element参照を除去（シリアライズできないため）
       const cleanItems = pageData.items.map(item => ({
         title: item.title,
         brand: item.brand,
@@ -901,17 +1232,13 @@ class BunsekiKunHighlighter {
         source: window.location.href
       }));
 
-      // 現在のシートIDを取得（デフォルトはsheet1）
       const currentSheetId = localStorage.getItem('currentSheetId') || 'sheet1';
 
-      // background scriptに送信して保存
       const result = await chrome.runtime.sendMessage({
         action: 'saveMarketData',
         items: cleanItems,
         sheetId: currentSheetId
       });
-
-      console.log('ぶんせき君: 保存結果:', result);
 
       if (result && result.success) {
         return {

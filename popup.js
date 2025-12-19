@@ -8923,3 +8923,266 @@ window.isPremiumUser = isPremiumUser;
 window.showUpgradePrompt = showUpgradePrompt;
 window.openBrandMasterModal = openBrandMasterModal;
 window.openSettingsModal = openSettingsModal;
+
+// =====================================
+// キーワード管理機能
+// =====================================
+
+/**
+ * キーワードモーダルを開く
+ */
+function openKeywordModal() {
+  const modal = document.getElementById('keywordModal');
+  modal.style.display = 'flex';
+  loadKeywordLists();
+}
+
+/**
+ * キーワードモーダルを閉じる
+ */
+function closeKeywordModal() {
+  const modal = document.getElementById('keywordModal');
+  modal.style.display = 'none';
+}
+
+/**
+ * キーワードリストを読み込み表示
+ */
+async function loadKeywordLists() {
+  const data = await chrome.storage.local.get(['watchedKeywords', 'excludedKeywords']);
+  const watchedKeywords = data.watchedKeywords || [];
+  const excludedKeywords = data.excludedKeywords || [];
+
+  // カウントバッジ更新
+  document.getElementById('watchedCountBadge').textContent = watchedKeywords.length;
+  document.getElementById('excludedCountBadge').textContent = excludedKeywords.length;
+
+  // 注目キーワードリスト
+  renderKeywordList('watchedKeywordList', watchedKeywords, 'watchedKeywords');
+
+  // 除外キーワードリスト
+  renderKeywordList('excludedKeywordList', excludedKeywords, 'excludedKeywords');
+}
+
+/**
+ * キーワードリストをレンダリング
+ */
+function renderKeywordList(containerId, keywords, listName) {
+  const container = document.getElementById(containerId);
+
+  if (keywords.length === 0) {
+    container.innerHTML = '<div class="keyword-empty">キーワードがありません</div>';
+    return;
+  }
+
+  container.innerHTML = keywords.map(keyword => {
+    const escaped = escapeHtmlKeyword(keyword);
+    return '<div class="keyword-item">' +
+      '<span class="keyword-item-text">' + escaped + '</span>' +
+      '<button class="keyword-item-delete" data-keyword="' + escaped + '" data-list="' + listName + '" title="削除">×</button>' +
+    '</div>';
+  }).join('');
+
+  // 削除ボタンイベント
+  container.querySelectorAll('.keyword-item-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      removeKeywordFromList(btn.dataset.list, btn.dataset.keyword);
+    });
+  });
+}
+
+/**
+ * HTMLエスケープ（キーワード用）
+ */
+function escapeHtmlKeyword(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * キーワードを追加
+ */
+async function addKeywordToList(listName, keyword) {
+  if (!keyword || keyword.trim() === '') return;
+
+  const data = await chrome.storage.local.get([listName]);
+  const list = data[listName] || [];
+
+  if (!list.map(k => k.toLowerCase()).includes(keyword.toLowerCase())) {
+    list.push(keyword.trim());
+    await chrome.storage.local.set({ [listName]: list });
+    loadKeywordLists();
+    showAlert('キーワードを追加しました', 'success');
+  } else {
+    showAlert('すでに登録されています', 'warning');
+  }
+}
+
+/**
+ * キーワードを削除
+ */
+async function removeKeywordFromList(listName, keyword) {
+  const data = await chrome.storage.local.get([listName]);
+  const list = data[listName] || [];
+  const filtered = list.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+  await chrome.storage.local.set({ [listName]: filtered });
+  loadKeywordLists();
+}
+
+/**
+ * キーワードをエクスポート
+ */
+async function exportKeywords() {
+  const data = await chrome.storage.local.get(['watchedKeywords', 'excludedKeywords']);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bunseki-keywords-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showAlert('キーワードをエクスポートしました', 'success');
+}
+
+/**
+ * キーワードをインポート
+ */
+async function importKeywords(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (data.watchedKeywords || data.excludedKeywords) {
+      await chrome.storage.local.set({
+        watchedKeywords: data.watchedKeywords || [],
+        excludedKeywords: data.excludedKeywords || []
+      });
+      loadKeywordLists();
+      showAlert('キーワードをインポートしました', 'success');
+    } else {
+      showAlert('有効なキーワードファイルではありません', 'error');
+    }
+  } catch (e) {
+    showAlert('ファイルの読み込みに失敗しました', 'error');
+  }
+}
+
+/**
+ * キーワードタブ切り替え
+ */
+function switchKeywordTab(tabName) {
+  // タブボタン
+  document.querySelectorAll('.keyword-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.keywordTab === tabName);
+  });
+
+  // セクション
+  const watchedSection = document.getElementById('watchedKeywordsSection');
+  const excludedSection = document.getElementById('excludedKeywordsSection');
+  
+  if (tabName === 'watched') {
+    watchedSection.style.display = 'block';
+    watchedSection.classList.add('active');
+    excludedSection.style.display = 'none';
+    excludedSection.classList.remove('active');
+  } else {
+    watchedSection.style.display = 'none';
+    watchedSection.classList.remove('active');
+    excludedSection.style.display = 'block';
+    excludedSection.classList.add('active');
+  }
+}
+
+/**
+ * キーワードUI初期化
+ */
+function initKeywordUI() {
+  // キーワードボタン
+  const keywordBtn = document.getElementById('keywordBtn');
+  if (keywordBtn) {
+    keywordBtn.addEventListener('click', openKeywordModal);
+  }
+
+  // モーダル閉じるボタン
+  const closeBtn = document.getElementById('closeKeywordModal');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeKeywordModal);
+  }
+
+  // タブ切り替え
+  document.querySelectorAll('.keyword-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchKeywordTab(tab.dataset.keywordTab);
+    });
+  });
+
+  // 注目キーワード追加
+  const addWatchedBtn = document.getElementById('addWatchedKeywordBtn');
+  const watchedInput = document.getElementById('watchedKeywordInput');
+  if (addWatchedBtn && watchedInput) {
+    addWatchedBtn.addEventListener('click', () => {
+      addKeywordToList('watchedKeywords', watchedInput.value);
+      watchedInput.value = '';
+    });
+    watchedInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addKeywordToList('watchedKeywords', watchedInput.value);
+        watchedInput.value = '';
+      }
+    });
+  }
+
+  // 除外キーワード追加
+  const addExcludedBtn = document.getElementById('addExcludedKeywordBtn');
+  const excludedInput = document.getElementById('excludedKeywordInput');
+  if (addExcludedBtn && excludedInput) {
+    addExcludedBtn.addEventListener('click', () => {
+      addKeywordToList('excludedKeywords', excludedInput.value);
+      excludedInput.value = '';
+    });
+    excludedInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addKeywordToList('excludedKeywords', excludedInput.value);
+        excludedInput.value = '';
+      }
+    });
+  }
+
+  // エクスポート
+  const exportBtn = document.getElementById('exportKeywordsBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportKeywords);
+  }
+
+  // インポート
+  const importBtn = document.getElementById('importKeywordsBtn');
+  const importFile = document.getElementById('keywordImportFile');
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', (e) => {
+      if (e.target.files[0]) {
+        importKeywords(e.target.files[0]);
+        e.target.value = '';
+      }
+    });
+  }
+
+  // モーダル外クリックで閉じる
+  const modal = document.getElementById('keywordModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeKeywordModal();
+      }
+    });
+  }
+}
+
+// グローバルエクスポート
+window.openKeywordModal = openKeywordModal;
+
+// DOMContentLoaded時にキーワードUIを初期化
+document.addEventListener('DOMContentLoaded', () => {
+  initKeywordUI();
+});
