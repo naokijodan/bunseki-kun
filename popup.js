@@ -522,7 +522,17 @@ async function restoreAIResults() {
 /**
  * 市場データ分析結果（データ入力タブ）を復元
  */
-function restoreMarketDataAnalysisResult(marketData) {
+async function restoreMarketDataAnalysisResult(marketData) {
+  // marketDataが渡されなかった場合はDBから取得
+  if (!marketData) {
+    marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
+  }
+
+  if (!marketData || marketData.length === 0) {
+    console.log('市場データがありません');
+    return;
+  }
+
   // ブランド分類を計算
   const brands = {};
   let classifiedCount = 0;
