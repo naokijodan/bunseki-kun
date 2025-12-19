@@ -222,7 +222,7 @@ class BunsekiKunHighlighter {
           break;
 
         case 'captureMarketData':
-          this.captureMarketData().then(result => {
+          this.captureMarketData(request.sheetId).then(result => {
             sendResponse(result);
           }).catch(error => {
             sendResponse({ success: false, error: error.message });
@@ -1213,7 +1213,7 @@ class BunsekiKunHighlighter {
   /**
    * 市場データをキャプチャ
    */
-  async captureMarketData() {
+  async captureMarketData(sheetId = 'sheet1') {
     try {
       const pageData = this.extractPageData();
 
@@ -1232,12 +1232,13 @@ class BunsekiKunHighlighter {
         source: window.location.href
       }));
 
-      const currentSheetId = localStorage.getItem('currentSheetId') || 'sheet1';
+      // sheetIdは引数から受け取る（popup.jsから渡される）
+      const targetSheetId = sheetId || 'sheet1';
 
       const result = await chrome.runtime.sendMessage({
         action: 'saveMarketData',
         items: cleanItems,
-        sheetId: currentSheetId
+        sheetId: targetSheetId
       });
 
       if (result && result.success) {

@@ -4287,7 +4287,8 @@ async function fetchMarketDataFromCurrentTab() {
     }
 
     const response = await chrome.tabs.sendMessage(tabs[0].id, {
-      action: 'captureMarketData'
+      action: 'captureMarketData',
+      sheetId: currentSheetId
     });
 
     if (response && response.success) {
