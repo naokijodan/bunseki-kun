@@ -47,7 +47,8 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function loadSettings() {
   try {
-    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+    // popup.jsと同じくchrome.storage.localを使用
+    const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
 
     elements.openaiApiKey.value = settings.openaiApiKey || '';
     elements.claudeApiKey.value = settings.claudeApiKey || '';
@@ -210,13 +211,14 @@ async function saveSettings() {
   const geminiApiKey = elements.geminiApiKey.value.trim();
 
   try {
-    await chrome.storage.sync.set({
+    // popup.jsと同じくchrome.storage.localを使用
+    await chrome.storage.local.set({
       openaiApiKey,
       claudeApiKey,
       geminiApiKey
     });
 
-    showAlert('success', '設定を保存しました');
+    showAlert('success', '設定を保存しました。ポップアップを開き直すと反映されます。');
 
     // 状態を更新
     updateAllStatus({ openaiApiKey, claudeApiKey, geminiApiKey });
@@ -235,7 +237,8 @@ async function resetSettings() {
   }
 
   try {
-    await chrome.storage.sync.set(DEFAULT_SETTINGS);
+    // popup.jsと同じくchrome.storage.localを使用
+    await chrome.storage.local.set(DEFAULT_SETTINGS);
 
     elements.openaiApiKey.value = '';
     elements.claudeApiKey.value = '';

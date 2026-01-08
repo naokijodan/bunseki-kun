@@ -452,9 +452,8 @@ async function switchSheet(sheetId) {
 async function restoreAllAnalysisUI() {
   const hasMyData = analyzer.activeListings.length > 0 || analyzer.soldItems.length > 0;
 
-  // 市場データを取得
-  const allMarketData = await BunsekiDB.getMarketData();
-  const marketData = allMarketData.filter(item => item.sheetId === currentSheetId);
+  // 市場データを取得（シートIDでフィルタ）
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
   const hasMarketData = marketData.length > 0;
 
   if (hasMyData) {
@@ -579,110 +578,207 @@ async function restoreMarketDataAnalysisResult(marketData) {
 
     // ブランド内訳を表示
     const breakdownEl = document.getElementById('marketBrandBreakdown');
+    const marketBrandToggle = document.getElementById('marketBrandToggle');
     if (breakdownEl) {
       const sortedBrands = Object.entries(brands)
         .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+        .sort((a, b) => b[1] - a[1]);
+      const totalBrandCount = sortedBrands.length;
 
-      breakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
-        <div class="breakdown-item expandable" data-brand="${escapeHtml(brand)}">
-          <div class="breakdown-header">
-            <span class="expand-icon">▶</span>
-            <span class="brand-name">${escapeHtml(brand)}</span>
-            <span class="brand-count">${count}件</span>
+      // 現在のトグル状態を保持
+      const isCurrentlyExpandedBrand = marketBrandToggle && marketBrandToggle.dataset.expanded === 'true';
+
+      const renderMarketBrands = (showAll) => {
+        const displayBrands = showAll ? sortedBrands : sortedBrands.slice(0, 10);
+        breakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+          <div class="breakdown-item expandable" data-brand="${escapeHtml(brand)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(brand)}</span>
+              <span class="brand-count">${count}件</span>
+            </div>
+            <div class="breakdown-items" style="display: none;">
+              <div class="loading-items">読み込み中...</div>
+            </div>
           </div>
-          <div class="breakdown-items" style="display: none;">
-            <div class="loading-items">読み込み中...</div>
-          </div>
-        </div>
-      `).join('');
+        `).join('');
 
-      // 展開クリックイベント
-      breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-        item.querySelector('.breakdown-header').addEventListener('click', function() {
-          const brand = item.dataset.brand;
-          const itemsDiv = item.querySelector('.breakdown-items');
-          const expandIcon = item.querySelector('.expand-icon');
+        // 展開クリックイベント
+        breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const brand = item.dataset.brand;
+            const itemsDiv = item.querySelector('.breakdown-items');
+            const expandIcon = item.querySelector('.expand-icon');
 
-          if (itemsDiv.style.display === 'none') {
-            itemsDiv.style.display = 'block';
-            expandIcon.textContent = '▼';
-            item.classList.add('expanded');
-            loadMarketBrandItems(brand, itemsDiv, marketData);
-          } else {
-            itemsDiv.style.display = 'none';
-            expandIcon.textContent = '▶';
-            item.classList.remove('expanded');
-          }
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMarketBrandItems(brand, itemsDiv, marketData);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
         });
-      });
+      };
+
+      renderMarketBrands(isCurrentlyExpandedBrand);
+
+      // トグルボタン設定
+      if (marketBrandToggle && totalBrandCount > 10) {
+        marketBrandToggle.textContent = isCurrentlyExpandedBrand ? `(上位10件に戻す)` : `(上位10件 - 全${totalBrandCount}件表示)`;
+        marketBrandToggle.style.display = 'inline';
+        marketBrandToggle.onclick = () => {
+          const isExpanded = marketBrandToggle.dataset.expanded === 'true';
+          marketBrandToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+          marketBrandToggle.textContent = isExpanded ? `(上位10件 - 全${totalBrandCount}件表示)` : `(上位10件に戻す)`;
+          breakdownEl.classList.toggle('expanded', !isExpanded);
+          renderMarketBrands(!isExpanded);
+        };
+      } else if (marketBrandToggle) {
+        marketBrandToggle.style.display = 'none';
+      }
     }
 
-    // カテゴリ分類を計算
-    const categories = {};
-    let categoryClassifiedCount = 0;
+    // カテゴリ分類を計算（階層構造）
+    const marketCategories = {};  // { main: { count, subs: { sub: count } } }
     let categoryUnclassifiedCount = 0;
 
     marketData.forEach(item => {
-      let category;
-      if (item.categoryManual && item.category) {
-        category = item.category;
-      } else if (item.categoryCleared) {
-        category = null;
-      } else {
-        category = detectCategoryFromTitle(item.title);
-      }
-
-      if (category && category !== '(不明)' && category !== '(未分類)' && category !== null) {
-        categoryClassifiedCount++;
-        categories[category] = (categories[category] || 0) + 1;
-      } else {
+      const { main, sub } = detectCategoryWithSub(item.title);
+      if (main === '未分類' || main === '(未分類)' || main === '(不明)') {
         categoryUnclassifiedCount++;
-        categories['(未分類)'] = (categories['(未分類)'] || 0) + 1;
       }
+      if (!marketCategories[main]) {
+        marketCategories[main] = { count: 0, subs: {} };
+      }
+      marketCategories[main].count++;
+      if (!marketCategories[main].subs[sub]) {
+        marketCategories[main].subs[sub] = 0;
+      }
+      marketCategories[main].subs[sub]++;
     });
 
-    // カテゴリ内訳を表示
+    // カテゴリ内訳を表示（階層構造）
     const categoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
+    const marketCategoryToggle = document.getElementById('marketCategoryToggle');
     if (categoryBreakdownEl) {
-      const sortedCategories = Object.entries(categories)
-        .filter(([category]) => category !== '(未分類)' && category !== '(不明)')
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+      const sortedCategories = Object.entries(marketCategories)
+        .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他' && category !== '未分類')
+        .sort((a, b) => b[1].count - a[1].count);
+      const totalCategoryCount = sortedCategories.length;
 
-      categoryBreakdownEl.innerHTML = sortedCategories.map(([category, count]) => `
-        <div class="breakdown-item expandable" data-category="${escapeHtml(category)}">
-          <div class="breakdown-header">
-            <span class="expand-icon">▶</span>
-            <span class="brand-name">${escapeHtml(category)}</span>
-            <span class="brand-count">${count}件</span>
-          </div>
-          <div class="breakdown-items" style="display: none;">
-            <div class="loading-items">読み込み中...</div>
-          </div>
-        </div>
-      `).join('');
+      // 現在のトグル状態を保持
+      const isCurrentlyExpandedCat = marketCategoryToggle && marketCategoryToggle.dataset.expanded === 'true';
 
-      // 展開クリックイベント
-      categoryBreakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-        item.querySelector('.breakdown-header').addEventListener('click', function() {
-          const category = item.dataset.category;
-          const itemsDiv = item.querySelector('.breakdown-items');
-          const expandIcon = item.querySelector('.expand-icon');
+      const renderMarketCategories = (showAll) => {
+        const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
+        categoryBreakdownEl.innerHTML = displayCategories.map(([mainCategory, data]) => {
+          // 細分類をソート（その他・未分類を除く）
+          const sortedSubs = Object.entries(data.subs)
+            .filter(([sub]) => sub !== 'その他' && sub !== '未分類')
+            .sort((a, b) => b[1] - a[1]);
+          const otherCount = data.subs['その他'] || 0;
 
-          if (itemsDiv.style.display === 'none') {
-            itemsDiv.style.display = 'block';
-            expandIcon.textContent = '▼';
-            item.classList.add('expanded');
-            loadMarketCategoryItems(category, itemsDiv, marketData);
-          } else {
-            itemsDiv.style.display = 'none';
-            expandIcon.textContent = '▶';
-            item.classList.remove('expanded');
-          }
+          return `
+            <div class="breakdown-item expandable category-main" data-category="${escapeHtml(mainCategory)}">
+              <div class="breakdown-header">
+                <span class="expand-icon">▶</span>
+                <span class="brand-name">${escapeHtml(mainCategory)}</span>
+                <span class="brand-count">${data.count}件</span>
+              </div>
+              <div class="breakdown-items subcategory-list" style="display: none;">
+                ${sortedSubs.map(([subCategory, subCount]) => `
+                  <div class="breakdown-item expandable subcategory-item" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="${escapeHtml(subCategory)}">
+                    <div class="breakdown-header sub-header">
+                      <span class="expand-icon">▶</span>
+                      <span class="brand-name">${escapeHtml(subCategory)}</span>
+                      <span class="brand-count">${subCount}件</span>
+                    </div>
+                    <div class="breakdown-items item-list" style="display: none;">
+                      <div class="loading-items">読み込み中...</div>
+                    </div>
+                  </div>
+                `).join('')}
+                ${otherCount > 0 ? `
+                  <div class="breakdown-item expandable subcategory-item other-sub" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="その他">
+                    <div class="breakdown-header sub-header">
+                      <span class="expand-icon">▶</span>
+                      <span class="brand-name">その他</span>
+                      <span class="brand-count">${otherCount}件</span>
+                    </div>
+                    <div class="breakdown-items item-list" style="display: none;">
+                      <div class="loading-items">読み込み中...</div>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // 大分類の展開クリックイベント
+        categoryBreakdownEl.querySelectorAll('.category-main > .breakdown-header').forEach(header => {
+          header.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const item = header.closest('.category-main');
+            const itemsDiv = item.querySelector('.subcategory-list');
+            const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
         });
-      });
+
+        // 細分類の展開クリックイベント
+        categoryBreakdownEl.querySelectorAll('.subcategory-item > .breakdown-header').forEach(header => {
+          header.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const item = header.closest('.subcategory-item');
+            const mainCategory = item.dataset.mainCategory;
+            const subCategory = item.dataset.subCategory;
+            const itemsDiv = item.querySelector('.item-list');
+            const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMarketCategorySubItems(mainCategory, subCategory, itemsDiv, marketData);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
+        });
+      };
+
+      renderMarketCategories(isCurrentlyExpandedCat);
+
+      // トグルボタン設定
+      if (marketCategoryToggle && totalCategoryCount > 10) {
+        marketCategoryToggle.textContent = isCurrentlyExpandedCat ? `(上位10件に戻す)` : `(上位10件 - 全${totalCategoryCount}件表示)`;
+        marketCategoryToggle.style.display = 'inline';
+        marketCategoryToggle.onclick = () => {
+          const isExpanded = marketCategoryToggle.dataset.expanded === 'true';
+          marketCategoryToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+          marketCategoryToggle.textContent = isExpanded ? `(上位10件 - 全${totalCategoryCount}件表示)` : `(上位10件に戻す)`;
+          categoryBreakdownEl.classList.toggle('expanded', !isExpanded);
+          renderMarketCategories(!isExpanded);
+        };
+      } else if (marketCategoryToggle) {
+        marketCategoryToggle.style.display = 'none';
+      }
     }
 
     // カテゴリ未分類セクションを更新
@@ -1430,46 +1526,164 @@ async function analyzeMyData() {
       }
     }
 
-    // ブランド内訳を表示（クリックで展開可能）- 未分類を除外
+    // ブランド内訳を表示（トグル機能付き）- 未分類を除外
     const breakdownEl = document.getElementById('myBrandBreakdown');
+    const myBrandToggle = document.getElementById('myBrandToggle');
     if (breakdownEl) {
       const sortedBrands = Object.entries(brands)
         .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+        .sort((a, b) => b[1] - a[1]);
+      const totalBrandCount = sortedBrands.length;
 
-      breakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
-        <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
-          <div class="breakdown-header">
-            <span class="expand-icon">▶</span>
-            <span class="brand-name">${escapeHtml(brand)}</span>
-            <span class="brand-count">${count}件</span>
+      let showAllBrands = false;
+
+      const renderBrands = () => {
+        const displayBrands = showAllBrands ? sortedBrands : sortedBrands.slice(0, 10);
+
+        breakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+          <div class="breakdown-item expandable" data-brand="${escapeHtml(brand)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(brand)}</span>
+              <span class="brand-count">${count}件</span>
+            </div>
+            <div class="breakdown-items" style="display: none;">
+              <div class="loading-items">読み込み中...</div>
+            </div>
           </div>
-          <div class="breakdown-items" style="display: none;">
-            <div class="loading-items">読み込み中...</div>
-          </div>
-        </div>
-      `).join('');
+        `).join('');
 
-      // 展開クリックイベント
-      breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-        item.querySelector('.breakdown-header').addEventListener('click', function() {
-          const brand = item.dataset.brand;
-          const itemsDiv = item.querySelector('.breakdown-items');
-          const expandIcon = item.querySelector('.expand-icon');
+        // 展開クリックイベント
+        breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const brand = item.dataset.brand;
+            const itemsDiv = item.querySelector('.breakdown-items');
+            const expandIcon = item.querySelector('.expand-icon');
 
-          if (itemsDiv.style.display === 'none') {
-            itemsDiv.style.display = 'block';
-            expandIcon.textContent = '▼';
-            item.classList.add('expanded');
-            loadMyBrandItems(brand, itemsDiv, allItems);
-          } else {
-            itemsDiv.style.display = 'none';
-            expandIcon.textContent = '▶';
-            item.classList.remove('expanded');
-          }
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMyBrandItems(brand, itemsDiv, allItems);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
         });
+      };
+
+      renderBrands();
+
+      // トグルボタンの設定
+      if (myBrandToggle) {
+        if (totalBrandCount > 10) {
+          myBrandToggle.style.display = 'block';
+          myBrandToggle.textContent = `全て表示 (${totalBrandCount}件)`;
+          myBrandToggle.onclick = () => {
+            showAllBrands = !showAllBrands;
+            myBrandToggle.textContent = showAllBrands ? 'トップ10のみ表示' : `全て表示 (${totalBrandCount}件)`;
+            renderBrands();
+          };
+        } else {
+          myBrandToggle.style.display = 'none';
+        }
+      }
+    }
+
+    // カテゴリ別内訳を表示（階層構造 + トグル機能付き）
+    const categoryBreakdownEl = document.getElementById('myCategoryBreakdown');
+    const myCategoryToggle = document.getElementById('myCategoryToggle');
+    if (categoryBreakdownEl) {
+      // カテゴリを階層構造で集計
+      const categories = {};  // { main: { count, subs: { sub: count } } }
+      allItems.forEach(item => {
+        const { main, sub } = detectCategoryWithSub(item.title);
+        if (!categories[main]) {
+          categories[main] = { count: 0, subs: {} };
+        }
+        categories[main].count++;
+        if (!categories[main].subs[sub]) {
+          categories[main].subs[sub] = 0;
+        }
+        categories[main].subs[sub]++;
       });
+
+      const sortedCategories = Object.entries(categories)
+        .filter(([cat]) => cat !== '(その他)' && cat !== 'その他')
+        .sort((a, b) => b[1].count - a[1].count);
+      const totalCategoryCount = sortedCategories.length;
+
+      let showAllCategories = false;
+
+      const renderCategories = () => {
+        const displayCategories = showAllCategories ? sortedCategories : sortedCategories.slice(0, 10);
+
+        categoryBreakdownEl.innerHTML = displayCategories.map(([category, data]) => {
+          const sortedSubs = Object.entries(data.subs)
+            .filter(([sub]) => sub !== category)
+            .sort((a, b) => b[1] - a[1]);
+
+          const subHtml = sortedSubs.length > 0 ? `
+            <div class="sub-categories" style="display: none;">
+              ${sortedSubs.map(([sub, count]) => `
+                <div class="sub-category-item">
+                  <span class="sub-category-name">${escapeHtml(sub)}</span>
+                  <span class="sub-category-count">${count}件</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '';
+
+          return `
+            <div class="breakdown-item ${sortedSubs.length > 0 ? 'has-subs' : ''}" data-category="${escapeHtml(category)}">
+              <div class="breakdown-header">
+                ${sortedSubs.length > 0 ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon" style="visibility:hidden">▶</span>'}
+                <span class="category-name">${escapeHtml(category)}</span>
+                <span class="category-count">${data.count}件</span>
+              </div>
+              ${subHtml}
+            </div>
+          `;
+        }).join('');
+
+        // サブカテゴリ展開イベント
+        categoryBreakdownEl.querySelectorAll('.breakdown-item.has-subs').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const subsDiv = item.querySelector('.sub-categories');
+            const expandIcon = item.querySelector('.expand-icon');
+            if (subsDiv) {
+              if (subsDiv.style.display === 'none') {
+                subsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+              } else {
+                subsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            }
+          });
+        });
+      };
+
+      renderCategories();
+
+      // トグルボタンの設定
+      if (myCategoryToggle) {
+        if (totalCategoryCount > 10) {
+          myCategoryToggle.style.display = 'block';
+          myCategoryToggle.textContent = `全て表示 (${totalCategoryCount}件)`;
+          myCategoryToggle.onclick = () => {
+            showAllCategories = !showAllCategories;
+            myCategoryToggle.textContent = showAllCategories ? 'トップ10のみ表示' : `全て表示 (${totalCategoryCount}件)`;
+            renderCategories();
+          };
+        } else {
+          myCategoryToggle.style.display = 'none';
+        }
+      }
     }
 
     // 保存ステータス表示
@@ -1862,6 +2076,139 @@ async function refreshMyDataAnalysis() {
       };
     } else if (myBrandToggle) {
       myBrandToggle.style.display = totalBrandCount > 0 ? 'none' : 'none';
+    }
+  }
+
+  // カテゴリ分類も計算（階層構造）
+  const myCategories = {};  // { main: { count, subs: { sub: count } } }
+  allItems.forEach(item => {
+    const { main, sub } = detectCategoryWithSub(item.title);
+    if (!myCategories[main]) {
+      myCategories[main] = { count: 0, subs: {} };
+    }
+    myCategories[main].count++;
+    if (!myCategories[main].subs[sub]) {
+      myCategories[main].subs[sub] = 0;
+    }
+    myCategories[main].subs[sub]++;
+  });
+
+  // カテゴリ内訳を表示（階層構造） - 未分類を除外
+  const myCategoryBreakdownEl = document.getElementById('myCategoryBreakdown');
+  const myCategoryToggle = document.getElementById('myCategoryToggle');
+  if (myCategoryBreakdownEl) {
+    const sortedCategories = Object.entries(myCategories)
+      .filter(([category]) => category !== '(未分類)' && category !== '(不明)' && category !== 'その他' && category !== '未分類')
+      .sort((a, b) => b[1].count - a[1].count);
+    const totalCategoryCount = sortedCategories.length;
+
+    // 現在のトグル状態を保持
+    const isCurrentlyExpandedCat = myCategoryToggle && myCategoryToggle.dataset.expanded === 'true';
+
+    const renderMyCategories = (showAll) => {
+      const displayCategories = showAll ? sortedCategories : sortedCategories.slice(0, 10);
+      myCategoryBreakdownEl.innerHTML = displayCategories.map(([mainCategory, data]) => {
+        // 細分類をソート（その他を除く）
+        const sortedSubs = Object.entries(data.subs)
+          .filter(([sub]) => sub !== 'その他' && sub !== '未分類')
+          .sort((a, b) => b[1] - a[1]);
+        const otherCount = data.subs['その他'] || 0;
+
+        return `
+          <div class="breakdown-item expandable category-main" data-category="${escapeHtml(mainCategory)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(mainCategory)}</span>
+              <span class="brand-count">${data.count}件</span>
+            </div>
+            <div class="breakdown-items subcategory-list" style="display: none;">
+              ${sortedSubs.map(([subCategory, subCount]) => `
+                <div class="breakdown-item expandable subcategory-item" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="${escapeHtml(subCategory)}">
+                  <div class="breakdown-header sub-header">
+                    <span class="expand-icon">▶</span>
+                    <span class="brand-name">${escapeHtml(subCategory)}</span>
+                    <span class="brand-count">${subCount}件</span>
+                  </div>
+                  <div class="breakdown-items item-list" style="display: none;">
+                    <div class="loading-items">読み込み中...</div>
+                  </div>
+                </div>
+              `).join('')}
+              ${otherCount > 0 ? `
+                <div class="breakdown-item expandable subcategory-item other-sub" data-main-category="${escapeHtml(mainCategory)}" data-sub-category="その他">
+                  <div class="breakdown-header sub-header">
+                    <span class="expand-icon">▶</span>
+                    <span class="brand-name">その他</span>
+                    <span class="brand-count">${otherCount}件</span>
+                  </div>
+                  <div class="breakdown-items item-list" style="display: none;">
+                    <div class="loading-items">読み込み中...</div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 大分類の展開クリックイベント
+      myCategoryBreakdownEl.querySelectorAll('.category-main > .breakdown-header').forEach(header => {
+        header.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const item = header.closest('.category-main');
+          const itemsDiv = item.querySelector('.subcategory-list');
+          const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+          if (itemsDiv.style.display === 'none') {
+            itemsDiv.style.display = 'block';
+            expandIcon.textContent = '▼';
+            item.classList.add('expanded');
+          } else {
+            itemsDiv.style.display = 'none';
+            expandIcon.textContent = '▶';
+            item.classList.remove('expanded');
+          }
+        });
+      });
+
+      // 細分類の展開クリックイベント
+      myCategoryBreakdownEl.querySelectorAll('.subcategory-item > .breakdown-header').forEach(header => {
+        header.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const item = header.closest('.subcategory-item');
+          const mainCategory = item.dataset.mainCategory;
+          const subCategory = item.dataset.subCategory;
+          const itemsDiv = item.querySelector('.item-list');
+          const expandIcon = item.querySelector(':scope > .breakdown-header > .expand-icon');
+
+          if (itemsDiv.style.display === 'none') {
+            itemsDiv.style.display = 'block';
+            expandIcon.textContent = '▼';
+            item.classList.add('expanded');
+            loadMyCategorySubItems(mainCategory, subCategory, itemsDiv, allItems);
+          } else {
+            itemsDiv.style.display = 'none';
+            expandIcon.textContent = '▶';
+            item.classList.remove('expanded');
+          }
+        });
+      });
+    };
+
+    renderMyCategories(isCurrentlyExpandedCat);
+
+    if (myCategoryToggle && totalCategoryCount > 10) {
+      myCategoryToggle.textContent = isCurrentlyExpandedCat ? `(上位10件に戻す)` : `(上位10件 - 全${totalCategoryCount}件表示)`;
+      myCategoryToggle.style.display = 'inline';
+      myCategoryToggle.onclick = () => {
+        const isExpanded = myCategoryToggle.dataset.expanded === 'true';
+        myCategoryToggle.dataset.expanded = isExpanded ? 'false' : 'true';
+        myCategoryToggle.textContent = isExpanded ? `(上位10件 - 全${totalCategoryCount}件表示)` : `(上位10件に戻す)`;
+        myCategoryBreakdownEl.classList.toggle('expanded', !isExpanded);
+        renderMyCategories(!isExpanded);
+      };
+    } else if (myCategoryToggle) {
+      myCategoryToggle.style.display = 'none';
     }
   }
 
@@ -3230,9 +3577,8 @@ function clearMyData() {
  */
 async function updateMarketDataInfo() {
   try {
-    const allMarketData = await BunsekiDB.getMarketData();
-    // 現在のシートIDでフィルタ（完全一致のみ）
-    const marketData = allMarketData.filter(item => item.sheetId === currentSheetId);
+    // 市場データを取得（シートIDでフィルタ）
+    const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
     console.log(`シート ${currentSheetId}: 市場データ${marketData.length}件`);
 
@@ -3274,9 +3620,8 @@ async function updateMarketDataInfo() {
  * 市場データを分析
  */
 async function analyzeMarketData() {
-  const allMarketData = await BunsekiDB.getMarketData();
-  // 現在のシートIDでフィルタ（完全一致のみ）
-  const marketData = allMarketData.filter(item => item.sheetId === currentSheetId);
+  // 市場データを取得（シートIDでフィルタ）
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
   if (!marketData || marketData.length === 0) {
     showAlert('分析する市場データがありません', 'warning');
@@ -3346,45 +3691,165 @@ async function analyzeMarketData() {
       }
     }
 
-    // ブランド内訳を表示（クリックで展開可能）
+    // ブランド内訳を表示（トグル機能付き）
     const breakdownEl = document.getElementById('marketBrandBreakdown');
+    const marketBrandToggle = document.getElementById('marketBrandToggle');
     if (breakdownEl) {
       const sortedBrands = Object.entries(brands)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+        .filter(([brand]) => brand !== '(未分類)' && brand !== '(不明)' && brand !== 'その他')
+        .sort((a, b) => b[1] - a[1]);
+      const totalBrandCount = sortedBrands.length;
 
-      breakdownEl.innerHTML = sortedBrands.map(([brand, count]) => `
-        <div class="breakdown-item expandable ${brand === '(未分類)' ? 'unknown' : ''}" data-brand="${escapeHtml(brand)}">
-          <div class="breakdown-header">
-            <span class="expand-icon">▶</span>
-            <span class="brand-name">${escapeHtml(brand)}</span>
-            <span class="brand-count">${count}件</span>
+      // トグル機能の初期化
+      let showAllBrands = false;
+
+      const renderBrands = () => {
+        const displayBrands = showAllBrands ? sortedBrands : sortedBrands.slice(0, 10);
+
+        breakdownEl.innerHTML = displayBrands.map(([brand, count]) => `
+          <div class="breakdown-item expandable" data-brand="${escapeHtml(brand)}">
+            <div class="breakdown-header">
+              <span class="expand-icon">▶</span>
+              <span class="brand-name">${escapeHtml(brand)}</span>
+              <span class="brand-count">${count}件</span>
+            </div>
+            <div class="breakdown-items" style="display: none;">
+              <div class="loading-items">読み込み中...</div>
+            </div>
           </div>
-          <div class="breakdown-items" style="display: none;">
-            <div class="loading-items">読み込み中...</div>
-          </div>
-        </div>
-      `).join('');
+        `).join('');
 
-      // 展開クリックイベント
-      breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
-        item.querySelector('.breakdown-header').addEventListener('click', function() {
-          const brand = item.dataset.brand;
-          const itemsDiv = item.querySelector('.breakdown-items');
-          const expandIcon = item.querySelector('.expand-icon');
+        // 展開クリックイベント
+        breakdownEl.querySelectorAll('.breakdown-item.expandable').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const brand = item.dataset.brand;
+            const itemsDiv = item.querySelector('.breakdown-items');
+            const expandIcon = item.querySelector('.expand-icon');
 
-          if (itemsDiv.style.display === 'none') {
-            itemsDiv.style.display = 'block';
-            expandIcon.textContent = '▼';
-            item.classList.add('expanded');
-            loadMarketBrandItems(brand, itemsDiv, marketData);
-          } else {
-            itemsDiv.style.display = 'none';
-            expandIcon.textContent = '▶';
-            item.classList.remove('expanded');
-          }
+            if (itemsDiv.style.display === 'none') {
+              itemsDiv.style.display = 'block';
+              expandIcon.textContent = '▼';
+              item.classList.add('expanded');
+              loadMarketBrandItems(brand, itemsDiv, marketData);
+            } else {
+              itemsDiv.style.display = 'none';
+              expandIcon.textContent = '▶';
+              item.classList.remove('expanded');
+            }
+          });
         });
+      };
+
+      renderBrands();
+
+      // トグルボタンの設定
+      if (marketBrandToggle) {
+        if (totalBrandCount > 10) {
+          marketBrandToggle.style.display = 'block';
+          marketBrandToggle.textContent = `全て表示 (${totalBrandCount}件)`;
+          marketBrandToggle.onclick = () => {
+            showAllBrands = !showAllBrands;
+            marketBrandToggle.textContent = showAllBrands ? 'トップ10のみ表示' : `全て表示 (${totalBrandCount}件)`;
+            renderBrands();
+          };
+        } else {
+          marketBrandToggle.style.display = 'none';
+        }
+      }
+    }
+
+    // カテゴリ別内訳を表示（階層構造 + トグル機能付き）
+    const categoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
+    const marketCategoryToggle = document.getElementById('marketCategoryToggle');
+    if (categoryBreakdownEl) {
+      // カテゴリを階層構造で集計
+      const categories = {};  // { main: { count, subs: { sub: count } } }
+      marketData.forEach(item => {
+        const { main, sub } = detectCategoryWithSub(item.title);
+        if (!categories[main]) {
+          categories[main] = { count: 0, subs: {} };
+        }
+        categories[main].count++;
+        if (!categories[main].subs[sub]) {
+          categories[main].subs[sub] = 0;
+        }
+        categories[main].subs[sub]++;
       });
+
+      const sortedCategories = Object.entries(categories)
+        .filter(([cat]) => cat !== '(その他)' && cat !== 'その他')
+        .sort((a, b) => b[1].count - a[1].count);
+      const totalCategoryCount = sortedCategories.length;
+
+      let showAllCategories = false;
+
+      const renderCategories = () => {
+        const displayCategories = showAllCategories ? sortedCategories : sortedCategories.slice(0, 10);
+
+        categoryBreakdownEl.innerHTML = displayCategories.map(([category, data]) => {
+          const sortedSubs = Object.entries(data.subs)
+            .filter(([sub]) => sub !== category)
+            .sort((a, b) => b[1] - a[1]);
+
+          const subHtml = sortedSubs.length > 0 ? `
+            <div class="sub-categories" style="display: none;">
+              ${sortedSubs.map(([sub, count]) => `
+                <div class="sub-category-item">
+                  <span class="sub-category-name">${escapeHtml(sub)}</span>
+                  <span class="sub-category-count">${count}件</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '';
+
+          return `
+            <div class="breakdown-item ${sortedSubs.length > 0 ? 'has-subs' : ''}" data-category="${escapeHtml(category)}">
+              <div class="breakdown-header">
+                ${sortedSubs.length > 0 ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon" style="visibility:hidden">▶</span>'}
+                <span class="category-name">${escapeHtml(category)}</span>
+                <span class="category-count">${data.count}件</span>
+              </div>
+              ${subHtml}
+            </div>
+          `;
+        }).join('');
+
+        // サブカテゴリ展開イベント
+        categoryBreakdownEl.querySelectorAll('.breakdown-item.has-subs').forEach(item => {
+          item.querySelector('.breakdown-header').addEventListener('click', function() {
+            const subsDiv = item.querySelector('.sub-categories');
+            const expandIcon = item.querySelector('.expand-icon');
+            if (subsDiv) {
+              if (subsDiv.style.display === 'none') {
+                subsDiv.style.display = 'block';
+                expandIcon.textContent = '▼';
+                item.classList.add('expanded');
+              } else {
+                subsDiv.style.display = 'none';
+                expandIcon.textContent = '▶';
+                item.classList.remove('expanded');
+              }
+            }
+          });
+        });
+      };
+
+      renderCategories();
+
+      // トグルボタンの設定
+      if (marketCategoryToggle) {
+        if (totalCategoryCount > 10) {
+          marketCategoryToggle.style.display = 'block';
+          marketCategoryToggle.textContent = `全て表示 (${totalCategoryCount}件)`;
+          marketCategoryToggle.onclick = () => {
+            showAllCategories = !showAllCategories;
+            marketCategoryToggle.textContent = showAllCategories ? 'トップ10のみ表示' : `全て表示 (${totalCategoryCount}件)`;
+            renderCategories();
+          };
+        } else {
+          marketCategoryToggle.style.display = 'none';
+        }
+      }
     }
 
     // 保存ステータス表示
@@ -5044,8 +5509,8 @@ async function restoreAnalysisResults() {
       }
     }
 
-    // 市場データの分析結果を復元
-    const marketItems = await BunsekiDB.getMarketData();
+    // 市場データの分析結果を復元（シートIDでフィルタ）
+    const marketItems = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
       const marketBrands = {};
@@ -7300,7 +7765,7 @@ function showBrandChartForCategory(mainCategory, subCategory, source = 'my-data'
  * 市場カテゴリ比較分析を生成
  */
 async function generateCategoryComparisonAnalysis() {
-  const marketData = await BunsekiDB.getMarketData();
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
   if (!marketData || marketData.length === 0) {
     return `
@@ -7408,7 +7873,7 @@ async function generateCategoryComparisonAnalysis() {
  * ブランド×カテゴリマトリックス分析を生成
  */
 async function generateBrandCategoryMatrixAnalysis() {
-  const marketData = await BunsekiDB.getMarketData();
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
   if (!marketData || marketData.length === 0) {
     return `
@@ -7847,7 +8312,7 @@ function initAITab() {
  */
 async function checkAPIStatus() {
   try {
-    const settings = await chrome.storage.sync.get({
+    const settings = await chrome.storage.local.get({
       openaiApiKey: '',
       claudeApiKey: '',
       geminiApiKey: ''
@@ -7894,7 +8359,7 @@ async function runAIAnalysis() {
     };
 
     // APIキーを確認
-    const settings = await chrome.storage.sync.get({
+    const settings = await chrome.storage.local.get({
       openaiApiKey: '',
       claudeApiKey: '',
       geminiApiKey: ''
@@ -7931,9 +8396,9 @@ async function prepareAIAnalysisData() {
     listingPace: analyzer.results?.listingPace || []
   };
 
-  // 市場データを追加
+  // 市場データを追加（シートIDでフィルタ）
   try {
-    const marketData = await BunsekiDB.getMarketData();
+    const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
     if (marketData && marketData.length > 0) {
       summary.marketData = summarizeMarketData(marketData);
     }
@@ -8364,7 +8829,7 @@ async function sendChatMessage() {
   // AIに送信
   try {
     const selectedAI = document.querySelector('input[name="aiProvider"]:checked')?.value || 'openai';
-    const settings = await chrome.storage.sync.get({
+    const settings = await chrome.storage.local.get({
       openaiApiKey: '',
       claudeApiKey: '',
       geminiApiKey: ''
@@ -8963,8 +9428,8 @@ window.aiClassificationResults = {};
  * @param {boolean} inline - 分析結果内のインラインボタンから呼ばれた場合true
  */
 async function classifyUnknownItemsWithAI(inline = false) {
-  // APIキーの取得（syncストレージから）
-  const settings = await chrome.storage.sync.get(['openaiApiKey']);
+  // APIキーの取得（localストレージから）
+  const settings = await chrome.storage.local.get(['openaiApiKey']);
   const apiKey = settings.openaiApiKey;
 
   if (!apiKey) {
@@ -9182,8 +9647,8 @@ async function classifyUnknownItemsWithAI(inline = false) {
  * 市場データのAI再分類
  */
 async function classifyMarketDataWithAI() {
-  // APIキーの取得（syncストレージから）
-  const settings = await chrome.storage.sync.get(['openaiApiKey']);
+  // APIキーの取得（localストレージから）
+  const settings = await chrome.storage.local.get(['openaiApiKey']);
   const apiKey = settings.openaiApiKey;
 
   if (!apiKey) {
@@ -9191,8 +9656,8 @@ async function classifyMarketDataWithAI() {
     return;
   }
 
-  // 市場データを取得
-  const marketData = await BunsekiDB.getMarketData();
+  // 市場データを取得（シートIDでフィルタ）
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
   if (!marketData || marketData.length === 0) {
     showAlert('市場データがありません', 'info');
@@ -10994,12 +11459,12 @@ function showUpgradePrompt() {
     modalContent.innerHTML = modalHtml;
     modal.style.display = 'flex';
 
-    // 設定画面へボタン
+    // 設定画面へボタン（設定ページを開く）
     const goToSettingsBtn = document.getElementById('goToSettingsBtn');
     if (goToSettingsBtn) {
       goToSettingsBtn.addEventListener('click', () => {
-        chrome.runtime.openOptionsPage();
         modal.style.display = 'none';
+        chrome.runtime.openOptionsPage();
       });
     }
   }
@@ -11420,19 +11885,21 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function initSettingsUI() {
   const settingsBtn = document.getElementById('settingsBtn');
+
+  // 設定ボタン - 設定ページを開く（設定変更後にポップアップを再読み込みすると反映される）
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.runtime.openOptionsPage();
+    });
+  }
+
+  // 以下はモーダル用（将来削除予定だが互換性のため残す）
   const settingsModal = document.getElementById('settingsModal');
   const closeSettingsModal = document.getElementById('closeSettingsModal');
   const closeSettingsBtn = document.getElementById('closeSettingsBtn');
   const saveSettingsBtn = document.getElementById('saveSettingsBtn');
   const activateCodeBtn = document.getElementById('settingsActivateCodeBtn');
-
-  // 設定ボタン - モーダルを開く（別ページではなく）
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      openSettingsModal();
-    });
-  }
 
   // モーダルを閉じる
   if (closeSettingsModal) {
@@ -11596,6 +12063,13 @@ async function saveSettings() {
   updateApiStatusBadge('claude', claudeKey);
   updateApiStatusBadge('gemini', geminiKey);
 
+  // 設定モーダルを閉じる
+  const modal = document.getElementById('settingsModal');
+  if (modal) modal.style.display = 'none';
+
+  // UIを即時反映
+  await refreshUIAfterSettingsChange();
+
   showAlert('設定を保存しました', 'success');
 }
 
@@ -11611,21 +12085,28 @@ async function activateSecretCode() {
     return;
   }
 
-  // シークレットコードの検証（簡易版）
-  // 実際にはサーバー認証などを行う
-  const validCodes = ['BUNSEKI2024', 'SCHOOL_MEMBER', 'VIP_ACCESS'];
+  // BunsekiAuthを使用してシークレットコードを検証
+  const result = await BunsekiAuth.activateWithSecretCode(code);
 
-  if (validCodes.includes(code.toUpperCase())) {
+  if (result.success) {
     await chrome.storage.local.set({
-      secretCode: code,
+      secretCode: code.toUpperCase(),
       isPremium: true,
       premiumType: 'school'
     });
 
     updateAccountStatus(true, 'school');
-    showAlert('認証に成功しました！全機能が利用可能です', 'success');
+
+    // 設定モーダルを閉じる
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.style.display = 'none';
+
+    // UIを即時反映（プレミアム機能の解放など）
+    await refreshUIAfterSettingsChange();
+
+    showAlert(result.message, 'success');
   } else {
-    showAlert('無効なコードです', 'error');
+    showAlert(result.message || '無効なコードです', 'error');
   }
 }
 
@@ -11723,6 +12204,53 @@ async function testGemini(apiKey) {
     return response.ok;
   } catch (e) {
     return false;
+  }
+}
+
+/**
+ * 設定変更後にUIを即時反映
+ */
+async function refreshUIAfterSettingsChange() {
+  try {
+    // プレミアム状態を再チェック
+    const data = await chrome.storage.local.get(['isPremium', 'premiumType']);
+
+    // プレミアム機能の表示/非表示を更新
+    const premiumElements = document.querySelectorAll('.premium-only');
+    premiumElements.forEach(el => {
+      if (data.isPremium) {
+        el.classList.remove('locked');
+      } else {
+        el.classList.add('locked');
+      }
+    });
+
+    // ヘッダーのプレミアムバッジを更新
+    const headerBadge = document.querySelector('.header-badge');
+    if (headerBadge) {
+      if (data.isPremium) {
+        headerBadge.textContent = data.premiumType === 'school' ? 'スクール会員' : 'フル版';
+        headerBadge.className = 'header-badge premium';
+      } else {
+        headerBadge.textContent = 'Free';
+        headerBadge.className = 'header-badge free';
+      }
+    }
+
+    // 既存の分析結果があれば再表示（データ入力タブ）
+    if (analyzer.activeListings.length > 0 || analyzer.soldItems.length > 0) {
+      await refreshMyDataAnalysis();
+    }
+
+    // 市場データがあれば再表示
+    const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
+    if (marketData && marketData.length > 0) {
+      await restoreMarketDataAnalysisResult();
+    }
+
+    console.log('設定変更後のUI更新完了');
+  } catch (error) {
+    console.error('UI更新エラー:', error);
   }
 }
 
