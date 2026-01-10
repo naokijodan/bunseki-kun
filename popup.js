@@ -936,6 +936,113 @@ async function loadPokemonAnalysisData(tabId) {
 }
 
 /**
+ * ポケモン属性別内訳を描画（市場データ概要用）
+ * @param {Array} items - 市場データ
+ * @param {string} attrType - 表示する属性タイプ: 'character', 'set', 'grade', 'rarity'
+ */
+function renderPokemonAttributeBreakdown(items, attrType) {
+  const container = document.getElementById('pokemonAttributeBreakdown');
+  if (!container) return;
+
+  let stats = {};
+
+  switch (attrType) {
+    case 'character':
+      items.forEach(item => {
+        const cardNameObj = item.attributes?.cardName;
+        if (!cardNameObj || !cardNameObj.name) return;
+        const name = cardNameObj.name;
+        if (!stats[name]) {
+          stats[name] = { count: 0, totalPrice: 0, sub: cardNameObj.nameEn || '' };
+        }
+        stats[name].count++;
+        stats[name].totalPrice += (item.price || 0);
+      });
+      break;
+
+    case 'set':
+      items.forEach(item => {
+        const setObj = item.attributes?.set;
+        if (!setObj || !setObj.name) return;
+        const name = setObj.name;
+        if (!stats[name]) {
+          stats[name] = { count: 0, totalPrice: 0, sub: setObj.era || '' };
+        }
+        stats[name].count++;
+        stats[name].totalPrice += (item.price || 0);
+      });
+      break;
+
+    case 'grade':
+      items.forEach(item => {
+        const grading = item.attributes?.grading;
+        if (!grading) return;
+        // グレーディングなし/ありで分類
+        const name = grading.isGraded && grading.company ?
+          `${grading.company} ${grading.grade || ''}`.trim() :
+          '未グレーディング';
+        if (!stats[name]) {
+          stats[name] = { count: 0, totalPrice: 0, sub: '' };
+        }
+        stats[name].count++;
+        stats[name].totalPrice += (item.price || 0);
+      });
+      // 未グレーディングも含めてカウント
+      const gradedItems = items.filter(item => item.attributes?.grading?.isGraded);
+      const ungradedItems = items.filter(item => !item.attributes?.grading?.isGraded);
+      if (ungradedItems.length > 0 && !stats['未グレーディング']) {
+        stats['未グレーディング'] = { count: ungradedItems.length, totalPrice: 0, sub: '' };
+        ungradedItems.forEach(item => {
+          stats['未グレーディング'].totalPrice += (item.price || 0);
+        });
+      }
+      break;
+
+    case 'rarity':
+      items.forEach(item => {
+        const rarityObj = item.attributes?.rarity;
+        if (!rarityObj || !rarityObj.name) return;
+        const name = rarityObj.name;
+        if (!stats[name]) {
+          stats[name] = { count: 0, totalPrice: 0, sub: rarityObj.code || '' };
+        }
+        stats[name].count++;
+        stats[name].totalPrice += (item.price || 0);
+      });
+      break;
+  }
+
+  // ソート（件数順）
+  const sorted = Object.entries(stats)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 15);
+
+  if (sorted.length === 0) {
+    const emptyMessages = {
+      'character': 'キャラクターが認識されていません',
+      'set': 'セットが認識されていません',
+      'grade': 'グレード情報がありません',
+      'rarity': 'レアリティが認識されていません'
+    };
+    container.innerHTML = `<p class="empty-message">${emptyMessages[attrType] || 'データがありません'}</p>`;
+    return;
+  }
+
+  container.innerHTML = sorted.map(([name, data]) => {
+    const avgPrice = data.count > 0 ? data.totalPrice / data.count : 0;
+    return `
+      <div class="attr-item">
+        <span class="attr-name">${escapeHtml(name)}${data.sub ? `<span class="attr-sub">${escapeHtml(data.sub)}</span>` : ''}</span>
+        <div class="attr-stats">
+          <span class="attr-count">${data.count}件</span>
+          <span class="attr-price">$${avgPrice.toFixed(0)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
  * キャラ別ランキングを描画
  */
 function renderCharacterRanking(items) {
@@ -4565,96 +4672,121 @@ async function analyzeMarketData() {
       }
     }
 
-    // カテゴリ別内訳を表示（階層構造 + トグル機能付き）
-    const categoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
-    const marketCategoryToggle = document.getElementById('marketCategoryToggle');
-    if (categoryBreakdownEl) {
-      // カテゴリを階層構造で集計
-      const categories = {};  // { main: { count, subs: { sub: count } } }
-      marketData.forEach(item => {
-        const { main, sub } = detectCategoryWithSub(item.title);
-        if (!categories[main]) {
-          categories[main] = { count: 0, subs: {} };
-        }
-        categories[main].count++;
-        if (!categories[main].subs[sub]) {
-          categories[main].subs[sub] = 0;
-        }
-        categories[main].subs[sub]++;
-      });
+    // プロファイルに応じてカテゴリ列を切り替え
+    const genericCategoryColumn = document.getElementById('genericCategoryColumn');
+    const pokemonAttributeColumn = document.getElementById('pokemonAttributeColumn');
 
-      const sortedCategories = Object.entries(categories)
-        .filter(([cat]) => cat !== '(その他)' && cat !== 'その他')
-        .sort((a, b) => b[1].count - a[1].count);
-      const totalCategoryCount = sortedCategories.length;
+    if (currentSheetProfile === 'pokemon') {
+      // ポケモンプロファイル: 属性別内訳を表示
+      if (genericCategoryColumn) genericCategoryColumn.style.display = 'none';
+      if (pokemonAttributeColumn) {
+        pokemonAttributeColumn.style.display = 'block';
+        renderPokemonAttributeBreakdown(marketData, 'character');
 
-      let showAllCategories = false;
-
-      const renderCategories = () => {
-        const displayCategories = showAllCategories ? sortedCategories : sortedCategories.slice(0, 10);
-
-        categoryBreakdownEl.innerHTML = displayCategories.map(([category, data]) => {
-          const sortedSubs = Object.entries(data.subs)
-            .filter(([sub]) => sub !== category)
-            .sort((a, b) => b[1] - a[1]);
-
-          const subHtml = sortedSubs.length > 0 ? `
-            <div class="sub-categories" style="display: none;">
-              ${sortedSubs.map(([sub, count]) => `
-                <div class="sub-category-item">
-                  <span class="sub-category-name">${escapeHtml(sub)}</span>
-                  <span class="sub-category-count">${count}件</span>
-                </div>
-              `).join('')}
-            </div>
-          ` : '';
-
-          return `
-            <div class="breakdown-item ${sortedSubs.length > 0 ? 'has-subs' : ''}" data-category="${escapeHtml(category)}">
-              <div class="breakdown-header">
-                ${sortedSubs.length > 0 ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon" style="visibility:hidden">▶</span>'}
-                <span class="category-name">${escapeHtml(category)}</span>
-                <span class="category-count">${data.count}件</span>
-              </div>
-              ${subHtml}
-            </div>
-          `;
-        }).join('');
-
-        // サブカテゴリ展開イベント
-        categoryBreakdownEl.querySelectorAll('.breakdown-item.has-subs').forEach(item => {
-          item.querySelector('.breakdown-header').addEventListener('click', function() {
-            const subsDiv = item.querySelector('.sub-categories');
-            const expandIcon = item.querySelector('.expand-icon');
-            if (subsDiv) {
-              if (subsDiv.style.display === 'none') {
-                subsDiv.style.display = 'block';
-                expandIcon.textContent = '▼';
-                item.classList.add('expanded');
-              } else {
-                subsDiv.style.display = 'none';
-                expandIcon.textContent = '▶';
-                item.classList.remove('expanded');
-              }
-            }
+        // タブクリックイベント
+        pokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(tab => {
+          tab.addEventListener('click', function() {
+            pokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            renderPokemonAttributeBreakdown(marketData, this.dataset.attr);
           });
         });
-      };
+      }
+    } else {
+      // 汎用プロファイル: カテゴリ別内訳を表示
+      if (genericCategoryColumn) genericCategoryColumn.style.display = 'block';
+      if (pokemonAttributeColumn) pokemonAttributeColumn.style.display = 'none';
 
-      renderCategories();
+      const categoryBreakdownEl = document.getElementById('marketCategoryBreakdown');
+      const marketCategoryToggle = document.getElementById('marketCategoryToggle');
+      if (categoryBreakdownEl) {
+        // カテゴリを階層構造で集計
+        const categories = {};  // { main: { count, subs: { sub: count } } }
+        marketData.forEach(item => {
+          const { main, sub } = detectCategoryWithSub(item.title);
+          if (!categories[main]) {
+            categories[main] = { count: 0, subs: {} };
+          }
+          categories[main].count++;
+          if (!categories[main].subs[sub]) {
+            categories[main].subs[sub] = 0;
+          }
+          categories[main].subs[sub]++;
+        });
 
-      // トグルボタンの設定
-      if (marketCategoryToggle) {
-        if (totalCategoryCount > 10) {
-          marketCategoryToggle.style.display = 'block';
-          marketCategoryToggle.textContent = `全て表示 (${totalCategoryCount}件)`;
-          marketCategoryToggle.onclick = () => {
-            showAllCategories = !showAllCategories;
-            marketCategoryToggle.textContent = showAllCategories ? 'トップ10のみ表示' : `全て表示 (${totalCategoryCount}件)`;
-            renderCategories();
-          };
-        } else {
-          marketCategoryToggle.style.display = 'none';
+        const sortedCategories = Object.entries(categories)
+          .filter(([cat]) => cat !== '(その他)' && cat !== 'その他')
+          .sort((a, b) => b[1].count - a[1].count);
+        const totalCategoryCount = sortedCategories.length;
+
+        let showAllCategories = false;
+
+        const renderCategories = () => {
+          const displayCategories = showAllCategories ? sortedCategories : sortedCategories.slice(0, 10);
+
+          categoryBreakdownEl.innerHTML = displayCategories.map(([category, data]) => {
+            const sortedSubs = Object.entries(data.subs)
+              .filter(([sub]) => sub !== category)
+              .sort((a, b) => b[1] - a[1]);
+
+            const subHtml = sortedSubs.length > 0 ? `
+              <div class="sub-categories" style="display: none;">
+                ${sortedSubs.map(([sub, count]) => `
+                  <div class="sub-category-item">
+                    <span class="sub-category-name">${escapeHtml(sub)}</span>
+                    <span class="sub-category-count">${count}件</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '';
+
+            return `
+              <div class="breakdown-item ${sortedSubs.length > 0 ? 'has-subs' : ''}" data-category="${escapeHtml(category)}">
+                <div class="breakdown-header">
+                  ${sortedSubs.length > 0 ? '<span class="expand-icon">▶</span>' : '<span class="expand-icon" style="visibility:hidden">▶</span>'}
+                  <span class="category-name">${escapeHtml(category)}</span>
+                  <span class="category-count">${data.count}件</span>
+                </div>
+                ${subHtml}
+              </div>
+            `;
+          }).join('');
+
+          // サブカテゴリ展開イベント
+          categoryBreakdownEl.querySelectorAll('.breakdown-item.has-subs').forEach(item => {
+            item.querySelector('.breakdown-header').addEventListener('click', function() {
+              const subsDiv = item.querySelector('.sub-categories');
+              const expandIcon = item.querySelector('.expand-icon');
+              if (subsDiv) {
+                if (subsDiv.style.display === 'none') {
+                  subsDiv.style.display = 'block';
+                  expandIcon.textContent = '▼';
+                  item.classList.add('expanded');
+                } else {
+                  subsDiv.style.display = 'none';
+                  expandIcon.textContent = '▶';
+                  item.classList.remove('expanded');
+                }
+              }
+            });
+          });
+        };
+
+        renderCategories();
+
+        // トグルボタンの設定
+        if (marketCategoryToggle) {
+          if (totalCategoryCount > 10) {
+            marketCategoryToggle.style.display = 'block';
+            marketCategoryToggle.textContent = `全て表示 (${totalCategoryCount}件)`;
+            marketCategoryToggle.onclick = () => {
+              showAllCategories = !showAllCategories;
+              marketCategoryToggle.textContent = showAllCategories ? 'トップ10のみ表示' : `全て表示 (${totalCategoryCount}件)`;
+              renderCategories();
+            };
+          } else {
+            marketCategoryToggle.style.display = 'none';
+          }
         }
       }
     }

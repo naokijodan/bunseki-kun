@@ -7028,3 +7028,78 @@ body {
     font-size: 11px;
   }
 }
+
+/* ポケモン属性別内訳タブ */
+.pokemon-attribute-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.pokemon-attribute-tabs .attr-tab {
+  padding: 4px 8px;
+  font-size: 10px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.pokemon-attribute-tabs .attr-tab:hover {
+  background: #e0e0e0;
+  border-color: #ccc;
+}
+
+.pokemon-attribute-tabs .attr-tab.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+/* 属性内訳リストのアイテム */
+#pokemonAttributeBreakdown .attr-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+#pokemonAttributeBreakdown .attr-item:hover {
+  background: #f5f5f5;
+}
+
+#pokemonAttributeBreakdown .attr-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+
+#pokemonAttributeBreakdown .attr-name .attr-sub {
+  font-size: 9px;
+  color: #888;
+  margin-left: 4px;
+}
+
+#pokemonAttributeBreakdown .attr-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #666;
+}
+
+#pokemonAttributeBreakdown .attr-count {
+  min-width: 40px;
+  text-align: right;
+}
+
+#pokemonAttributeBreakdown .attr-price {
+  min-width: 60px;
+  text-align: right;
+  color: #2e7d32;
+}
