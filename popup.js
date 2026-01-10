@@ -627,9 +627,12 @@ function displayUnrecognizedItems(items) {
   if (!container) return;
 
   // 未認識（カード名またはセット名がない）のアイテムを抽出
+  // cardName/setはオブジェクト形式なので、存在チェック＆中身のチェック
   const unrecognized = items.filter(item => {
     if (!item.attributes) return true;
-    return !item.attributes.cardName || !item.attributes.set;
+    const hasCardName = item.attributes.cardName && item.attributes.cardName.name;
+    const hasSet = item.attributes.set && item.attributes.set.name;
+    return !hasCardName || !hasSet;
   }).slice(0, 20); // 最大20件
 
   if (unrecognized.length === 0) {
@@ -640,8 +643,8 @@ function displayUnrecognizedItems(items) {
   container.innerHTML = unrecognized.map(item => {
     const attrs = item.attributes || {};
     const missing = [];
-    if (!attrs.cardName) missing.push('カード名');
-    if (!attrs.set) missing.push('セット');
+    if (!attrs.cardName || !attrs.cardName.name) missing.push('カード名');
+    if (!attrs.set || !attrs.set.name) missing.push('セット');
 
     return `
       <div class="unrecognized-item" data-title="${escapeHtml(item.title || '')}">
@@ -942,11 +945,13 @@ function renderCharacterRanking(items) {
   // カード名でグループ化
   const characterStats = {};
   items.forEach(item => {
-    const cardName = item.attributes?.cardName;
-    if (!cardName) return;
+    // cardNameはオブジェクト: { name: '日本語名', nameEn: '英語名', id: '図鑑No', category: 'ポケモン' }
+    const cardNameObj = item.attributes?.cardName;
+    if (!cardNameObj || !cardNameObj.name) return;
 
+    const cardName = cardNameObj.name;
     if (!characterStats[cardName]) {
-      characterStats[cardName] = { count: 0, totalPrice: 0, prices: [] };
+      characterStats[cardName] = { count: 0, totalPrice: 0, prices: [], nameEn: cardNameObj.nameEn };
     }
     characterStats[cardName].count++;
     const price = item.price || 0;
@@ -973,6 +978,7 @@ function renderCharacterRanking(items) {
         <span class="pokemon-rank ${rankClass}">${index + 1}</span>
         <div class="pokemon-info">
           <span class="pokemon-name">${escapeHtml(name)}</span>
+          ${stats.nameEn ? `<span class="pokemon-sub">${escapeHtml(stats.nameEn)}</span>` : ''}
         </div>
         <div class="pokemon-stats">
           <div class="pokemon-stat">
@@ -996,14 +1002,15 @@ function renderSetRanking(items) {
   const container = document.getElementById('setRankingList');
   if (!container) return;
 
-  // セット名でグループ化
+  // セット名でグループ化（setは { name: '日本語名', code: 'コード', era: '時代' }）
   const setStats = {};
   items.forEach(item => {
-    const setName = item.attributes?.set?.en || item.attributes?.set?.ja;
-    if (!setName) return;
+    const setObj = item.attributes?.set;
+    if (!setObj || !setObj.name) return;
 
+    const setName = setObj.name;
     if (!setStats[setName]) {
-      setStats[setName] = { count: 0, totalPrice: 0, series: item.attributes?.set?.series || '' };
+      setStats[setName] = { count: 0, totalPrice: 0, era: setObj.era || '', code: setObj.code || '' };
     }
     setStats[setName].count++;
     setStats[setName].totalPrice += (item.price || 0);
@@ -1028,7 +1035,7 @@ function renderSetRanking(items) {
         <span class="pokemon-rank ${rankClass}">${index + 1}</span>
         <div class="pokemon-info">
           <span class="pokemon-name">${escapeHtml(name)}</span>
-          <span class="pokemon-sub">${escapeHtml(stats.series)}</span>
+          ${stats.era ? `<span class="pokemon-sub">${escapeHtml(stats.era)}</span>` : ''}
         </div>
         <div class="pokemon-stats">
           <div class="pokemon-stat">
@@ -1126,17 +1133,18 @@ function renderRarityAnalysis(items) {
   const container = document.getElementById('rarityAnalysisList');
   if (!container) return;
 
-  // レアリティでグループ化
+  // レアリティでグループ化（rarityは { code: 'SAR', name: '日本語名', tier: 1 }）
   const rarityStats = {};
   items.forEach(item => {
-    const rarity = item.attributes?.rarity;
-    if (!rarity) return;
+    const rarityObj = item.attributes?.rarity;
+    if (!rarityObj || !rarityObj.name) return;
 
-    if (!rarityStats[rarity]) {
-      rarityStats[rarity] = { count: 0, totalPrice: 0 };
+    const rarityName = rarityObj.name;
+    if (!rarityStats[rarityName]) {
+      rarityStats[rarityName] = { count: 0, totalPrice: 0, code: rarityObj.code || '', tier: rarityObj.tier || 99 };
     }
-    rarityStats[rarity].count++;
-    rarityStats[rarity].totalPrice += (item.price || 0);
+    rarityStats[rarityName].count++;
+    rarityStats[rarityName].totalPrice += (item.price || 0);
   });
 
   // ソート（平均価格順）
