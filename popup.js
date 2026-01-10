@@ -273,6 +273,58 @@ const SHEET_PROFILES = {
 // 現在のシートプロファイル
 let currentSheetProfile = 'general';
 
+/**
+ * プロファイルに応じた属性抽出
+ * @param {string} title - 商品タイトル
+ * @param {string} profile - プロファイルID（省略時は現在のプロファイル）
+ * @returns {object|null} - 抽出された属性
+ */
+function extractAttributesByProfile(title, profile = currentSheetProfile) {
+  if (!title) return null;
+
+  switch (profile) {
+    case 'pokemon':
+      if (typeof PokemonProfile !== 'undefined') {
+        return PokemonProfile.extractAttributes(title);
+      }
+      break;
+    case 'yugioh':
+      // 将来実装
+      break;
+    case 'onepiece':
+      // 将来実装
+      break;
+    case 'general':
+    default:
+      // 汎用プロファイルは属性抽出なし
+      return null;
+  }
+
+  return null;
+}
+
+/**
+ * 市場データに属性を付与
+ * @param {Array} items - 市場データ配列
+ * @returns {Array} - 属性付きデータ配列
+ */
+function enrichMarketDataWithAttributes(items) {
+  if (!items || !Array.isArray(items)) return items;
+  if (currentSheetProfile === 'general') return items;
+
+  return items.map(item => {
+    const attributes = extractAttributesByProfile(item.title);
+    if (attributes) {
+      return {
+        ...item,
+        attributes,
+        profileExtracted: currentSheetProfile
+      };
+    }
+    return item;
+  });
+}
+
 // デフォルトのシート名
 const DEFAULT_SHEET_NAMES = {
   sheet1: 'シート1',
@@ -3758,6 +3810,15 @@ async function analyzeMarketData() {
 
     // カテゴリも常に再判定
     item.category = detectCategoryFromTitle(item.title);
+
+    // プロファイル別の属性抽出
+    if (currentSheetProfile !== 'general') {
+      const attributes = extractAttributesByProfile(item.title);
+      if (attributes) {
+        item.attributes = attributes;
+        item.profileExtracted = currentSheetProfile;
+      }
+    }
   });
 
   // 更新した市場データをIndexedDBに保存（現在のシートのみクリアして追加）
@@ -4923,8 +4984,11 @@ async function importMarketCsv(file) {
       throw new Error('有効なデータが見つかりませんでした');
     }
 
+    // プロファイルに応じて属性を抽出
+    const enrichedItems = enrichMarketDataWithAttributes(items);
+
     // IndexedDBに保存
-    await BunsekiDB.addMarketData(items);
+    await BunsekiDB.addMarketData(enrichedItems);
 
     showAlert(`${items.length}件のデータをインポートしました`, 'success');
     await updateMarketDataInfo();
