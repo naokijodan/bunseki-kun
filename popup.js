@@ -1184,6 +1184,12 @@ function initDataInput() {
     clearMarketAnalysisBtn.addEventListener('click', clearAnalysisResults);
   }
 
+  // CSV出力ボタン
+  const exportMarketCsvBtn = document.getElementById('exportMarketCsvBtn');
+  if (exportMarketCsvBtn) {
+    exportMarketCsvBtn.addEventListener('click', exportMarketCsv);
+  }
+
   // データ保存ボタン
   const saveAllDataBtn = document.getElementById('saveAllDataBtn');
   if (saveAllDataBtn) {
@@ -4883,6 +4889,79 @@ function parseCSVLine(line) {
 
   result.push(current.trim());
   return result;
+}
+
+/**
+ * 市場データCSV出力
+ */
+async function exportMarketCsv() {
+  try {
+    showLoading('CSVを作成中...');
+
+    // 全市場データを取得
+    const allData = await BunsekiDB.getMarketData();
+
+    // 現在のシートのデータのみフィルタリング
+    const sheetData = allData.filter(item => item.sheetId === currentSheetId);
+
+    if (sheetData.length === 0) {
+      showAlert('出力するデータがありません', 'warning');
+      return;
+    }
+
+    // CSVヘッダー
+    const headers = ['タイトル', '価格', 'ブランド', 'カテゴリ', '取得日時'];
+
+    // CSVデータ行を作成
+    const rows = sheetData.map(item => {
+      return [
+        escapeCSVField(item.title || ''),
+        item.price || 0,
+        escapeCSVField(item.brand || ''),
+        escapeCSVField(item.category || ''),
+        item.capturedAt || ''
+      ].join(',');
+    });
+
+    // CSV文字列を作成（BOM付きでExcel対応）
+    const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+
+    // ダウンロード
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // ファイル名にシート名と日付を含める
+    const date = new Date().toISOString().split('T')[0];
+    const sheetName = document.querySelector(`[data-sheet-id="${currentSheetId}"] .sheet-name`)?.textContent || currentSheetId;
+    link.download = `市場データ_${sheetName}_${date}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showAlert(`${sheetData.length}件のデータをCSV出力しました`, 'success');
+  } catch (error) {
+    console.error('CSV出力エラー:', error);
+    showAlert('CSV出力に失敗しました: ' + error.message, 'danger');
+  } finally {
+    hideLoading();
+  }
+}
+
+/**
+ * CSVフィールドのエスケープ
+ */
+function escapeCSVField(field) {
+  if (field === null || field === undefined) return '';
+  const str = String(field);
+  // カンマ、ダブルクォート、改行を含む場合はダブルクォートで囲む
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
 }
 
 /**
