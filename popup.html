@@ -588,6 +588,28 @@
             </button>
           </div>
 
+          <!-- ポケモンカード専用サブタブ（自分の分析用・プロファイルがpokemonの時のみ表示） -->
+          <div class="pokemon-analysis-tabs" id="myPokemonAnalysisTabs" style="display: none;">
+            <div class="pokemon-tabs-header">
+              <span class="pokemon-tabs-icon">⚡</span>
+              <span class="pokemon-tabs-title">ポケモンカード分析</span>
+            </div>
+            <div class="pokemon-subtabs">
+              <button class="pokemon-subtab active" data-my-pokemon-tab="my-character-ranking">
+                <span>🐾 キャラ別</span>
+              </button>
+              <button class="pokemon-subtab" data-my-pokemon-tab="my-set-ranking">
+                <span>📦 セット別</span>
+              </button>
+              <button class="pokemon-subtab" data-my-pokemon-tab="my-grade-analysis">
+                <span>🏅 グレード別</span>
+              </button>
+              <button class="pokemon-subtab" data-my-pokemon-tab="my-rarity-analysis">
+                <span>✨ レアリティ別</span>
+              </button>
+            </div>
+          </div>
+
           <!-- 自分の分析コンテンツエリア -->
           <div id="myAnalysisContent" class="my-analysis-content">
             <!-- 出品・販売ペース -->
@@ -615,6 +637,49 @@
             <div id="my-category-performance" class="my-tab-content">
               <div class="my-analysis-placeholder">
                 <p>カテゴリ別の分析結果</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ポケモン分析コンテンツエリア（自分の分析用） -->
+          <div id="myPokemonAnalysisContent" class="pokemon-analysis-content" style="display: none;">
+            <!-- キャラ別ランキング -->
+            <div id="my-pokemon-character-ranking" class="pokemon-tab-content active">
+              <div class="analysis-description">
+                <p>カード名（ポケモン名）別の出品・販売傾向を表示します</p>
+              </div>
+              <div id="myCharacterRankingList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- セット別ランキング -->
+            <div id="my-pokemon-set-ranking" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>パック・セット別の出品・販売傾向を表示します</p>
+              </div>
+              <div id="mySetRankingList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- グレード別分析 -->
+            <div id="my-pokemon-grade-analysis" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>PSA/CGC/BGSなどのグレード別分析を表示します</p>
+              </div>
+              <div id="myGradeAnalysisList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- レアリティ別分析 -->
+            <div id="my-pokemon-rarity-analysis" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>SAR/AR/SRなどのレアリティ別分析を表示します</p>
+              </div>
+              <div id="myRarityAnalysisList" class="ranking-list compact">
+                <!-- 動的に生成 -->
               </div>
             </div>
           </div>
