@@ -225,8 +225,8 @@
                   <!-- 動的に生成 -->
                 </div>
               </div>
-              <!-- カテゴリ別内訳 -->
-              <div class="breakdown-column">
+              <!-- カテゴリ別内訳（汎用） -->
+              <div class="breakdown-column" id="myGenericCategoryColumn">
                 <h4>カテゴリ別内訳 <span class="breakdown-toggle" id="myCategoryToggle" data-expanded="false">(上位10件 - 全て表示)</span></h4>
                 <div id="myCategoryBreakdown" class="breakdown-list">
                   <!-- 動的に生成 -->
@@ -241,6 +241,19 @@
                       <!-- 動的に生成 -->
                     </div>
                   </div>
+                </div>
+              </div>
+              <!-- ポケモン属性別内訳（ポケモンプロファイル時） -->
+              <div class="breakdown-column" id="myPokemonAttributeColumn" style="display: none;">
+                <h4>属性別内訳</h4>
+                <div class="pokemon-attribute-tabs">
+                  <button class="attr-tab active" data-attr="character">キャラ別</button>
+                  <button class="attr-tab" data-attr="set">セット別</button>
+                  <button class="attr-tab" data-attr="grade">グレード別</button>
+                  <button class="attr-tab" data-attr="rarity">レアリティ別</button>
+                </div>
+                <div id="myPokemonAttributeBreakdown" class="breakdown-list">
+                  <!-- 動的に生成 -->
                 </div>
               </div>
             </div>
