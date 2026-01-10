@@ -429,6 +429,231 @@ body {
   padding: 8px;
 }
 
+/* ===================== */
+/* ポケモン分析タブ */
+/* ===================== */
+.pokemon-analysis-tabs {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+  border: 1px solid #f5c542;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 12px;
+}
+
+.pokemon-tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #856404;
+}
+
+.pokemon-tabs-icon {
+  font-size: 16px;
+}
+
+.pokemon-subtabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pokemon-subtab {
+  padding: 6px 12px;
+  border: 1px solid #e0c568;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.7);
+  cursor: pointer;
+  font-size: 11px;
+  color: #856404;
+  transition: all 0.2s;
+}
+
+.pokemon-subtab:hover {
+  background: rgba(255,255,255,0.9);
+}
+
+.pokemon-subtab.active {
+  background: #f5c542;
+  color: #fff;
+  border-color: #f5c542;
+  font-weight: 600;
+}
+
+.pokemon-analysis-content {
+  margin-top: 12px;
+}
+
+.pokemon-tab-content {
+  display: block;
+}
+
+.pokemon-tab-content .analysis-description {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.pokemon-tab-content .analysis-description p {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+/* ポケモン分析ランキングアイテム */
+.pokemon-ranking-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.pokemon-ranking-item:hover {
+  background: #f8f9fa;
+}
+
+.pokemon-rank {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  min-width: 24px;
+  text-align: center;
+}
+
+.pokemon-rank.gold { color: #ffc107; }
+.pokemon-rank.silver { color: #6c757d; }
+.pokemon-rank.bronze { color: #cd7f32; }
+
+.pokemon-info {
+  flex: 1;
+}
+
+.pokemon-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.pokemon-sub {
+  font-size: 11px;
+  color: #888;
+}
+
+.pokemon-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.pokemon-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pokemon-stat-label {
+  font-size: 10px;
+  color: #888;
+}
+
+.pokemon-stat-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.pokemon-stat-value.price {
+  color: #28a745;
+}
+
+/* グレード別分析 */
+.grade-chart-container {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.grade-company-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.grade-company-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.grade-company-count {
+  font-size: 12px;
+  color: #888;
+}
+
+.grade-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.grade-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grade-label {
+  min-width: 50px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.grade-bar {
+  flex: 1;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.grade-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+  border-radius: 10px;
+  transition: width 0.3s;
+}
+
+.grade-bar-fill.psa { background: linear-gradient(90deg, #e53935 0%, #f44336 100%); }
+.grade-bar-fill.bgs { background: linear-gradient(90deg, #1565c0 0%, #1976d2 100%); }
+.grade-bar-fill.cgc { background: linear-gradient(90deg, #7b1fa2 0%, #9c27b0 100%); }
+
+.grade-count {
+  min-width: 40px;
+  font-size: 11px;
+  color: #666;
+  text-align: right;
+}
+
+.grade-avg-price {
+  min-width: 70px;
+  font-size: 11px;
+  color: #28a745;
+  font-weight: 600;
+  text-align: right;
+}
+
 .icon-btn {
   width: 36px;
   height: 36px;

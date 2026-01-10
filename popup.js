@@ -242,6 +242,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCustomPokemonDict();
   await displayCustomDictList();
   updatePokemonCorrectionVisibility();
+
+  // ポケモン分析タブを初期化
+  initPokemonAnalysisTabs();
+  updatePokemonAnalysisVisibility();
 });
 
 // =====================================
@@ -548,6 +552,9 @@ function updateProfileDisplay() {
 
   // ポケモン補正セクションの表示/非表示
   updatePokemonCorrectionVisibility();
+
+  // ポケモン分析タブの表示/非表示
+  updatePokemonAnalysisVisibility();
 }
 
 /**
@@ -851,6 +858,324 @@ function initPokemonCorrectionEvents() {
   if (addSetBtn) {
     addSetBtn.addEventListener('click', addCustomSet);
   }
+}
+
+// =====================================
+// ポケモンカード分析機能
+// =====================================
+
+/**
+ * ポケモン分析タブの表示/非表示を更新
+ */
+function updatePokemonAnalysisVisibility() {
+  const tabsSection = document.getElementById('pokemonAnalysisTabs');
+  const contentSection = document.getElementById('pokemonAnalysisContent');
+
+  if (tabsSection) {
+    tabsSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+  }
+  if (contentSection) {
+    contentSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+  }
+}
+
+/**
+ * ポケモン分析タブのイベントを初期化
+ */
+function initPokemonAnalysisTabs() {
+  document.querySelectorAll('.pokemon-subtab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabId = tab.dataset.pokemonTab;
+
+      // タブのアクティブ状態
+      document.querySelectorAll('.pokemon-subtab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // コンテンツ表示切り替え
+      document.querySelectorAll('.pokemon-tab-content').forEach(content => {
+        content.style.display = 'none';
+      });
+      const targetContent = document.getElementById(`pokemon-${tabId}`);
+      if (targetContent) {
+        targetContent.style.display = 'block';
+      }
+
+      // 分析データを読み込み
+      loadPokemonAnalysisData(tabId);
+    });
+  });
+}
+
+/**
+ * ポケモン分析データを読み込み・表示
+ */
+async function loadPokemonAnalysisData(tabId) {
+  const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
+  if (!marketData || marketData.length === 0) return;
+
+  // 属性付きのアイテムのみフィルタ
+  const itemsWithAttrs = marketData.filter(item => item.attributes);
+
+  switch (tabId) {
+    case 'character-ranking':
+      renderCharacterRanking(itemsWithAttrs);
+      break;
+    case 'set-ranking':
+      renderSetRanking(itemsWithAttrs);
+      break;
+    case 'grade-analysis':
+      renderGradeAnalysis(itemsWithAttrs);
+      break;
+    case 'rarity-analysis':
+      renderRarityAnalysis(itemsWithAttrs);
+      break;
+  }
+}
+
+/**
+ * キャラ別ランキングを描画
+ */
+function renderCharacterRanking(items) {
+  const container = document.getElementById('characterRankingList');
+  if (!container) return;
+
+  // カード名でグループ化
+  const characterStats = {};
+  items.forEach(item => {
+    const cardName = item.attributes?.cardName;
+    if (!cardName) return;
+
+    if (!characterStats[cardName]) {
+      characterStats[cardName] = { count: 0, totalPrice: 0, prices: [] };
+    }
+    characterStats[cardName].count++;
+    const price = item.price || 0;
+    characterStats[cardName].totalPrice += price;
+    characterStats[cardName].prices.push(price);
+  });
+
+  // ソート（件数順）
+  const sorted = Object.entries(characterStats)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 20);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="empty-message">認識されたカードがありません</p>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(([name, stats], index) => {
+    const avgPrice = stats.count > 0 ? stats.totalPrice / stats.count : 0;
+    const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+
+    return `
+      <div class="pokemon-ranking-item">
+        <span class="pokemon-rank ${rankClass}">${index + 1}</span>
+        <div class="pokemon-info">
+          <span class="pokemon-name">${escapeHtml(name)}</span>
+        </div>
+        <div class="pokemon-stats">
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">件数</span>
+            <span class="pokemon-stat-value">${stats.count}</span>
+          </div>
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">平均価格</span>
+            <span class="pokemon-stat-value price">$${avgPrice.toFixed(0)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * セット別ランキングを描画
+ */
+function renderSetRanking(items) {
+  const container = document.getElementById('setRankingList');
+  if (!container) return;
+
+  // セット名でグループ化
+  const setStats = {};
+  items.forEach(item => {
+    const setName = item.attributes?.set?.en || item.attributes?.set?.ja;
+    if (!setName) return;
+
+    if (!setStats[setName]) {
+      setStats[setName] = { count: 0, totalPrice: 0, series: item.attributes?.set?.series || '' };
+    }
+    setStats[setName].count++;
+    setStats[setName].totalPrice += (item.price || 0);
+  });
+
+  // ソート（件数順）
+  const sorted = Object.entries(setStats)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 20);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="empty-message">認識されたセットがありません</p>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(([name, stats], index) => {
+    const avgPrice = stats.count > 0 ? stats.totalPrice / stats.count : 0;
+    const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+
+    return `
+      <div class="pokemon-ranking-item">
+        <span class="pokemon-rank ${rankClass}">${index + 1}</span>
+        <div class="pokemon-info">
+          <span class="pokemon-name">${escapeHtml(name)}</span>
+          <span class="pokemon-sub">${escapeHtml(stats.series)}</span>
+        </div>
+        <div class="pokemon-stats">
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">件数</span>
+            <span class="pokemon-stat-value">${stats.count}</span>
+          </div>
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">平均価格</span>
+            <span class="pokemon-stat-value price">$${avgPrice.toFixed(0)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * グレード別分析を描画
+ */
+function renderGradeAnalysis(items) {
+  const container = document.getElementById('gradeAnalysisList');
+  if (!container) return;
+
+  // グレーディング会社とスコアでグループ化
+  const gradeStats = {};
+  items.forEach(item => {
+    const grading = item.attributes?.grading;
+    if (!grading || !grading.company) return;
+
+    const company = grading.company;
+    const score = grading.score || 'N/A';
+
+    if (!gradeStats[company]) {
+      gradeStats[company] = {};
+    }
+    if (!gradeStats[company][score]) {
+      gradeStats[company][score] = { count: 0, totalPrice: 0 };
+    }
+    gradeStats[company][score].count++;
+    gradeStats[company][score].totalPrice += (item.price || 0);
+  });
+
+  if (Object.keys(gradeStats).length === 0) {
+    container.innerHTML = '<p class="empty-message">グレード情報が認識されませんでした</p>';
+    return;
+  }
+
+  // 各会社ごとにチャートを描画
+  let html = '';
+  Object.entries(gradeStats).forEach(([company, scores]) => {
+    const sortedScores = Object.entries(scores)
+      .sort((a, b) => {
+        const scoreA = parseFloat(a[0]) || 0;
+        const scoreB = parseFloat(b[0]) || 0;
+        return scoreB - scoreA;
+      });
+
+    const totalCount = sortedScores.reduce((sum, [, s]) => sum + s.count, 0);
+    const maxCount = Math.max(...sortedScores.map(([, s]) => s.count));
+
+    html += `
+      <div class="grade-chart-container">
+        <div class="grade-company-header">
+          <span class="grade-company-name">${escapeHtml(company)}</span>
+          <span class="grade-company-count">${totalCount}件</span>
+        </div>
+        <div class="grade-bars">
+          ${sortedScores.map(([score, stats]) => {
+            const width = maxCount > 0 ? (stats.count / maxCount * 100) : 0;
+            const avgPrice = stats.count > 0 ? stats.totalPrice / stats.count : 0;
+            const companyClass = company.toLowerCase();
+            return `
+              <div class="grade-bar-row">
+                <span class="grade-label">${escapeHtml(score)}</span>
+                <div class="grade-bar">
+                  <div class="grade-bar-fill ${companyClass}" style="width: ${width}%"></div>
+                </div>
+                <span class="grade-count">${stats.count}件</span>
+                <span class="grade-avg-price">$${avgPrice.toFixed(0)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+/**
+ * レアリティ別分析を描画
+ */
+function renderRarityAnalysis(items) {
+  const container = document.getElementById('rarityAnalysisList');
+  if (!container) return;
+
+  // レアリティでグループ化
+  const rarityStats = {};
+  items.forEach(item => {
+    const rarity = item.attributes?.rarity;
+    if (!rarity) return;
+
+    if (!rarityStats[rarity]) {
+      rarityStats[rarity] = { count: 0, totalPrice: 0 };
+    }
+    rarityStats[rarity].count++;
+    rarityStats[rarity].totalPrice += (item.price || 0);
+  });
+
+  // ソート（平均価格順）
+  const sorted = Object.entries(rarityStats)
+    .sort((a, b) => {
+      const avgA = a[1].count > 0 ? a[1].totalPrice / a[1].count : 0;
+      const avgB = b[1].count > 0 ? b[1].totalPrice / b[1].count : 0;
+      return avgB - avgA;
+    })
+    .slice(0, 20);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p class="empty-message">レアリティ情報が認識されませんでした</p>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(([name, stats], index) => {
+    const avgPrice = stats.count > 0 ? stats.totalPrice / stats.count : 0;
+    const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+
+    return `
+      <div class="pokemon-ranking-item">
+        <span class="pokemon-rank ${rankClass}">${index + 1}</span>
+        <div class="pokemon-info">
+          <span class="pokemon-name">${escapeHtml(name)}</span>
+        </div>
+        <div class="pokemon-stats">
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">件数</span>
+            <span class="pokemon-stat-value">${stats.count}</span>
+          </div>
+          <div class="pokemon-stat">
+            <span class="pokemon-stat-label">平均価格</span>
+            <span class="pokemon-stat-value price">$${avgPrice.toFixed(0)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 /**
@@ -4338,10 +4663,13 @@ async function analyzeMarketData() {
     }
   }
 
-  // ポケモンプロファイルの場合、未認識アイテムを表示
+  // ポケモンプロファイルの場合、未認識アイテムを表示＆分析データ読み込み
   if (currentSheetProfile === 'pokemon') {
     displayUnrecognizedItems(marketData);
     updatePokemonCorrectionVisibility();
+    updatePokemonAnalysisVisibility();
+    // デフォルトでキャラ別ランキングを表示
+    loadPokemonAnalysisData('character-ranking');
   }
 
   showAlert(`${marketData.length}件の市場データを分析しました`, 'success');

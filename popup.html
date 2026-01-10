@@ -631,6 +631,28 @@
             </button>
           </div>
 
+          <!-- ポケモンカード専用サブタブ（プロファイルがpokemonの時のみ表示） -->
+          <div class="pokemon-analysis-tabs" id="pokemonAnalysisTabs" style="display: none;">
+            <div class="pokemon-tabs-header">
+              <span class="pokemon-tabs-icon">⚡</span>
+              <span class="pokemon-tabs-title">ポケモンカード分析</span>
+            </div>
+            <div class="pokemon-subtabs">
+              <button class="pokemon-subtab active" data-pokemon-tab="character-ranking">
+                <span>🐾 キャラ別</span>
+              </button>
+              <button class="pokemon-subtab" data-pokemon-tab="set-ranking">
+                <span>📦 セット別</span>
+              </button>
+              <button class="pokemon-subtab" data-pokemon-tab="grade-analysis">
+                <span>🏅 グレード別</span>
+              </button>
+              <button class="pokemon-subtab" data-pokemon-tab="rarity-analysis">
+                <span>✨ レアリティ別</span>
+              </button>
+            </div>
+          </div>
+
           <!-- 市場分析コンテンツエリア -->
           <div id="marketAnalysisContent" class="market-analysis-content">
             <!-- ブランドランキング -->
@@ -657,6 +679,49 @@
             <!-- 自分と比較 -->
             <div id="market-comparison" class="market-tab-content" style="display: none;">
               <div id="comparisonContent" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- ポケモン分析コンテンツエリア -->
+          <div id="pokemonAnalysisContent" class="pokemon-analysis-content" style="display: none;">
+            <!-- キャラ別ランキング -->
+            <div id="pokemon-character-ranking" class="pokemon-tab-content active">
+              <div class="analysis-description">
+                <p>カード名（ポケモン名）別の販売傾向を表示します</p>
+              </div>
+              <div id="characterRankingList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- セット別ランキング -->
+            <div id="pokemon-set-ranking" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>セット（パック・拡張）別の販売傾向を表示します</p>
+              </div>
+              <div id="setRankingList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- グレード別分析 -->
+            <div id="pokemon-grade-analysis" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>PSA/BGS/CGCなどのグレード別価格分布を表示します</p>
+              </div>
+              <div id="gradeAnalysisList" class="ranking-list compact">
+                <!-- 動的に生成 -->
+              </div>
+            </div>
+
+            <!-- レアリティ別分析 -->
+            <div id="pokemon-rarity-analysis" class="pokemon-tab-content" style="display: none;">
+              <div class="analysis-description">
+                <p>レアリティ（SAR、SR、UR等）別の販売傾向を表示します</p>
+              </div>
+              <div id="rarityAnalysisList" class="ranking-list compact">
                 <!-- 動的に生成 -->
               </div>
             </div>
