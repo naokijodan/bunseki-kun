@@ -236,6 +236,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // タブ制限を適用（認証状態に基づく）
   await applyTabRestrictions();
+
+  // ポケモン補正機能を初期化
+  initPokemonCorrectionEvents();
+  await loadCustomPokemonDict();
+  await displayCustomDictList();
+  updatePokemonCorrectionVisibility();
 });
 
 // =====================================
@@ -539,6 +545,9 @@ function updateProfileDisplay() {
     profileBadge.innerHTML = `${profile.icon} ${profile.name}`;
     profileBadge.title = profile.description;
   }
+
+  // ポケモン補正セクションの表示/非表示
+  updatePokemonCorrectionVisibility();
 }
 
 /**
@@ -547,6 +556,301 @@ function updateProfileDisplay() {
 async function loadSheetProfiles() {
   const result = await chrome.storage.local.get('sheetProfiles');
   return result.sheetProfiles || {};
+}
+
+// =====================================
+// ポケモンカード辞書補正機能
+// =====================================
+
+/**
+ * カスタム辞書を取得
+ */
+async function getCustomPokemonDict() {
+  const result = await chrome.storage.local.get('customPokemonDict');
+  return result.customPokemonDict || { cards: {}, sets: {} };
+}
+
+/**
+ * カスタム辞書を保存
+ */
+async function saveCustomPokemonDict(dict) {
+  await chrome.storage.local.set({ customPokemonDict: dict });
+  // PokemonProfileに反映
+  if (typeof PokemonProfile !== 'undefined') {
+    Object.entries(dict.cards).forEach(([key, value]) => {
+      PokemonProfile.addCustomCard(key, value);
+    });
+    Object.entries(dict.sets).forEach(([key, value]) => {
+      PokemonProfile.addCustomSet(key, value);
+    });
+  }
+}
+
+/**
+ * カスタム辞書を読み込んでPokemonProfileに反映
+ */
+async function loadCustomPokemonDict() {
+  const dict = await getCustomPokemonDict();
+  if (typeof PokemonProfile !== 'undefined') {
+    Object.entries(dict.cards).forEach(([key, value]) => {
+      PokemonProfile.addCustomCard(key, value);
+    });
+    Object.entries(dict.sets).forEach(([key, value]) => {
+      PokemonProfile.addCustomSet(key, value);
+    });
+  }
+  return dict;
+}
+
+/**
+ * ポケモン補正セクションの表示/非表示
+ */
+function updatePokemonCorrectionVisibility() {
+  const section = document.getElementById('pokemonCorrectionSection');
+  if (section) {
+    section.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+  }
+}
+
+/**
+ * 未認識アイテムを表示
+ */
+function displayUnrecognizedItems(items) {
+  const container = document.getElementById('pokemonUnrecognizedItems');
+  if (!container) return;
+
+  // 未認識（カード名またはセット名がない）のアイテムを抽出
+  const unrecognized = items.filter(item => {
+    if (!item.attributes) return true;
+    return !item.attributes.cardName || !item.attributes.set;
+  }).slice(0, 20); // 最大20件
+
+  if (unrecognized.length === 0) {
+    container.innerHTML = '<p class="empty-message">すべてのアイテムが認識されました</p>';
+    return;
+  }
+
+  container.innerHTML = unrecognized.map(item => {
+    const attrs = item.attributes || {};
+    const missing = [];
+    if (!attrs.cardName) missing.push('カード名');
+    if (!attrs.set) missing.push('セット');
+
+    return `
+      <div class="unrecognized-item" data-title="${escapeHtml(item.title || '')}">
+        <span class="unrecognized-title" title="${escapeHtml(item.title || '')}">${escapeHtml(item.title || '(タイトルなし)')}</span>
+        <span class="unrecognized-missing">${missing.join(', ')}不明</span>
+        <div class="unrecognized-actions">
+          <button class="copy-title-btn" title="タイトルをコピー">📋</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // コピーボタンのイベント
+  container.querySelectorAll('.copy-title-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const title = e.target.closest('.unrecognized-item').dataset.title;
+      navigator.clipboard.writeText(title);
+      btn.textContent = '✓';
+      setTimeout(() => btn.textContent = '📋', 1000);
+    });
+  });
+}
+
+/**
+ * カスタム辞書一覧を表示
+ */
+async function displayCustomDictList() {
+  const dict = await getCustomPokemonDict();
+  const container = document.getElementById('customDictList');
+  const countEl = document.getElementById('customDictCount');
+
+  if (!container) return;
+
+  const cardEntries = Object.entries(dict.cards);
+  const setEntries = Object.entries(dict.sets);
+  const total = cardEntries.length + setEntries.length;
+
+  if (countEl) {
+    countEl.textContent = `(${total}件)`;
+  }
+
+  if (total === 0) {
+    container.innerHTML = '<p class="empty-message">まだカスタム辞書はありません</p>';
+    return;
+  }
+
+  let html = '';
+
+  // カード一覧
+  cardEntries.forEach(([key, value]) => {
+    html += `
+      <div class="custom-dict-item" data-type="card" data-key="${escapeHtml(key)}">
+        <span class="custom-dict-key">${escapeHtml(key)}</span>
+        <span class="custom-dict-value">${escapeHtml(value.ja)}</span>
+        <button class="custom-dict-delete" title="削除">×</button>
+      </div>
+    `;
+  });
+
+  // セット一覧
+  setEntries.forEach(([key, value]) => {
+    html += `
+      <div class="custom-dict-item set-item" data-type="set" data-key="${escapeHtml(key)}">
+        <span class="custom-dict-key">${escapeHtml(key)}</span>
+        <span class="custom-dict-value">${escapeHtml(value.en || value.ja)}</span>
+        <button class="custom-dict-delete" title="削除">×</button>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  // 削除ボタンのイベント
+  container.querySelectorAll('.custom-dict-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const item = e.target.closest('.custom-dict-item');
+      const type = item.dataset.type;
+      const key = item.dataset.key;
+
+      const dict = await getCustomPokemonDict();
+      if (type === 'card') {
+        delete dict.cards[key];
+      } else {
+        delete dict.sets[key];
+      }
+      await saveCustomPokemonDict(dict);
+      await displayCustomDictList();
+    });
+  });
+}
+
+/**
+ * カード追加処理
+ */
+async function addCustomCard() {
+  const keyInput = document.getElementById('cardKeyInput');
+  const jaInput = document.getElementById('cardJaInput');
+  const idInput = document.getElementById('cardIdInput');
+
+  const key = keyInput.value.trim().toLowerCase();
+  const ja = jaInput.value.trim();
+  const id = idInput.value.trim();
+
+  if (!key || !ja) {
+    alert('検索キーと日本語名は必須です');
+    return;
+  }
+
+  const dict = await getCustomPokemonDict();
+  dict.cards[key] = { ja, id: id || '', category: 'ポケモン' };
+
+  // 日本語名でも検索できるように追加
+  dict.cards[ja] = { ja, id: id || '', category: 'ポケモン' };
+
+  await saveCustomPokemonDict(dict);
+
+  // フォームクリア
+  keyInput.value = '';
+  jaInput.value = '';
+  idInput.value = '';
+
+  // 一覧更新
+  await displayCustomDictList();
+
+  // 成功メッセージ
+  const btn = document.getElementById('addCardBtn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-icon">✓</span> 追加完了';
+  setTimeout(() => btn.innerHTML = originalText, 1500);
+}
+
+/**
+ * セット追加処理
+ */
+async function addCustomSet() {
+  const keyInput = document.getElementById('setKeyInput');
+  const enInput = document.getElementById('setEnInput');
+  const jaInput = document.getElementById('setJaInput');
+  const seriesSelect = document.getElementById('setSeriesSelect');
+
+  const key = keyInput.value.trim().toLowerCase();
+  const en = enInput.value.trim();
+  const ja = jaInput.value.trim();
+  const series = seriesSelect.value;
+
+  if (!key || (!en && !ja)) {
+    alert('検索キーと、英語名または日本語名は必須です');
+    return;
+  }
+
+  const dict = await getCustomPokemonDict();
+  dict.sets[key] = { en: en || ja, ja: ja || en, series };
+
+  // 日本語名でも検索できるように追加
+  if (ja) {
+    dict.sets[ja.toLowerCase()] = { en: en || ja, ja, series };
+  }
+
+  await saveCustomPokemonDict(dict);
+
+  // フォームクリア
+  keyInput.value = '';
+  enInput.value = '';
+  jaInput.value = '';
+
+  // 一覧更新
+  await displayCustomDictList();
+
+  // 成功メッセージ
+  const btn = document.getElementById('addSetBtn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-icon">✓</span> 追加完了';
+  setTimeout(() => btn.innerHTML = originalText, 1500);
+}
+
+/**
+ * 補正セクションのイベントを初期化
+ */
+function initPokemonCorrectionEvents() {
+  // トグルボタン
+  const toggleBtn = document.getElementById('pokemonCorrectionToggle');
+  const content = document.getElementById('pokemonCorrectionContent');
+  if (toggleBtn && content) {
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'flex' : 'none';
+      toggleBtn.textContent = isHidden ? '▲' : '▼';
+    });
+  }
+
+  // タブ切り替え
+  document.querySelectorAll('.correction-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabType = tab.dataset.correctionTab;
+
+      // タブのアクティブ状態
+      document.querySelectorAll('.correction-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // フォーム表示切り替え
+      document.getElementById('cardCorrectionForm').style.display = tabType === 'card' ? 'block' : 'none';
+      document.getElementById('setCorrectionForm').style.display = tabType === 'set' ? 'block' : 'none';
+    });
+  });
+
+  // カード追加ボタン
+  const addCardBtn = document.getElementById('addCardBtn');
+  if (addCardBtn) {
+    addCardBtn.addEventListener('click', addCustomCard);
+  }
+
+  // セット追加ボタン
+  const addSetBtn = document.getElementById('addSetBtn');
+  if (addSetBtn) {
+    addSetBtn.addEventListener('click', addCustomSet);
+  }
 }
 
 /**
@@ -4032,6 +4336,12 @@ async function analyzeMarketData() {
       saveInfo.textContent = `自動保存済み (${formatDateTime(new Date())})`;
       saveInfo.className = 'save-info success';
     }
+  }
+
+  // ポケモンプロファイルの場合、未認識アイテムを表示
+  if (currentSheetProfile === 'pokemon') {
+    displayUnrecognizedItems(marketData);
+    updatePokemonCorrectionVisibility();
   }
 
   showAlert(`${marketData.length}件の市場データを分析しました`, 'success');

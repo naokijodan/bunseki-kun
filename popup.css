@@ -200,6 +200,235 @@ body {
   padding: 8px;
 }
 
+/* ===================== */
+/* ポケモン補正セクション */
+/* ===================== */
+.pokemon-correction-section {
+  background: linear-gradient(135deg, #fef9e7 0%, #fdebd0 100%);
+  border: 1px solid #f5b041;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.pokemon-correction-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pokemon-correction-section .section-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #b7950b;
+}
+
+.pokemon-correction-section .toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #b7950b;
+  padding: 4px 8px;
+}
+
+.correction-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.correction-subsection {
+  background: rgba(255,255,255,0.7);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.correction-subsection h5 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #5d4e37;
+  border-bottom: 1px solid #e0d5c7;
+  padding-bottom: 4px;
+}
+
+.correction-hint {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin: 0 0 8px 0;
+}
+
+/* 未認識アイテム一覧 */
+.unrecognized-items-list {
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.unrecognized-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.unrecognized-item:hover {
+  background: #f8f9fa;
+}
+
+.unrecognized-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+
+.unrecognized-missing {
+  font-size: 10px;
+  color: #e74c3c;
+  margin-left: 8px;
+}
+
+.unrecognized-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.unrecognized-actions button {
+  padding: 2px 6px;
+  font-size: 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.unrecognized-actions button:hover {
+  background: #f0f0f0;
+}
+
+/* 補正フォームタブ */
+.correction-form-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.correction-tab {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px 4px 0 0;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+}
+
+.correction-tab.active {
+  background: #fff;
+  border-bottom-color: #fff;
+  color: #333;
+  font-weight: 600;
+}
+
+/* 補正フォーム */
+.correction-form {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  padding: 10px;
+}
+
+.correction-form .form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.correction-form label {
+  font-size: 12px;
+  color: #555;
+  min-width: 130px;
+}
+
+.correction-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.correction-input.short {
+  max-width: 80px;
+  flex: 0 0 80px;
+}
+
+.correction-input:focus {
+  outline: none;
+  border-color: #f5b041;
+  box-shadow: 0 0 0 2px rgba(245, 176, 65, 0.2);
+}
+
+/* カスタム辞書一覧 */
+.custom-dict-list {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.custom-dict-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: #e8f4e8;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.custom-dict-item.set-item {
+  background: #e8e8f4;
+}
+
+.custom-dict-key {
+  color: #666;
+}
+
+.custom-dict-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.custom-dict-delete {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.custom-dict-delete:hover {
+  color: #c0392b;
+}
+
+.empty-message {
+  text-align: center;
+  color: #999;
+  font-size: 11px;
+  padding: 8px;
+}
+
 .icon-btn {
   width: 36px;
   height: 36px;

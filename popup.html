@@ -420,6 +420,97 @@
             </div>
           </div>
 
+          <!-- ポケモンカード用ユーザー補正セクション（プロファイルがpokemonの時のみ表示） -->
+          <div class="data-section pokemon-correction-section" id="pokemonCorrectionSection" style="display: none;">
+            <div class="section-header">
+              <h4><span class="section-icon">✏️</span> ポケモンカード辞書補正</h4>
+              <button id="pokemonCorrectionToggle" class="toggle-btn">▼</button>
+            </div>
+            <div id="pokemonCorrectionContent" class="correction-content">
+              <!-- 未認識アイテム一覧 -->
+              <div class="correction-subsection">
+                <h5>未認識アイテム</h5>
+                <p class="correction-hint">以下のアイテムはカード名・セット名が認識できませんでした。正しい情報を入力して辞書に追加できます。</p>
+                <div id="pokemonUnrecognizedItems" class="unrecognized-items-list">
+                  <!-- 動的に生成 -->
+                </div>
+              </div>
+
+              <!-- カスタム辞書追加フォーム -->
+              <div class="correction-subsection">
+                <h5>辞書に追加</h5>
+                <div class="correction-form-tabs">
+                  <button class="correction-tab active" data-correction-tab="card">カード名</button>
+                  <button class="correction-tab" data-correction-tab="set">セット名</button>
+                </div>
+
+                <!-- カード名追加フォーム -->
+                <div id="cardCorrectionForm" class="correction-form">
+                  <div class="form-row">
+                    <label>検索キー（英語/日本語）:</label>
+                    <input type="text" id="cardKeyInput" placeholder="例: pikachu, ピカチュウ" class="correction-input">
+                  </div>
+                  <div class="form-row">
+                    <label>日本語名:</label>
+                    <input type="text" id="cardJaInput" placeholder="例: ピカチュウ" class="correction-input">
+                  </div>
+                  <div class="form-row">
+                    <label>図鑑No（任意）:</label>
+                    <input type="text" id="cardIdInput" placeholder="例: 025" class="correction-input short">
+                  </div>
+                  <button id="addCardBtn" class="action-btn primary small">
+                    <span class="btn-icon">+</span>
+                    カード追加
+                  </button>
+                </div>
+
+                <!-- セット名追加フォーム -->
+                <div id="setCorrectionForm" class="correction-form" style="display: none;">
+                  <div class="form-row">
+                    <label>検索キー（英語/日本語）:</label>
+                    <input type="text" id="setKeyInput" placeholder="例: base set, 第一弾" class="correction-input">
+                  </div>
+                  <div class="form-row">
+                    <label>英語名:</label>
+                    <input type="text" id="setEnInput" placeholder="例: Base Set" class="correction-input">
+                  </div>
+                  <div class="form-row">
+                    <label>日本語名:</label>
+                    <input type="text" id="setJaInput" placeholder="例: 第一弾拡張パック" class="correction-input">
+                  </div>
+                  <div class="form-row">
+                    <label>シリーズ:</label>
+                    <select id="setSeriesSelect" class="correction-input">
+                      <option value="WOTC">WOTC時代</option>
+                      <option value="EX">EXシリーズ</option>
+                      <option value="DP">DPシリーズ</option>
+                      <option value="BW">BWシリーズ</option>
+                      <option value="XY">XYシリーズ</option>
+                      <option value="SM">SMシリーズ</option>
+                      <option value="SWSH" selected>ソード&シールド</option>
+                      <option value="SV">スカーレット&バイオレット</option>
+                      <option value="Promo">プロモ</option>
+                      <option value="Special">特別セット</option>
+                    </select>
+                  </div>
+                  <button id="addSetBtn" class="action-btn primary small">
+                    <span class="btn-icon">+</span>
+                    セット追加
+                  </button>
+                </div>
+              </div>
+
+              <!-- ユーザー追加辞書一覧 -->
+              <div class="correction-subsection">
+                <h5>追加済み辞書 <span id="customDictCount">(0件)</span></h5>
+                <div id="customDictList" class="custom-dict-list">
+                  <!-- 動的に生成 -->
+                  <p class="empty-message">まだカスタム辞書はありません</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- AI学習済みルール表示（市場データ用）- 分析結果の下 -->
           <div class="data-section" id="marketLearnedRulesSection">
             <div class="section-header">
