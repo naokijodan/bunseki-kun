@@ -242,6 +242,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 // シート管理（固定10シート方式）
 // =====================================
 
+// シートプロファイル定義
+const SHEET_PROFILES = {
+  general: {
+    id: 'general',
+    name: '汎用',
+    icon: '📊',
+    description: '全カテゴリ対応の標準分析'
+  },
+  pokemon: {
+    id: 'pokemon',
+    name: 'ポケモンカード',
+    icon: '⚡',
+    description: 'ポケカ専用分析（キャラ/セット/グレーディング）'
+  },
+  yugioh: {
+    id: 'yugioh',
+    name: '遊戯王',
+    icon: '🎴',
+    description: '遊戯王専用分析（カード名/レアリティ/シリーズ）'
+  },
+  onepiece: {
+    id: 'onepiece',
+    name: 'ワンピースカード',
+    icon: '🏴‍☠️',
+    description: 'ワンピカ専用分析（キャラ/シリーズ/レアリティ）'
+  }
+};
+
+// 現在のシートプロファイル
+let currentSheetProfile = 'general';
+
 // デフォルトのシート名
 const DEFAULT_SHEET_NAMES = {
   sheet1: 'シート1',
@@ -279,6 +310,20 @@ async function initSheetManagement() {
   // BunsekiDBにも設定
   if (typeof BunsekiDB !== 'undefined') {
     BunsekiDB.currentSheetId = currentSheetId;
+  }
+
+  // プロファイルを読み込んで表示
+  currentSheetProfile = await getSheetProfile(currentSheetId);
+  const profileSelect = document.getElementById('profileSelect');
+  if (profileSelect) {
+    profileSelect.value = currentSheetProfile;
+
+    // プロファイル変更イベント
+    profileSelect.addEventListener('change', async (e) => {
+      const newProfile = e.target.value;
+      await setSheetProfile(currentSheetId, newProfile);
+      showAlert(`プロファイルを「${SHEET_PROFILES[newProfile]?.name || newProfile}」に変更しました`, 'success');
+    });
   }
 
   // シート選択変更
@@ -400,12 +445,70 @@ async function renameSheet(sheetId, newName) {
 }
 
 /**
+ * シートプロファイルを取得
+ */
+async function getSheetProfile(sheetId) {
+  const result = await chrome.storage.local.get('sheetProfiles');
+  const profiles = result.sheetProfiles || {};
+  return profiles[sheetId] || 'general';
+}
+
+/**
+ * シートプロファイルを保存
+ */
+async function setSheetProfile(sheetId, profileId) {
+  const result = await chrome.storage.local.get('sheetProfiles');
+  const profiles = result.sheetProfiles || {};
+  profiles[sheetId] = profileId;
+  await chrome.storage.local.set({ sheetProfiles: profiles });
+
+  // 現在のシートなら変数も更新
+  if (sheetId === currentSheetId) {
+    currentSheetProfile = profileId;
+    updateProfileDisplay();
+  }
+
+  console.log('シートプロファイルを変更:', sheetId, '->', profileId);
+}
+
+/**
+ * プロファイル表示を更新
+ */
+function updateProfileDisplay() {
+  const profileSelect = document.getElementById('profileSelect');
+  if (profileSelect) {
+    profileSelect.value = currentSheetProfile;
+  }
+
+  // プロファイルバッジを更新
+  const profileBadge = document.getElementById('profileBadge');
+  if (profileBadge) {
+    const profile = SHEET_PROFILES[currentSheetProfile] || SHEET_PROFILES.general;
+    profileBadge.innerHTML = `${profile.icon} ${profile.name}`;
+    profileBadge.title = profile.description;
+  }
+}
+
+/**
+ * 全シートのプロファイルを読み込み
+ */
+async function loadSheetProfiles() {
+  const result = await chrome.storage.local.get('sheetProfiles');
+  return result.sheetProfiles || {};
+}
+
+/**
  * シートを切り替え
  */
 async function switchSheet(sheetId) {
   console.log('switchSheet開始:', sheetId);
   currentSheetId = sheetId;
   localStorage.setItem('currentSheetId', sheetId);
+
+  // シートプロファイルを読み込み
+  currentSheetProfile = await getSheetProfile(sheetId);
+  updateProfileDisplay();
+  console.log('シートプロファイル:', currentSheetProfile);
 
   // BunsekiDBにも設定
   if (typeof BunsekiDB !== 'undefined') {
