@@ -380,6 +380,7 @@ async function initSheetManagement() {
 
   // プロファイルを読み込んで表示
   currentSheetProfile = await getSheetProfile(currentSheetId);
+  console.log('[Pokemon] initSheetManagement: シート', currentSheetId, 'のプロファイル=', currentSheetProfile);
   const profileSelect = document.getElementById('profileSelect');
   if (profileSelect) {
     profileSelect.value = currentSheetProfile;
@@ -516,17 +517,21 @@ async function renameSheet(sheetId, newName) {
 async function getSheetProfile(sheetId) {
   const result = await chrome.storage.local.get('sheetProfiles');
   const profiles = result.sheetProfiles || {};
-  return profiles[sheetId] || 'general';
+  const profile = profiles[sheetId] || 'general';
+  console.log('[Pokemon] getSheetProfile:', sheetId, '-> profiles=', profiles, '-> result=', profile);
+  return profile;
 }
 
 /**
  * シートプロファイルを保存
  */
 async function setSheetProfile(sheetId, profileId) {
+  console.log('[Pokemon] setSheetProfile: 保存前 sheetId=', sheetId, ', profileId=', profileId);
   const result = await chrome.storage.local.get('sheetProfiles');
   const profiles = result.sheetProfiles || {};
   profiles[sheetId] = profileId;
   await chrome.storage.local.set({ sheetProfiles: profiles });
+  console.log('[Pokemon] setSheetProfile: 保存後 profiles=', profiles);
 
   // 現在のシートなら変数も更新
   if (sheetId === currentSheetId) {
@@ -891,11 +896,13 @@ function updatePokemonAnalysisVisibility() {
  * 自分の分析用ポケモン分析タブの表示/非表示を更新
  */
 function updateMyPokemonAnalysisVisibility() {
+  console.log('[Pokemon] updateMyPokemonAnalysisVisibility: currentSheetProfile=', currentSheetProfile);
   const tabsSection = document.getElementById('myPokemonAnalysisTabs');
   const contentSection = document.getElementById('myPokemonAnalysisContent');
 
   if (tabsSection) {
     tabsSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    console.log('[Pokemon] myPokemonAnalysisTabs display:', tabsSection.style.display);
   }
   if (contentSection) {
     contentSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
