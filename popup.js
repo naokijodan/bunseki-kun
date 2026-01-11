@@ -7330,6 +7330,13 @@ async function restoreAnalysisResults() {
       }
     }
 
+    // ポケモンプロファイルの場合、ポケモン分析データも読み込み
+    if (currentSheetProfile === 'pokemon') {
+      console.log('[Pokemon] restoreAnalysisResults: ポケモン分析データを読み込み');
+      updateMyPokemonAnalysisVisibility();
+      loadMyPokemonAnalysisData('my-character-ranking');
+    }
+
     console.log('分析結果を復元しました');
   } catch (error) {
     console.error('分析結果の復元に失敗:', error);
