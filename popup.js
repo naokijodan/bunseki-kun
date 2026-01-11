@@ -2748,15 +2748,35 @@ async function analyzeMyData() {
     return;
   }
 
-  // ポケモンプロファイルの場合、属性を付与
+  // ポケモンプロファイルの場合、属性を付与（元のオブジェクトに直接付与して保存時に反映されるようにする）
   if (currentSheetProfile === 'pokemon') {
-    allItems = allItems.map(item => {
-      const attributes = extractAttributesByProfile(item.title);
-      if (attributes) {
-        return { ...item, attributes, profileExtracted: currentSheetProfile };
+    console.log('[Pokemon] analyzeMyData: 属性を付与中...');
+    let attributeCount = 0;
+    // activeItemsに属性を付与
+    activeItems.forEach(item => {
+      if (!item.attributes && item.title) {
+        const attributes = extractAttributesByProfile(item.title);
+        if (attributes) {
+          item.attributes = attributes;
+          item.profileExtracted = currentSheetProfile;
+          attributeCount++;
+        }
       }
-      return item;
     });
+    // soldItemsに属性を付与
+    soldItems.forEach(item => {
+      if (!item.attributes && item.title) {
+        const attributes = extractAttributesByProfile(item.title);
+        if (attributes) {
+          item.attributes = attributes;
+          item.profileExtracted = currentSheetProfile;
+          attributeCount++;
+        }
+      }
+    });
+    console.log(`[Pokemon] analyzeMyData: ${attributeCount}件に属性を付与`);
+    // allItemsを再構築
+    allItems = [...activeItems, ...soldItems];
   }
 
   // ブランド分類を実行
@@ -2809,6 +2829,13 @@ async function analyzeMyData() {
   // IndexedDBに保存（10万件以上対応）
   let saveSuccess = false;
   try {
+    // 保存前に属性が付与されているか確認
+    if (currentSheetProfile === 'pokemon') {
+      const withAttrs = analyzer.activeListings.filter(i => i.attributes).length;
+      const soldWithAttrs = analyzer.soldItems.filter(i => i.attributes).length;
+      console.log(`[Pokemon] 保存前確認: activeListings属性あり=${withAttrs}/${analyzer.activeListings.length}, soldItems属性あり=${soldWithAttrs}/${analyzer.soldItems.length}`);
+    }
+
     await BunsekiDB.setActiveListings(analyzer.activeListings);
     await BunsekiDB.setSoldItems(analyzer.soldItems);
 
@@ -6629,9 +6656,15 @@ async function loadSavedData() {
     const metaData = await chrome.storage.local.get(metaKeys);
 
     // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を再抽出
+    console.log(`[Pokemon] loadSavedData: currentSheetProfile=${currentSheetProfile}`);
     if (currentSheetProfile === 'pokemon') {
+      let withAttributes = 0;
+      let withoutAttributes = 0;
       activeListings.forEach(item => {
-        if (!item.attributes && item.title) {
+        if (item.attributes) {
+          withAttributes++;
+        } else if (item.title) {
+          withoutAttributes++;
           const attributes = extractAttributesByProfile(item.title);
           if (attributes) {
             item.attributes = attributes;
@@ -6640,7 +6673,10 @@ async function loadSavedData() {
         }
       });
       soldItems.forEach(item => {
-        if (!item.attributes && item.title) {
+        if (item.attributes) {
+          withAttributes++;
+        } else if (item.title) {
+          withoutAttributes++;
           const attributes = extractAttributesByProfile(item.title);
           if (attributes) {
             item.attributes = attributes;
@@ -6648,6 +6684,7 @@ async function loadSavedData() {
           }
         }
       });
+      console.log(`[Pokemon] loadSavedData: 属性あり=${withAttributes}件, 属性なし(再抽出)=${withoutAttributes}件`);
     }
 
     // analyzerにデータをセット（0件でもセット）
