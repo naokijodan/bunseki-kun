@@ -6628,6 +6628,28 @@ async function loadSavedData() {
     ];
     const metaData = await chrome.storage.local.get(metaKeys);
 
+    // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を再抽出
+    if (currentSheetProfile === 'pokemon') {
+      activeListings.forEach(item => {
+        if (!item.attributes && item.title) {
+          const attributes = extractAttributesByProfile(item.title);
+          if (attributes) {
+            item.attributes = attributes;
+            item.profileExtracted = currentSheetProfile;
+          }
+        }
+      });
+      soldItems.forEach(item => {
+        if (!item.attributes && item.title) {
+          const attributes = extractAttributesByProfile(item.title);
+          if (attributes) {
+            item.attributes = attributes;
+            item.profileExtracted = currentSheetProfile;
+          }
+        }
+      });
+    }
+
     // analyzerにデータをセット（0件でもセット）
     analyzer.activeListings = activeListings;
     analyzer.soldItems = soldItems;
@@ -6719,6 +6741,19 @@ async function restoreAnalysisResults() {
     }
 
     if (allMyItems.length > 0) {
+      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      if (currentSheetProfile === 'pokemon') {
+        allMyItems.forEach(item => {
+          if (!item.attributes && item.title) {
+            const attributes = extractAttributesByProfile(item.title);
+            if (attributes) {
+              item.attributes = attributes;
+              item.profileExtracted = currentSheetProfile;
+            }
+          }
+        });
+      }
+
       // ブランド分類を再計算
       const myBrands = {};
       let myClassified = 0;
@@ -7531,19 +7566,37 @@ async function reanalyzeMyData() {
     // 出品中データを再判定
     const activeListings = analyzer.activeListings.map(item => {
       const brand = analyzer.extractBrand(item.title) || '(不明)';
-      return {
+      const updated = {
         ...item,
         brand: brand
       };
+      // ポケモンプロファイルの場合は属性も再抽出
+      if (currentSheetProfile === 'pokemon' && item.title) {
+        const attributes = extractAttributesByProfile(item.title);
+        if (attributes) {
+          updated.attributes = attributes;
+          updated.profileExtracted = currentSheetProfile;
+        }
+      }
+      return updated;
     });
 
     // 販売済みデータを再判定
     const soldItems = analyzer.soldItems.map(item => {
       const brand = analyzer.extractBrand(item.title) || '(不明)';
-      return {
+      const updated = {
         ...item,
         brand: brand
       };
+      // ポケモンプロファイルの場合は属性も再抽出
+      if (currentSheetProfile === 'pokemon' && item.title) {
+        const attributes = extractAttributesByProfile(item.title);
+        if (attributes) {
+          updated.attributes = attributes;
+          updated.profileExtracted = currentSheetProfile;
+        }
+      }
+      return updated;
     });
 
     // 更新されたデータを再度分析
@@ -11868,6 +11921,19 @@ async function loadMarketAnalysis() {
       return;
     }
 
+    // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+    if (currentSheetProfile === 'pokemon') {
+      marketItems.forEach(item => {
+        if (!item.attributes && item.title) {
+          const attributes = extractAttributesByProfile(item.title);
+          if (attributes) {
+            item.attributes = attributes;
+            item.profileExtracted = currentSheetProfile;
+          }
+        }
+      });
+    }
+
     // 市場データを正規化
     const normalizedItems = analyzer.normalizeMarketData(marketItems);
 
@@ -11917,6 +11983,19 @@ async function restoreMarketAnalysis() {
     const marketItems = allMarketItems.filter(item => item.sheetId === currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
+      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      if (currentSheetProfile === 'pokemon') {
+        marketItems.forEach(item => {
+          if (!item.attributes && item.title) {
+            const attributes = extractAttributesByProfile(item.title);
+            if (attributes) {
+              item.attributes = attributes;
+              item.profileExtracted = currentSheetProfile;
+            }
+          }
+        });
+      }
+
       // 市場データを正規化
       const normalizedItems = analyzer.normalizeMarketData(marketItems);
 
@@ -12012,11 +12091,20 @@ async function reanalyzeMarketData() {
     const reclassifiedItems = marketItems.map(item => {
       const brand = extractBrandFromTitle(item.title || '');
       const category = analyzer.extractCategoryFromTitle(item.title || '');
-      return {
+      const updated = {
         ...item,
         brand: brand,
         category: category
       };
+      // ポケモンプロファイルの場合は属性も再抽出
+      if (currentSheetProfile === 'pokemon' && item.title) {
+        const attributes = extractAttributesByProfile(item.title);
+        if (attributes) {
+          updated.attributes = attributes;
+          updated.profileExtracted = currentSheetProfile;
+        }
+      }
+      return updated;
     });
 
     // IndexedDBを更新
