@@ -303,10 +303,14 @@ function extractAttributesByProfile(title, profile = currentSheetProfile) {
       }
       break;
     case 'yugioh':
-      // 将来実装
+      if (typeof YugiohProfile !== 'undefined') {
+        return YugiohProfile.extractAttributes(title);
+      }
       break;
     case 'onepiece':
-      // 将来実装
+      if (typeof OnePieceProfile !== 'undefined') {
+        return OnePieceProfile.extractAttributes(title);
+      }
       break;
     case 'general':
     default:
@@ -620,7 +624,7 @@ async function loadCustomPokemonDict() {
 function updatePokemonCorrectionVisibility() {
   const section = document.getElementById('pokemonCorrectionSection');
   if (section) {
-    section.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    section.style.display = ['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) ? 'block' : 'none';
   }
 }
 
@@ -880,10 +884,10 @@ function updatePokemonAnalysisVisibility() {
   const contentSection = document.getElementById('pokemonAnalysisContent');
 
   if (tabsSection) {
-    tabsSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    tabsSection.style.display = ['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) ? 'block' : 'none';
   }
   if (contentSection) {
-    contentSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    contentSection.style.display = ['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) ? 'block' : 'none';
   }
 }
 
@@ -895,10 +899,10 @@ function updateMyPokemonAnalysisVisibility() {
   const contentSection = document.getElementById('myPokemonAnalysisContent');
 
   if (tabsSection) {
-    tabsSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    tabsSection.style.display = ['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) ? 'block' : 'none';
   }
   if (contentSection) {
-    contentSection.style.display = currentSheetProfile === 'pokemon' ? 'block' : 'none';
+    contentSection.style.display = ['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) ? 'block' : 'none';
   }
 }
 
@@ -2749,7 +2753,7 @@ async function analyzeMyData() {
   }
 
   // ポケモンプロファイルの場合、属性を付与
-  if (currentSheetProfile === 'pokemon') {
+  if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
     allItems = allItems.map(item => {
       const attributes = extractAttributesByProfile(item.title);
       if (attributes) {
@@ -2928,7 +2932,7 @@ async function analyzeMyData() {
     const myGenericCategoryColumn = document.getElementById('myGenericCategoryColumn');
     const myPokemonAttributeColumn = document.getElementById('myPokemonAttributeColumn');
 
-    if (currentSheetProfile === 'pokemon') {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
       // ポケモンプロファイル: 属性別内訳を表示
       if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'none';
       if (myPokemonAttributeColumn) {
@@ -5128,7 +5132,7 @@ async function analyzeMarketData() {
     const genericCategoryColumn = document.getElementById('genericCategoryColumn');
     const pokemonAttributeColumn = document.getElementById('pokemonAttributeColumn');
 
-    if (currentSheetProfile === 'pokemon') {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
       // ポケモンプロファイル: 属性別内訳を表示
       if (genericCategoryColumn) genericCategoryColumn.style.display = 'none';
       if (pokemonAttributeColumn) {
@@ -5256,7 +5260,7 @@ async function analyzeMarketData() {
   }
 
   // ポケモンプロファイルの場合、未認識アイテムを表示＆分析データ読み込み
-  if (currentSheetProfile === 'pokemon') {
+  if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
     displayUnrecognizedItems(marketData);
     updatePokemonCorrectionVisibility();
     updatePokemonAnalysisVisibility();
@@ -6629,7 +6633,7 @@ async function loadSavedData() {
     const metaData = await chrome.storage.local.get(metaKeys);
 
     // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を再抽出
-    if (currentSheetProfile === 'pokemon') {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
       activeListings.forEach(item => {
         if (!item.attributes && item.title) {
           const attributes = extractAttributesByProfile(item.title);
@@ -6698,7 +6702,7 @@ async function loadSavedData() {
     updateLearnedRulesDisplay();
 
     // ポケモンプロファイルの場合、ポケモン分析タブを復元
-    if (currentSheetProfile === 'pokemon' && (activeListings.length > 0 || soldItems.length > 0)) {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) && (activeListings.length > 0 || soldItems.length > 0)) {
       updateMyPokemonAnalysisVisibility();
       loadMyPokemonAnalysisData('my-character-ranking');
     }
@@ -6748,7 +6752,7 @@ async function restoreAnalysisResults() {
 
     if (allMyItems.length > 0) {
       // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
-      if (currentSheetProfile === 'pokemon') {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
         allMyItems.forEach(item => {
           if (!item.attributes && item.title) {
             const attributes = extractAttributesByProfile(item.title);
@@ -7029,7 +7033,7 @@ async function restoreAnalysisResults() {
       const myGenericCategoryColumn = document.getElementById('myGenericCategoryColumn');
       const myPokemonAttributeColumn = document.getElementById('myPokemonAttributeColumn');
 
-      if (currentSheetProfile === 'pokemon') {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
         // ポケモンプロファイル: 属性別内訳を表示
         if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'none';
         if (myPokemonAttributeColumn) {
@@ -7057,7 +7061,7 @@ async function restoreAnalysisResults() {
 
     if (marketItems && marketItems.length > 0) {
       // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
-      if (currentSheetProfile === 'pokemon') {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
         marketItems.forEach(item => {
           if (!item.attributes && item.title) {
             const attributes = extractAttributesByProfile(item.title);
@@ -7334,7 +7338,7 @@ async function restoreAnalysisResults() {
       const genericCategoryColumn = document.getElementById('genericCategoryColumn');
       const pokemonAttributeColumn = document.getElementById('pokemonAttributeColumn');
 
-      if (currentSheetProfile === 'pokemon') {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
         // ポケモンプロファイル: 属性別内訳を表示
         if (genericCategoryColumn) genericCategoryColumn.style.display = 'none';
         if (pokemonAttributeColumn) {
@@ -7596,7 +7600,7 @@ async function loadMyAnalysis() {
     ]);
 
     // ポケモンプロファイルの場合、ポケモン分析も読み込み
-    if (currentSheetProfile === 'pokemon') {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
       updateMyPokemonAnalysisVisibility();
       loadMyPokemonAnalysisData('my-character-ranking');
     }
@@ -7642,7 +7646,7 @@ async function reanalyzeMyData() {
         brand: brand
       };
       // ポケモンプロファイルの場合は属性も再抽出
-      if (currentSheetProfile === 'pokemon' && item.title) {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) && item.title) {
         const attributes = extractAttributesByProfile(item.title);
         if (attributes) {
           updated.attributes = attributes;
@@ -7660,7 +7664,7 @@ async function reanalyzeMyData() {
         brand: brand
       };
       // ポケモンプロファイルの場合は属性も再抽出
-      if (currentSheetProfile === 'pokemon' && item.title) {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) && item.title) {
         const attributes = extractAttributesByProfile(item.title);
         if (attributes) {
           updated.attributes = attributes;
@@ -11993,7 +11997,7 @@ async function loadMarketAnalysis() {
     }
 
     // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
-    if (currentSheetProfile === 'pokemon') {
+    if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
       marketItems.forEach(item => {
         if (!item.attributes && item.title) {
           const attributes = extractAttributesByProfile(item.title);
@@ -12055,7 +12059,7 @@ async function restoreMarketAnalysis() {
 
     if (marketItems && marketItems.length > 0) {
       // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
-      if (currentSheetProfile === 'pokemon') {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile)) {
         marketItems.forEach(item => {
           if (!item.attributes && item.title) {
             const attributes = extractAttributesByProfile(item.title);
@@ -12168,7 +12172,7 @@ async function reanalyzeMarketData() {
         category: category
       };
       // ポケモンプロファイルの場合は属性も再抽出
-      if (currentSheetProfile === 'pokemon' && item.title) {
+      if (['pokemon', 'onepiece', 'yugioh'].includes(currentSheetProfile) && item.title) {
         const attributes = extractAttributesByProfile(item.title);
         if (attributes) {
           updated.attributes = attributes;
