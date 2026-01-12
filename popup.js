@@ -613,6 +613,14 @@ function updateCardAnalysisLabels() {
   const profile = SHEET_PROFILES[currentSheetProfile];
   if (!profile || !profile.hasCardAnalysis) return;
 
+  // タブアイコン定義
+  const tabIcons = {
+    character: '🐾',
+    set: '📦',
+    grade: '🏅',
+    rarity: '✨'
+  };
+
   // 市場分析用ラベル更新
   // 分析タブのタイトル
   const tabsTitle = document.querySelector('#pokemonAnalysisTabs .pokemon-tabs-title');
@@ -624,23 +632,25 @@ function updateCardAnalysisLabels() {
     tabsIcon.textContent = profile.icon;
   }
 
-  // 属性別内訳のタイトル
-  const attrTitle = document.querySelector('#pokemonAttributeColumn .breakdown-title');
+  // 属性別内訳のタイトル（h4直下）
+  const attrTitle = document.querySelector('#pokemonAttributeColumn > h4');
   if (attrTitle) {
     attrTitle.textContent = profile.attributeTitle;
   }
 
-  // タブボタンのラベル
+  // タブボタンのラベル（span内を更新）
   document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
     const tabId = tab.dataset.pokemonTab;
+    const span = tab.querySelector('span');
+    if (!span) return;
     if (tabId === 'character-ranking' && profile.tabs.character) {
-      tab.textContent = profile.tabs.character;
+      span.textContent = `${tabIcons.character} ${profile.tabs.character}`;
     } else if (tabId === 'set-ranking' && profile.tabs.set) {
-      tab.textContent = profile.tabs.set;
+      span.textContent = `${tabIcons.set} ${profile.tabs.set}`;
     } else if (tabId === 'grade-analysis' && profile.tabs.grade) {
-      tab.textContent = profile.tabs.grade;
+      span.textContent = `${tabIcons.grade} ${profile.tabs.grade}`;
     } else if (tabId === 'rarity-analysis' && profile.tabs.rarity) {
-      tab.textContent = profile.tabs.rarity;
+      span.textContent = `${tabIcons.rarity} ${profile.tabs.rarity}`;
     }
   });
 
@@ -675,22 +685,24 @@ function updateCardAnalysisLabels() {
   }
 
   // 自分の分析用 属性別内訳のタイトル
-  const myAttrTitle = document.querySelector('#myPokemonAttributeColumn .breakdown-title');
+  const myAttrTitle = document.querySelector('#myPokemonAttributeColumn > h4');
   if (myAttrTitle) {
     myAttrTitle.textContent = profile.attributeTitle;
   }
 
-  // 自分の分析用タブボタンのラベル
+  // 自分の分析用タブボタンのラベル（span内を更新）
   document.querySelectorAll('#myPokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
     const tabId = tab.dataset.myPokemonTab;
+    const span = tab.querySelector('span');
+    if (!span) return;
     if (tabId === 'my-character-ranking' && profile.tabs.character) {
-      tab.textContent = profile.tabs.character;
+      span.textContent = `${tabIcons.character} ${profile.tabs.character}`;
     } else if (tabId === 'my-set-ranking' && profile.tabs.set) {
-      tab.textContent = profile.tabs.set;
+      span.textContent = `${tabIcons.set} ${profile.tabs.set}`;
     } else if (tabId === 'my-grade-analysis' && profile.tabs.grade) {
-      tab.textContent = profile.tabs.grade;
+      span.textContent = `${tabIcons.grade} ${profile.tabs.grade}`;
     } else if (tabId === 'my-rarity-analysis' && profile.tabs.rarity) {
-      tab.textContent = profile.tabs.rarity;
+      span.textContent = `${tabIcons.rarity} ${profile.tabs.rarity}`;
     }
   });
 
@@ -715,7 +727,7 @@ function updateCardAnalysisLabels() {
   });
 
   // 辞書補正セクションのタイトル
-  const correctionTitle = document.querySelector('#pokemonCorrectionSection .section-title h4');
+  const correctionTitle = document.querySelector('#pokemonCorrectionSection .section-header h4');
   if (correctionTitle) {
     correctionTitle.innerHTML = `<span class="section-icon">✏️</span> ${profile.correctionTitle}`;
   }
