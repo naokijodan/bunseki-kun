@@ -237,19 +237,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // タブ制限を適用（認証状態に基づく）
   await applyTabRestrictions();
 
-  // ポケモン補正機能を初期化
+  // カード分析機能を初期化
   initPokemonCorrectionEvents();
   await loadCustomPokemonDict();
   await displayCustomDictList();
   updatePokemonCorrectionVisibility();
 
-  // ポケモン分析タブを初期化（市場分析用）
+  // カード分析タブを初期化（市場分析用）
   initPokemonAnalysisTabs();
   updatePokemonAnalysisVisibility();
 
-  // ポケモン分析タブを初期化（自分の分析用）
+  // カード分析タブを初期化（自分の分析用）
   initMyPokemonAnalysisTabs();
   updateMyPokemonAnalysisVisibility();
+
+  // プロファイルに応じたUIラベルを更新
+  updateCardAnalysisLabels();
 });
 
 // =====================================
@@ -262,25 +265,59 @@ const SHEET_PROFILES = {
     id: 'general',
     name: '汎用',
     icon: '📊',
-    description: '全カテゴリ対応の標準分析'
+    description: '全カテゴリ対応の標準分析',
+    hasCardAnalysis: false
   },
   pokemon: {
     id: 'pokemon',
     name: 'ポケモンカード',
     icon: '⚡',
-    description: 'ポケカ専用分析（キャラ/セット/グレーディング）'
+    description: 'ポケカ専用分析（キャラ/セット/グレーディング）',
+    hasCardAnalysis: true,
+    tabs: {
+      character: 'カード名',
+      set: 'シリーズ',
+      grade: 'グレード',
+      rarity: 'レアリティ'
+    },
+    analysisTitle: 'ポケモンカード分析',
+    attributeTitle: 'ポケモン属性別内訳',
+    correctionTitle: 'ポケモンカード辞書補正',
+    characterLabel: 'カード名（ポケモン名）別の販売傾向を表示します'
   },
   yugioh: {
     id: 'yugioh',
-    name: '遊戯王',
+    name: '遊戯王カード',
     icon: '🎴',
-    description: '遊戯王専用分析（カード名/レアリティ/シリーズ）'
+    description: '遊戯王専用分析（カード名/レアリティ/シリーズ）',
+    hasCardAnalysis: true,
+    tabs: {
+      character: 'カード名',
+      set: 'パック/シリーズ',
+      grade: 'グレード',
+      rarity: 'レアリティ'
+    },
+    analysisTitle: '遊戯王カード分析',
+    attributeTitle: '遊戯王属性別内訳',
+    correctionTitle: '遊戯王カード辞書補正',
+    characterLabel: 'カード名別の販売傾向を表示します'
   },
   onepiece: {
     id: 'onepiece',
     name: 'ワンピースカード',
     icon: '🏴‍☠️',
-    description: 'ワンピカ専用分析（キャラ/シリーズ/レアリティ）'
+    description: 'ワンピカ専用分析（キャラ/シリーズ/レアリティ）',
+    hasCardAnalysis: true,
+    tabs: {
+      character: 'キャラクター',
+      set: 'ブースター/スターター',
+      grade: 'グレード',
+      rarity: 'レアリティ'
+    },
+    analysisTitle: 'ワンピースカード分析',
+    attributeTitle: 'ワンピース属性別内訳',
+    correctionTitle: 'ワンピースカード辞書補正',
+    characterLabel: 'キャラクター別の販売傾向を表示します'
   }
 };
 
@@ -558,12 +595,130 @@ function updateProfileDisplay() {
     profileBadge.title = profile.description;
   }
 
-  // ポケモン補正セクションの表示/非表示
+  // カード分析セクションのラベルを動的に更新
+  updateCardAnalysisLabels();
+
+  // カード補正セクションの表示/非表示
   updatePokemonCorrectionVisibility();
 
-  // ポケモン分析タブの表示/非表示（市場分析・自分の分析両方）
+  // カード分析タブの表示/非表示（市場分析・自分の分析両方）
   updatePokemonAnalysisVisibility();
   updateMyPokemonAnalysisVisibility();
+}
+
+/**
+ * カード分析UIのラベルをプロファイルに応じて更新
+ */
+function updateCardAnalysisLabels() {
+  const profile = SHEET_PROFILES[currentSheetProfile];
+  if (!profile || !profile.hasCardAnalysis) return;
+
+  // 市場分析用ラベル更新
+  // 分析タブのタイトル
+  const tabsTitle = document.querySelector('#pokemonAnalysisTabs .pokemon-tabs-title');
+  if (tabsTitle) {
+    tabsTitle.textContent = profile.analysisTitle;
+  }
+  const tabsIcon = document.querySelector('#pokemonAnalysisTabs .pokemon-tabs-icon');
+  if (tabsIcon) {
+    tabsIcon.textContent = profile.icon;
+  }
+
+  // 属性別内訳のタイトル
+  const attrTitle = document.querySelector('#pokemonAttributeColumn .breakdown-title');
+  if (attrTitle) {
+    attrTitle.textContent = profile.attributeTitle;
+  }
+
+  // タブボタンのラベル
+  document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
+    const tabId = tab.dataset.pokemonTab;
+    if (tabId === 'character-ranking' && profile.tabs.character) {
+      tab.textContent = profile.tabs.character;
+    } else if (tabId === 'set-ranking' && profile.tabs.set) {
+      tab.textContent = profile.tabs.set;
+    } else if (tabId === 'grade-analysis' && profile.tabs.grade) {
+      tab.textContent = profile.tabs.grade;
+    } else if (tabId === 'rarity-analysis' && profile.tabs.rarity) {
+      tab.textContent = profile.tabs.rarity;
+    }
+  });
+
+  // キャラクターランキングの説明文
+  const charDesc = document.querySelector('#pokemon-character-ranking .analysis-description p');
+  if (charDesc) {
+    charDesc.textContent = profile.characterLabel;
+  }
+
+  // 属性タブのラベル
+  document.querySelectorAll('#pokemonAttributeColumn .attr-tab').forEach(tab => {
+    const attr = tab.dataset.attr;
+    if (attr === 'character' && profile.tabs.character) {
+      tab.textContent = profile.tabs.character;
+    } else if (attr === 'set' && profile.tabs.set) {
+      tab.textContent = profile.tabs.set;
+    } else if (attr === 'grade' && profile.tabs.grade) {
+      tab.textContent = profile.tabs.grade;
+    } else if (attr === 'rarity' && profile.tabs.rarity) {
+      tab.textContent = profile.tabs.rarity;
+    }
+  });
+
+  // 自分の分析用ラベル更新
+  const myTabsTitle = document.querySelector('#myPokemonAnalysisTabs .pokemon-tabs-title');
+  if (myTabsTitle) {
+    myTabsTitle.textContent = profile.analysisTitle;
+  }
+  const myTabsIcon = document.querySelector('#myPokemonAnalysisTabs .pokemon-tabs-icon');
+  if (myTabsIcon) {
+    myTabsIcon.textContent = profile.icon;
+  }
+
+  // 自分の分析用 属性別内訳のタイトル
+  const myAttrTitle = document.querySelector('#myPokemonAttributeColumn .breakdown-title');
+  if (myAttrTitle) {
+    myAttrTitle.textContent = profile.attributeTitle;
+  }
+
+  // 自分の分析用タブボタンのラベル
+  document.querySelectorAll('#myPokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
+    const tabId = tab.dataset.myPokemonTab;
+    if (tabId === 'my-character-ranking' && profile.tabs.character) {
+      tab.textContent = profile.tabs.character;
+    } else if (tabId === 'my-set-ranking' && profile.tabs.set) {
+      tab.textContent = profile.tabs.set;
+    } else if (tabId === 'my-grade-analysis' && profile.tabs.grade) {
+      tab.textContent = profile.tabs.grade;
+    } else if (tabId === 'my-rarity-analysis' && profile.tabs.rarity) {
+      tab.textContent = profile.tabs.rarity;
+    }
+  });
+
+  // 自分の分析用 キャラクターランキングの説明文
+  const myCharDesc = document.querySelector('#my-pokemon-character-ranking .analysis-description p');
+  if (myCharDesc) {
+    myCharDesc.textContent = profile.characterLabel;
+  }
+
+  // 自分の分析用 属性タブのラベル
+  document.querySelectorAll('#myPokemonAttributeColumn .attr-tab').forEach(tab => {
+    const attr = tab.dataset.attr;
+    if (attr === 'character' && profile.tabs.character) {
+      tab.textContent = profile.tabs.character;
+    } else if (attr === 'set' && profile.tabs.set) {
+      tab.textContent = profile.tabs.set;
+    } else if (attr === 'grade' && profile.tabs.grade) {
+      tab.textContent = profile.tabs.grade;
+    } else if (attr === 'rarity' && profile.tabs.rarity) {
+      tab.textContent = profile.tabs.rarity;
+    }
+  });
+
+  // 辞書補正セクションのタイトル
+  const correctionTitle = document.querySelector('#pokemonCorrectionSection .section-title h4');
+  if (correctionTitle) {
+    correctionTitle.innerHTML = `<span class="section-icon">✏️</span> ${profile.correctionTitle}`;
+  }
 }
 
 /**
