@@ -6697,6 +6697,12 @@ async function loadSavedData() {
     // 学習済みルール表示を更新
     updateLearnedRulesDisplay();
 
+    // ポケモンプロファイルの場合、ポケモン分析タブを復元
+    if (currentSheetProfile === 'pokemon' && (activeListings.length > 0 || soldItems.length > 0)) {
+      updateMyPokemonAnalysisVisibility();
+      loadMyPokemonAnalysisData('my-character-ranking');
+    }
+
   } catch (error) {
     console.error('保存データの読み込みに失敗:', error);
   }
@@ -7018,12 +7024,51 @@ async function restoreAnalysisResults() {
       if (myAiSection) {
         myAiSection.style.display = myUnclassified > 0 ? 'block' : 'none';
       }
+
+      // プロファイルに応じてカテゴリ列を切り替え（自分のデータ）
+      const myGenericCategoryColumn = document.getElementById('myGenericCategoryColumn');
+      const myPokemonAttributeColumn = document.getElementById('myPokemonAttributeColumn');
+
+      if (currentSheetProfile === 'pokemon') {
+        // ポケモンプロファイル: 属性別内訳を表示
+        if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'none';
+        if (myPokemonAttributeColumn) {
+          myPokemonAttributeColumn.style.display = 'block';
+          renderMyPokemonAttributeBreakdown(allMyItems, 'character');
+
+          // タブクリックイベント
+          myPokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+              myPokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(t => t.classList.remove('active'));
+              this.classList.add('active');
+              renderMyPokemonAttributeBreakdown(allMyItems, this.dataset.attr);
+            });
+          });
+        }
+      } else {
+        // 汎用プロファイル: カテゴリ別内訳を表示
+        if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'block';
+        if (myPokemonAttributeColumn) myPokemonAttributeColumn.style.display = 'none';
+      }
     }
 
     // 市場データの分析結果を復元（シートIDでフィルタ）
     const marketItems = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
+      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      if (currentSheetProfile === 'pokemon') {
+        marketItems.forEach(item => {
+          if (!item.attributes && item.title) {
+            const attributes = extractAttributesByProfile(item.title);
+            if (attributes) {
+              item.attributes = attributes;
+              item.profileExtracted = currentSheetProfile;
+            }
+          }
+        });
+      }
+
       const marketBrands = {};
       let marketClassified = 0;
       let marketUnclassified = 0;
@@ -7283,6 +7328,32 @@ async function restoreAnalysisResults() {
       const marketAiSection = document.getElementById('marketAiSection');
       if (marketAiSection) {
         marketAiSection.style.display = marketUnclassified > 0 ? 'block' : 'none';
+      }
+
+      // プロファイルに応じてカテゴリ列を切り替え（市場データ）
+      const genericCategoryColumn = document.getElementById('genericCategoryColumn');
+      const pokemonAttributeColumn = document.getElementById('pokemonAttributeColumn');
+
+      if (currentSheetProfile === 'pokemon') {
+        // ポケモンプロファイル: 属性別内訳を表示
+        if (genericCategoryColumn) genericCategoryColumn.style.display = 'none';
+        if (pokemonAttributeColumn) {
+          pokemonAttributeColumn.style.display = 'block';
+          renderPokemonAttributeBreakdown(marketItems, 'character');
+
+          // タブクリックイベント
+          pokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+              pokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(t => t.classList.remove('active'));
+              this.classList.add('active');
+              renderPokemonAttributeBreakdown(marketItems, this.dataset.attr);
+            });
+          });
+        }
+      } else {
+        // 汎用プロファイル: カテゴリ別内訳を表示
+        if (genericCategoryColumn) genericCategoryColumn.style.display = 'block';
+        if (pokemonAttributeColumn) pokemonAttributeColumn.style.display = 'none';
       }
     }
 
