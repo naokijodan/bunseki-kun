@@ -286,7 +286,13 @@ const SHEET_PROFILES = {
     characterLabel: 'カード名（ポケモン名）別の販売傾向を表示します',
     setLabel: 'セット（パック・拡張）別の販売傾向を表示します',
     gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
-    rarityLabel: 'レアリティ（SAR、SR、UR等）別の販売傾向を表示します'
+    rarityLabel: 'レアリティ（SAR、SR、UR等）別の販売傾向を表示します',
+    emptyMessages: {
+      character: 'カード名が認識されていません',
+      set: 'セットが認識されていません',
+      grade: 'グレード情報がありません',
+      rarity: 'レアリティが認識されていません'
+    }
   },
   yugioh: {
     id: 'yugioh',
@@ -306,7 +312,13 @@ const SHEET_PROFILES = {
     characterLabel: 'カード名別の販売傾向を表示します',
     setLabel: 'パック・シリーズ別の販売傾向を表示します',
     gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
-    rarityLabel: 'レアリティ（Ghost、Starlight、Ultimate等）別の販売傾向を表示します'
+    rarityLabel: 'レアリティ（Ghost、Starlight、Ultimate等）別の販売傾向を表示します',
+    emptyMessages: {
+      character: 'カード名が認識されていません',
+      set: 'パック/シリーズが認識されていません',
+      grade: 'グレード情報がありません',
+      rarity: 'レアリティが認識されていません'
+    }
   },
   onepiece: {
     id: 'onepiece',
@@ -326,7 +338,13 @@ const SHEET_PROFILES = {
     characterLabel: 'キャラクター別の販売傾向を表示します',
     setLabel: 'ブースター・スターター別の販売傾向を表示します',
     gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
-    rarityLabel: 'レアリティ（SEC、SP、L、SR等）別の販売傾向を表示します'
+    rarityLabel: 'レアリティ（SEC、SP、L、SR等）別の販売傾向を表示します',
+    emptyMessages: {
+      character: 'キャラクターが認識されていません',
+      set: 'ブースター/スターターが認識されていません',
+      grade: 'グレード情報がありません',
+      rarity: 'レアリティが認識されていません'
+    }
   },
   watch: {
     id: 'watch',
@@ -346,7 +364,13 @@ const SHEET_PROFILES = {
     characterLabel: 'ブランド別の販売傾向を表示します',
     setLabel: 'タイプ（ダイバー、クロノグラフ等）別の販売傾向を表示します',
     gradeLabel: 'ムーブメント（自動巻き、クォーツ等）別の販売傾向を表示します',
-    rarityLabel: 'サイズ（メンズ、レディース等）別の販売傾向を表示します'
+    rarityLabel: 'サイズ（メンズ、レディース等）別の販売傾向を表示します',
+    emptyMessages: {
+      character: 'ブランドが認識されていません',
+      set: 'タイプが認識されていません',
+      grade: 'ムーブメントが認識されていません',
+      rarity: 'サイズが認識されていません'
+    }
   }
 };
 
@@ -1572,11 +1596,12 @@ function renderPokemonAttributeBreakdown(items, attrType) {
     .slice(0, 15);
 
   if (sorted.length === 0) {
-    const emptyMessages = {
-      'character': 'キャラクターが認識されていません',
-      'set': 'セットが認識されていません',
-      'grade': 'グレード情報がありません',
-      'rarity': 'レアリティが認識されていません'
+    const profile = SHEET_PROFILES[currentSheetProfile] || SHEET_PROFILES.pokemon;
+    const emptyMessages = profile.emptyMessages || {
+      'character': 'データがありません',
+      'set': 'データがありません',
+      'grade': 'データがありません',
+      'rarity': 'データがありません'
     };
     container.innerHTML = `<p class="empty-message">${emptyMessages[attrType] || 'データがありません'}</p>`;
     return;
@@ -1675,11 +1700,12 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
     .slice(0, 15);
 
   if (sorted.length === 0) {
-    const emptyMessages = {
-      'character': 'キャラクターが認識されていません',
-      'set': 'セットが認識されていません',
-      'grade': 'グレード情報がありません',
-      'rarity': 'レアリティが認識されていません'
+    const profile = SHEET_PROFILES[currentSheetProfile] || SHEET_PROFILES.pokemon;
+    const emptyMessages = profile.emptyMessages || {
+      'character': 'データがありません',
+      'set': 'データがありません',
+      'grade': 'データがありません',
+      'rarity': 'データがありません'
     };
     container.innerHTML = `<p class="empty-message">${emptyMessages[attrType] || 'データがありません'}</p>`;
     return;
