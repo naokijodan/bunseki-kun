@@ -283,7 +283,10 @@ const SHEET_PROFILES = {
     analysisTitle: 'ポケモンカード分析',
     attributeTitle: 'ポケモン属性別内訳',
     correctionTitle: 'ポケモンカード辞書補正',
-    characterLabel: 'カード名（ポケモン名）別の販売傾向を表示します'
+    characterLabel: 'カード名（ポケモン名）別の販売傾向を表示します',
+    setLabel: 'セット（パック・拡張）別の販売傾向を表示します',
+    gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
+    rarityLabel: 'レアリティ（SAR、SR、UR等）別の販売傾向を表示します'
   },
   yugioh: {
     id: 'yugioh',
@@ -300,7 +303,10 @@ const SHEET_PROFILES = {
     analysisTitle: '遊戯王カード分析',
     attributeTitle: '遊戯王属性別内訳',
     correctionTitle: '遊戯王カード辞書補正',
-    characterLabel: 'カード名別の販売傾向を表示します'
+    characterLabel: 'カード名別の販売傾向を表示します',
+    setLabel: 'パック・シリーズ別の販売傾向を表示します',
+    gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
+    rarityLabel: 'レアリティ（Ghost、Starlight、Ultimate等）別の販売傾向を表示します'
   },
   onepiece: {
     id: 'onepiece',
@@ -317,7 +323,10 @@ const SHEET_PROFILES = {
     analysisTitle: 'ワンピースカード分析',
     attributeTitle: 'ワンピース属性別内訳',
     correctionTitle: 'ワンピースカード辞書補正',
-    characterLabel: 'キャラクター別の販売傾向を表示します'
+    characterLabel: 'キャラクター別の販売傾向を表示します',
+    setLabel: 'ブースター・スターター別の販売傾向を表示します',
+    gradeLabel: 'PSA/BGS/CGCなどのグレード別価格分布を表示します',
+    rarityLabel: 'レアリティ（SEC、SP、L、SR等）別の販売傾向を表示します'
   },
   watch: {
     id: 'watch',
@@ -334,7 +343,10 @@ const SHEET_PROFILES = {
     analysisTitle: '時計分析',
     attributeTitle: '時計属性別内訳',
     correctionTitle: '時計辞書補正',
-    characterLabel: 'ブランド別の販売傾向を表示します'
+    characterLabel: 'ブランド別の販売傾向を表示します',
+    setLabel: 'タイプ（ダイバー、クロノグラフ等）別の販売傾向を表示します',
+    gradeLabel: 'ムーブメント（自動巻き、クォーツ等）別の販売傾向を表示します',
+    rarityLabel: 'サイズ（メンズ、レディース等）別の販売傾向を表示します'
   }
 };
 
@@ -682,6 +694,24 @@ function updateCardAnalysisLabels() {
     charDesc.textContent = profile.characterLabel;
   }
 
+  // セットランキングの説明文
+  const setDesc = document.querySelector('#pokemon-set-ranking .analysis-description p');
+  if (setDesc && profile.setLabel) {
+    setDesc.textContent = profile.setLabel;
+  }
+
+  // グレード分析の説明文
+  const gradeDesc = document.querySelector('#pokemon-grade-analysis .analysis-description p');
+  if (gradeDesc && profile.gradeLabel) {
+    gradeDesc.textContent = profile.gradeLabel;
+  }
+
+  // レアリティ分析の説明文
+  const rarityDesc = document.querySelector('#pokemon-rarity-analysis .analysis-description p');
+  if (rarityDesc && profile.rarityLabel) {
+    rarityDesc.textContent = profile.rarityLabel;
+  }
+
   // 属性タブのラベル
   document.querySelectorAll('#pokemonAttributeColumn .attr-tab').forEach(tab => {
     const attr = tab.dataset.attr;
@@ -732,6 +762,24 @@ function updateCardAnalysisLabels() {
   const myCharDesc = document.querySelector('#my-pokemon-character-ranking .analysis-description p');
   if (myCharDesc) {
     myCharDesc.textContent = profile.characterLabel;
+  }
+
+  // 自分の分析用 セットランキングの説明文
+  const mySetDesc = document.querySelector('#my-pokemon-set-ranking .analysis-description p');
+  if (mySetDesc && profile.setLabel) {
+    mySetDesc.textContent = profile.setLabel;
+  }
+
+  // 自分の分析用 グレード分析の説明文
+  const myGradeDesc = document.querySelector('#my-pokemon-grade-analysis .analysis-description p');
+  if (myGradeDesc && profile.gradeLabel) {
+    myGradeDesc.textContent = profile.gradeLabel;
+  }
+
+  // 自分の分析用 レアリティ分析の説明文
+  const myRarityDesc = document.querySelector('#my-pokemon-rarity-analysis .analysis-description p');
+  if (myRarityDesc && profile.rarityLabel) {
+    myRarityDesc.textContent = profile.rarityLabel;
   }
 
   // 自分の分析用 属性タブのラベル
