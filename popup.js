@@ -488,6 +488,9 @@ async function initSheetManagement() {
       const newProfile = e.target.value;
       await setSheetProfile(currentSheetId, newProfile);
       showAlert(`プロファイルを「${SHEET_PROFILES[newProfile]?.name || newProfile}」に変更しました`, 'success');
+
+      // プロファイル変更後、自分のデータ表示を再描画
+      await restoreMyDataDisplay();
     });
   }
 
@@ -2414,6 +2417,17 @@ async function restoreMyDataDisplay() {
     return;
   }
 
+  // プロファイルに応じて属性を再抽出
+  if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
+    allMyItems.forEach(item => {
+      if (item.title) {
+        const attrs = extractAttributesByProfile(item.title, currentSheetProfile);
+        item.attributes = attrs;
+        item.profileExtracted = currentSheetProfile;
+      }
+    });
+  }
+
   // ブランド分類を計算
   const myBrands = {};
   let myClassified = 0;
@@ -2482,6 +2496,42 @@ async function restoreMyDataDisplay() {
         }
       });
     });
+  }
+
+  // プロファイルに応じてカテゴリ列を切り替え（自分のデータ）
+  const myGenericCategoryColumn = document.getElementById('myGenericCategoryColumn');
+  const myPokemonAttributeColumn = document.getElementById('myPokemonAttributeColumn');
+
+  if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
+    // カード/時計プロファイル: 属性別内訳を表示
+    if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'none';
+    if (myPokemonAttributeColumn) {
+      myPokemonAttributeColumn.style.display = 'block';
+      renderMyPokemonAttributeBreakdown(allMyItems, 'character');
+
+      // タブクリックイベントを再設定
+      myPokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(tab => {
+        // 既存のイベントリスナーを削除するためにクローンで置き換え
+        const newTab = tab.cloneNode(true);
+        tab.parentNode.replaceChild(newTab, tab);
+        newTab.addEventListener('click', function() {
+          myPokemonAttributeColumn.querySelectorAll('.attr-tab').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          renderMyPokemonAttributeBreakdown(allMyItems, this.dataset.attr);
+        });
+      });
+
+      // 最初のタブをアクティブに
+      const firstTab = myPokemonAttributeColumn.querySelector('.attr-tab');
+      if (firstTab) firstTab.classList.add('active');
+    }
+
+    // UIラベルを更新
+    updateCardAnalysisLabels();
+  } else {
+    // 汎用プロファイル: カテゴリ別内訳を表示
+    if (myGenericCategoryColumn) myGenericCategoryColumn.style.display = 'block';
+    if (myPokemonAttributeColumn) myPokemonAttributeColumn.style.display = 'none';
   }
 }
 
