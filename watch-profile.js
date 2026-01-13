@@ -555,11 +555,31 @@
     // ジュエリー
     'earring', 'earrings', 'necklace', 'bracelet', 'ring', 'pendant', 'brooch', 'anklet', 'charm',
     // バッグ・財布
-    'bag', 'handbag', 'wallet', 'purse', 'tote', 'clutch', 'backpack',
-    // 衣類・靴
-    'clothing', 'dress', 'shirt', 'shoes', 'sneaker', 'heel', 'boot', 'sandal',
-    // その他
-    'sunglasses', 'eyeglasses', 'keychain', 'key chain', 'scarf', 'belt'
+    'bag', 'handbag', 'wallet', 'purse', 'tote', 'clutch', 'backpack', 'satchel', 'crossbody',
+    // 衣類（トップス）
+    'shirt', 't-shirt', 'tshirt', 'polo', 'blouse', 'sweater', 'cardigan', 'hoodie', 'sweatshirt',
+    'top', 'tank top', 'vest', 'blazer', 'coat', 'jacket', 'parka', 'windbreaker',
+    // 衣類（ボトムス）
+    'pants', 'trousers', 'jeans', 'shorts', 'skirt', 'leggings',
+    // 衣類（その他）
+    'dress', 'suit', 'jumpsuit', 'romper', 'outerwear', 'clothing', 'apparel',
+    // 靴
+    'shoes', 'sneaker', 'sneakers', 'heel', 'heels', 'boot', 'boots', 'sandal', 'sandals',
+    'loafer', 'loafers', 'slipper', 'slippers', 'flip flop', 'flip flops',
+    // 帽子
+    'hat', 'cap', 'beanie', 'bucket hat', 'baseball cap', 'visor', 'fedora', 'beret',
+    // ヘアアクセサリ
+    'hair clip', 'hair accessory', 'hair accessories', 'hairclip', 'hairpin', 'hair pin',
+    'headband', 'hair band', 'hairband', 'scrunchie', 'barrette', 'hair tie',
+    // ベビー用品
+    'baby gift', 'baby set', 'baby clothes', 'body mitts', 'bib', 'onesie', 'romper',
+    // その他アクセサリ
+    'sunglasses', 'eyeglasses', 'glasses', 'keychain', 'key chain', 'scarf', 'belt',
+    'tie', 'necktie', 'bow tie', 'cufflink', 'cufflinks', 'gloves', 'mittens', 'socks',
+    // 香水・化粧品
+    'perfume', 'cologne', 'fragrance', 'cosmetic', 'makeup', 'lipstick',
+    // 家具・インテリア
+    'furniture', 'lamp', 'pillow', 'cushion', 'blanket', 'towel', 'rug', 'curtain'
   ];
 
   /**

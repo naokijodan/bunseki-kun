@@ -3455,8 +3455,52 @@ body {
   padding: 8px 12px;
   background: var(--bg-secondary);
   border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* カテゴリ内訳の商品リスト用スタイル */
+#myCategoryBreakdown .attr-items-scrollable {
   max-height: 250px;
   overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+}
+
+#myCategoryBreakdown .attr-detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+#myCategoryBreakdown .attr-detail-item:last-child {
+  border-bottom: none;
+}
+
+#myCategoryBreakdown .item-title {
+  flex: 1;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+#myCategoryBreakdown .item-price {
+  color: #2e7d32;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#myCategoryBreakdown .items-count {
+  font-size: 9px;
+  color: #666;
+  text-align: right;
+  padding: 4px 0;
+  font-weight: 500;
 }
 
 /* 細分類のスタイル */
@@ -7029,6 +7073,42 @@ body {
   }
 }
 
+/* 出品中/販売済み切り替えタブ */
+.data-source-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.data-source-tabs .source-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #666;
+  font-weight: 500;
+}
+
+.data-source-tabs .source-tab:hover {
+  background: #e0e0e0;
+  border-color: #ccc;
+}
+
+.data-source-tabs .source-tab.active {
+  background: #2e7d32;
+  color: white;
+  border-color: #2e7d32;
+}
+
+.data-source-tabs .source-tab[data-source="sold"].active {
+  background: #1565c0;
+  border-color: #1565c0;
+}
+
 /* ポケモン属性別内訳タブ */
 .pokemon-attribute-tabs {
   display: flex;
@@ -7057,6 +7137,13 @@ body {
   background: #1976d2;
   color: white;
   border-color: #1976d2;
+}
+
+/* 属性内訳リスト全体をスクロール可能に */
+#pokemonAttributeBreakdown,
+#myPokemonAttributeBreakdown {
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 /* 属性内訳リストのアイテム - 市場データ用・自分のデータ用共通 */
@@ -7175,6 +7262,25 @@ body {
   text-align: center;
   padding: 4px 0;
   font-style: italic;
+}
+
+/* スクロール可能な全件表示コンテナ */
+#pokemonAttributeBreakdown .attr-items-scrollable,
+#myPokemonAttributeBreakdown .attr-items-scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+}
+
+#pokemonAttributeBreakdown .items-count,
+#myPokemonAttributeBreakdown .items-count {
+  font-size: 9px;
+  color: #666;
+  text-align: right;
+  padding: 4px 0;
+  font-weight: 500;
 }
 
 #pokemonAttributeBreakdown .no-items,

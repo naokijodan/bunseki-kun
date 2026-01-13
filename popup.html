@@ -222,6 +222,11 @@
               <!-- ブランド別内訳 -->
               <div class="breakdown-column">
                 <h4>ブランド別内訳 <span class="breakdown-toggle" id="myBrandToggle" data-expanded="false">(上位10件 - 全て表示)</span></h4>
+                <!-- 出品中/販売済み切り替えタブ -->
+                <div class="data-source-tabs" id="myBrandSourceTabs">
+                  <button class="source-tab active" data-source="active">出品中</button>
+                  <button class="source-tab" data-source="sold">販売済み</button>
+                </div>
                 <div id="myBrandBreakdown" class="breakdown-list">
                   <!-- 動的に生成 -->
                 </div>
@@ -229,6 +234,11 @@
               <!-- カテゴリ別内訳（汎用） -->
               <div class="breakdown-column" id="myGenericCategoryColumn">
                 <h4>カテゴリ別内訳 <span class="breakdown-toggle" id="myCategoryToggle" data-expanded="false">(上位10件 - 全て表示)</span></h4>
+                <!-- 出品中/販売済み切り替えタブ -->
+                <div class="data-source-tabs" id="myCategorySourceTabs">
+                  <button class="source-tab active" data-source="active">出品中</button>
+                  <button class="source-tab" data-source="sold">販売済み</button>
+                </div>
                 <div id="myCategoryBreakdown" class="breakdown-list">
                   <!-- 動的に生成 -->
                 </div>
@@ -247,6 +257,11 @@
               <!-- ポケモン属性別内訳（ポケモンプロファイル時） -->
               <div class="breakdown-column" id="myPokemonAttributeColumn" style="display: none;">
                 <h4>属性別内訳</h4>
+                <!-- 出品中/販売済み切り替えタブ -->
+                <div class="data-source-tabs">
+                  <button class="source-tab active" data-source="active">出品中</button>
+                  <button class="source-tab" data-source="sold">販売済み</button>
+                </div>
                 <div class="pokemon-attribute-tabs">
                   <button class="attr-tab active" data-attr="character">キャラ別</button>
                   <button class="attr-tab" data-attr="set">セット別</button>
