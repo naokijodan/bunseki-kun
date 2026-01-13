@@ -350,26 +350,26 @@ const SHEET_PROFILES = {
     id: 'watch',
     name: '時計',
     icon: '⌚',
-    description: '時計専用分析（ブランド/タイプ/ムーブメント/サイズ）',
+    description: '時計専用分析（ブランド/駆動方式/表示形式/スタイル）',
     hasCardAnalysis: true,
     tabs: {
       character: 'ブランド',
-      set: 'タイプ',
-      grade: 'ムーブメント',
-      rarity: 'サイズ'
+      set: 'スタイル',
+      grade: '駆動方式',
+      rarity: '表示形式'
     },
     analysisTitle: '時計分析',
     attributeTitle: '時計属性別内訳',
     correctionTitle: '時計辞書補正',
     characterLabel: 'ブランド別の販売傾向を表示します',
-    setLabel: 'タイプ（ダイバー、クロノグラフ等）別の販売傾向を表示します',
-    gradeLabel: 'ムーブメント（自動巻き、クォーツ等）別の販売傾向を表示します',
-    rarityLabel: 'サイズ（メンズ、レディース等）別の販売傾向を表示します',
+    setLabel: 'スタイル（ダイバー、クロノグラフ、ドレス等）別の販売傾向を表示します',
+    gradeLabel: '駆動方式（自動巻き、手巻き、クォーツ、スマート等）別の販売傾向を表示します',
+    rarityLabel: '表示形式（アナログ、デジタル、アナデジ）別の販売傾向を表示します',
     emptyMessages: {
       character: 'ブランドが認識されていません',
-      set: 'タイプが認識されていません',
-      grade: 'ムーブメントが認識されていません',
-      rarity: 'サイズが認識されていません'
+      set: 'スタイルが認識されていません',
+      grade: '駆動方式が認識されていません',
+      rarity: '表示形式が認識されていません'
     }
   }
 };

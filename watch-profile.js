@@ -1,7 +1,13 @@
 /**
  * 時計プロファイル - eBay時計販売向け属性抽出
  * 中低価格帯（$800以下）を中心とした分析向け
- * 分析軸: ブランド → タイプ → ムーブメント → サイズ → デザイン
+ *
+ * 3軸分類システム:
+ *   1. Movement（駆動方式）: 自動巻き, 手巻き, クォーツ, ソーラー, スマート
+ *   2. Display（表示形式）: アナログ, デジタル, アナデジ
+ *   3. Style（スタイル/機能）: ダイバー, クロノグラフ, ドレス, フィールド, スポーツ
+ *
+ * 分析軸: ブランド → 駆動方式 → 表示形式 → スタイル → サイズ → デザイン
  */
 
 (function() {
@@ -92,9 +98,44 @@
   };
 
   // ============================================
-  // タイプ辞書（見た目ベース）
+  // 表示形式辞書（Display）- 3軸分類の軸2
   // ============================================
-  const TYPE_DICTIONARY = {
+  const DISPLAY_DICTIONARY = {
+    analog: {
+      name: 'Analog',
+      nameJp: 'アナログ',
+      keywords: [
+        'analog', 'analogue', 'hand', 'hands', 'dial',
+        'indices', 'hour hand', 'minute hand', 'second hand',
+        'sweep', 'automatic', 'mechanical', 'self-winding',
+        'manual wind', 'hand-winding', 'swiss'
+      ]
+    },
+    digital: {
+      name: 'Digital',
+      nameJp: 'デジタル',
+      keywords: [
+        'digital', 'lcd', 'led', 'display',
+        'module', 'databank', 'calculator',
+        'f-91', 'ae-1200', 'a168', 'w-800'
+      ]
+    },
+    anadigi: {
+      name: 'Ana-Digi',
+      nameJp: 'アナデジ',
+      keywords: [
+        'ana-digi', 'anadigi', 'ana digi', 'analog-digital',
+        'analog digital', 'dual display', 'combo',
+        'ga-100', 'ga-110', 'ga-2100', 'gst-', 'aw-'
+      ]
+    }
+  };
+
+  // ============================================
+  // スタイル/機能辞書（Style）- 3軸分類の軸3
+  // ※旧TYPE_DICTIONARYから表示形式を分離
+  // ============================================
+  const STYLE_DICTIONARY = {
     diver: {
       name: 'Diver',
       nameJp: 'ダイバー',
@@ -132,28 +173,7 @@
       keywords: [
         'field', 'military', 'army', 'tactical', 'combat',
         'pilot', 'flieger', 'aviator', 'aviation', 'flight',
-        'khaki', 'expedition', 'ranger', 'scout',
-        'nato', 'canvas'
-      ]
-    },
-    digital: {
-      name: 'Digital',
-      nameJp: 'デジタル',
-      keywords: [
-        'digital', 'lcd', 'led', 'g-shock', 'gshock',
-        'baby-g', 'pro trek', 'databank', 'calculator',
-        'casio f-91', 'ae-1200', 'dw-5600', 'ga-100',
-        'square', 'module'
-      ]
-    },
-    smartwatch: {
-      name: 'Smart Watch',
-      nameJp: 'スマートウォッチ',
-      keywords: [
-        'smart watch', 'smartwatch', 'fitness', 'tracker',
-        'apple watch', 'galaxy watch', 'garmin', 'fitbit',
-        'amazfit', 'huawei watch', 'wear os', 'watchos',
-        'heart rate', 'gps', 'bluetooth'
+        'khaki', 'expedition', 'ranger', 'scout'
       ]
     },
     sports: {
@@ -162,7 +182,7 @@
       keywords: [
         'sport', 'sports', 'athletic', 'active', 'outdoor',
         'running', 'training', 'workout', 'gym',
-        'rubber', 'silicone', 'resin'
+        'g-shock', 'gshock', 'baby-g', 'pro trek'
       ]
     },
     fashion: {
@@ -175,8 +195,11 @@
     }
   };
 
+  // 後方互換性のためTYPE_DICTIONARYも維持
+  const TYPE_DICTIONARY = STYLE_DICTIONARY;
+
   // ============================================
-  // ムーブメント辞書
+  // ムーブメント辞書（Movement）- 3軸分類の軸1
   // ============================================
   const MOVEMENT_DICTIONARY = {
     automatic: {
@@ -186,16 +209,16 @@
         'automatic', 'auto', 'self-winding', 'self winding',
         'nh35', 'nh36', '4r35', '4r36', '6r15', '6r35',
         'miyota 8215', 'miyota 9015', 'sw200', 'eta 2824',
-        'caliber', 'calibre', 'movement', 'rotor',
+        'caliber', 'calibre', 'rotor',
         '21 jewels', '23 jewels', '24 jewels'
       ]
     },
     mechanical: {
-      name: 'Mechanical',
+      name: 'Manual',
       nameJp: '手巻き',
       keywords: [
         'mechanical', 'manual', 'hand-winding', 'hand winding',
-        'hand wound', 'manual wind'
+        'hand wound', 'manual wind', 'hand-wound'
       ]
     },
     quartz: {
@@ -219,6 +242,16 @@
       nameJp: 'キネティック',
       keywords: [
         'kinetic', 'autoquartz', 'auto quartz', 'spring drive'
+      ]
+    },
+    smart: {
+      name: 'Smart',
+      nameJp: 'スマート',
+      keywords: [
+        'smart watch', 'smartwatch', 'fitness tracker',
+        'apple watch', 'galaxy watch', 'garmin', 'fitbit',
+        'amazfit', 'huawei watch', 'wear os', 'watchos',
+        'heart rate', 'gps watch', 'bluetooth'
       ]
     }
   };
@@ -313,20 +346,58 @@
   }
 
   /**
-   * タイプを抽出
+   * 表示形式を抽出（Display）- 3軸の軸2
+   * アナデジを最優先でチェック（アナログ・デジタル両方のキーワードを含むため）
    */
-  function extractType(title) {
+  function extractDisplay(title) {
     const lowerTitle = title.toLowerCase();
 
-    for (const [key, typeInfo] of Object.entries(TYPE_DICTIONARY)) {
-      for (const keyword of typeInfo.keywords) {
+    // アナデジを最初にチェック（特異的なキーワード）
+    for (const keyword of DISPLAY_DICTIONARY.anadigi.keywords) {
+      if (lowerTitle.includes(keyword.toLowerCase())) {
+        return { key: 'anadigi', name: DISPLAY_DICTIONARY.anadigi.name, nameJp: DISPLAY_DICTIONARY.anadigi.nameJp };
+      }
+    }
+
+    // デジタルをチェック
+    for (const keyword of DISPLAY_DICTIONARY.digital.keywords) {
+      if (lowerTitle.includes(keyword.toLowerCase())) {
+        return { key: 'digital', name: DISPLAY_DICTIONARY.digital.name, nameJp: DISPLAY_DICTIONARY.digital.nameJp };
+      }
+    }
+
+    // アナログをチェック
+    for (const keyword of DISPLAY_DICTIONARY.analog.keywords) {
+      if (lowerTitle.includes(keyword.toLowerCase())) {
+        return { key: 'analog', name: DISPLAY_DICTIONARY.analog.name, nameJp: DISPLAY_DICTIONARY.analog.nameJp };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * スタイル/機能を抽出（Style）- 3軸の軸3
+   */
+  function extractStyle(title) {
+    const lowerTitle = title.toLowerCase();
+
+    for (const [key, styleInfo] of Object.entries(STYLE_DICTIONARY)) {
+      for (const keyword of styleInfo.keywords) {
         if (lowerTitle.includes(keyword.toLowerCase())) {
-          return { key, name: typeInfo.name, nameJp: typeInfo.nameJp };
+          return { key, name: styleInfo.name, nameJp: styleInfo.nameJp };
         }
       }
     }
 
     return null;
+  }
+
+  /**
+   * タイプを抽出（後方互換性のため維持 - extractStyleのエイリアス）
+   */
+  function extractType(title) {
+    return extractStyle(title);
   }
 
   /**
@@ -446,11 +517,13 @@
 
   /**
    * メイン抽出関数
+   * 3軸分類: Movement（駆動方式）、Display（表示形式）、Style（スタイル/機能）
    */
   function extractAttributes(title) {
     const brand = extractBrand(title);
-    const type = extractType(title);
     const movement = extractMovement(title);
+    const display = extractDisplay(title);
+    const style = extractStyle(title);
     const size = extractSize(title);
     const dialColor = extractDialColor(title);
     const bandType = extractBandType(title);
@@ -459,10 +532,17 @@
     return {
       // 時計固有の詳細情報
       brand: brand,
-      type: type ? type.name : null,
-      typeJp: type ? type.nameJp : null,
+      // 3軸分類
       movement: movement ? movement.name : null,
       movementJp: movement ? movement.nameJp : null,
+      display: display ? display.name : null,
+      displayJp: display ? display.nameJp : null,
+      style: style ? style.name : null,
+      styleJp: style ? style.nameJp : null,
+      // 後方互換性のためtype（=style）も維持
+      type: style ? style.name : null,
+      typeJp: style ? style.nameJp : null,
+      // サイズ・デザイン
       size: size ? size.name : null,
       sizeJp: size ? size.nameJp : null,
       sizeMm: size ? size.mm : null,
@@ -473,20 +553,22 @@
       reference: reference,
       // 分析用キー
       brandKey: brand ? brand.toLowerCase().replace(/\s+/g, '_') : null,
-      typeKey: type ? type.key : null,
       movementKey: movement ? movement.key : null,
+      displayKey: display ? display.key : null,
+      styleKey: style ? style.key : null,
+      typeKey: style ? style.key : null,  // 後方互換
       sizeKey: size ? size.key : null,
       // カード系プロファイルとの互換性（タブ表示用）
-      // cardName = ブランド, set = タイプ, grading = ムーブメント, rarity = サイズ
+      // cardName = ブランド, set = スタイル, grading = 駆動方式, rarity = 表示形式
       cardName: brand ? {
         name: brand,
-        nameEn: getCategoryNameJp(getBrandCategory(brand)),  // サブ表示用にカテゴリ名
+        nameEn: getCategoryNameJp(getBrandCategory(brand)),
         category: getBrandCategory(brand)
       } : null,
-      set: type ? {
-        name: type.name,
-        nameJp: type.nameJp,
-        code: type.key,
+      set: style ? {
+        name: style.name,
+        nameJp: style.nameJp,
+        code: style.key,
         era: null
       } : null,
       grading: {
@@ -495,10 +577,11 @@
         gradeStr: movement ? movement.nameJp : null,
         isGraded: movement !== null
       },
-      rarity: size ? {
-        code: size.key,
-        name: size.name,
-        nameJp: size.nameJp,
+      // 表示形式（3軸分類の軸2）をrarityにマップ
+      rarity: display ? {
+        code: display.key,
+        name: display.name,
+        nameJp: display.nameJp,
         tier: null
       } : null
     };
@@ -628,10 +711,13 @@
   // グローバル公開
   // ============================================
   window.WatchProfile = {
+    // 抽出関数
     extractAttributes,
     extractBrand,
-    extractType,
     extractMovement,
+    extractDisplay,     // 3軸: 表示形式
+    extractStyle,       // 3軸: スタイル/機能
+    extractType,        // 後方互換（extractStyleのエイリアス）
     extractSize,
     extractDialColor,
     extractBandType,
@@ -641,10 +727,12 @@
     isValidCategory,
     isExcludedByKeyword,
     isValidWatchItem,
-    // 辞書へのアクセス
+    // 辞書へのアクセス（3軸分類）
     BRAND_DICTIONARY,
-    TYPE_DICTIONARY,
-    MOVEMENT_DICTIONARY,
+    MOVEMENT_DICTIONARY,  // 軸1: 駆動方式
+    DISPLAY_DICTIONARY,   // 軸2: 表示形式
+    STYLE_DICTIONARY,     // 軸3: スタイル/機能
+    TYPE_DICTIONARY,      // 後方互換（STYLE_DICTIONARYのエイリアス）
     SIZE_DICTIONARY,
     DIAL_COLOR_DICTIONARY,
     BAND_TYPE_DICTIONARY,
