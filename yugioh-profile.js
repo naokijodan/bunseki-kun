@@ -25,15 +25,16 @@ const YUGIOH_CARDS = {
   'exodia the forbidden one': { ja: '封印されしエクゾディア', aliases: ['exodia'], category: '魔法使い族' },
 
   // ===== 三幻神 =====
-  'slifer the sky dragon': { ja: 'オシリスの天空竜', aliases: ['slifer', 'オシリス'], category: '幻神獣族' },
+  'slifer the sky dragon': { ja: 'オシリスの天空竜', aliases: ['slifer', 'オシリス', 'sky dragon'], category: '幻神獣族' },
   'オシリスの天空竜': { ja: 'オシリスの天空竜', aliases: [], category: '幻神獣族' },
-  'obelisk the tormentor': { ja: 'オベリスクの巨神兵', aliases: ['obelisk', 'オベリスク'], category: '幻神獣族' },
+  'obelisk the tormentor': { ja: 'オベリスクの巨神兵', aliases: ['obelisk', 'オベリスク', 'tormentor'], category: '幻神獣族' },
   'オベリスクの巨神兵': { ja: 'オベリスクの巨神兵', aliases: [], category: '幻神獣族' },
-  'the winged dragon of ra': { ja: 'ラーの翼神竜', aliases: ['ra', 'ラー'], category: '幻神獣族' },
+  'the winged dragon of ra': { ja: 'ラーの翼神竜', aliases: ['winged dragon', 'ラー', '翼神竜'], category: '幻神獣族' },
   'ラーの翼神竜': { ja: 'ラーの翼神竜', aliases: [], category: '幻神獣族' },
 
   // ===== 手札誘発（環境カード）=====
-  'ash blossom & joyous spring': { ja: '灰流うらら', aliases: ['ash blossom', 'ash', 'うらら'], category: 'アンデット族' },
+  // 注意: 短いエイリアス（3文字以下）は誤マッチの原因になるため避ける
+  'ash blossom & joyous spring': { ja: '灰流うらら', aliases: ['ash blossom', 'うらら', '灰流'], category: 'アンデット族' },
   'ash blossom': { ja: '灰流うらら', aliases: ['うらら'], category: 'アンデット族' },
   '灰流うらら': { ja: '灰流うらら', aliases: [], category: 'アンデット族' },
   'ghost belle & haunted mansion': { ja: '屋敷わらし', aliases: ['ghost belle', 'わらし'], category: 'アンデット族' },
@@ -42,13 +43,13 @@ const YUGIOH_CARDS = {
   '幽鬼うさぎ': { ja: '幽鬼うさぎ', aliases: [], category: 'サイキック族' },
   'ghost mourner & moonlit chill': { ja: '儚無みずき', aliases: ['ghost mourner', 'みずき'], category: 'アンデット族' },
   '儚無みずき': { ja: '儚無みずき', aliases: [], category: 'アンデット族' },
-  'effect veiler': { ja: 'エフェクト・ヴェーラー', aliases: ['veiler', 'ヴェーラー'], category: '魔法使い族' },
+  'effect veiler': { ja: 'エフェクト・ヴェーラー', aliases: ['ヴェーラー'], category: '魔法使い族' },
   'エフェクト・ヴェーラー': { ja: 'エフェクト・ヴェーラー', aliases: [], category: '魔法使い族' },
-  'maxx c': { ja: '増殖するG', aliases: ['maxx', '増G', '増殖G'], category: '昆虫族' },
+  'maxx c': { ja: '増殖するG', aliases: ['増殖するg', '増G', '増殖G'], category: '昆虫族' },
   '増殖するG': { ja: '増殖するG', aliases: [], category: '昆虫族' },
   'nibiru': { ja: '原始生命態ニビル', aliases: ['nibiru the primal being', 'ニビル'], category: '岩石族' },
   '原始生命態ニビル': { ja: '原始生命態ニビル', aliases: [], category: '岩石族' },
-  'droll & lock bird': { ja: 'ドロール＆ロックバード', aliases: ['droll', 'ドロール'], category: '魔法使い族' },
+  'droll & lock bird': { ja: 'ドロール＆ロックバード', aliases: ['droll lock', 'ドロール'], category: '魔法使い族' },
 
   // ===== シンクロモンスター =====
   'stardust dragon': { ja: 'スターダスト・ドラゴン', aliases: ['stardust', 'スタダ'], category: 'ドラゴン族' },
@@ -285,7 +286,10 @@ function extractYugiohCard(title) {
 
     if (!found && value.aliases) {
       for (const alias of value.aliases) {
-        if (alias.length > 2) {
+        // 短いエイリアス（4文字未満）は英語の場合スキップ（日本語は許可）
+        const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(alias);
+        const minLength = isJapanese ? 2 : 4;
+        if (alias.length >= minLength) {
           const aliasLower = alias.toLowerCase();
           if (/^[a-z\s\.\-'&]+$/i.test(alias)) {
             const regex = new RegExp(`\\b${escapeRegex(aliasLower)}\\b`, 'i');

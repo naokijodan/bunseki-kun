@@ -2182,6 +2182,21 @@ async function switchSheet(sheetId) {
   const aiResultContent = document.getElementById('aiResultContent');
   if (aiResultContent) aiResultContent.innerHTML = '';
 
+  // 属性別内訳をクリア
+  const myPokemonAttributeBreakdown = document.getElementById('myPokemonAttributeBreakdown');
+  if (myPokemonAttributeBreakdown) myPokemonAttributeBreakdown.innerHTML = '';
+
+  // ブランド・カテゴリ内訳をクリア
+  const myBrandBreakdown = document.getElementById('myBrandBreakdown');
+  const myCategoryBreakdown = document.getElementById('myCategoryBreakdown');
+  if (myBrandBreakdown) myBrandBreakdown.innerHTML = '';
+  if (myCategoryBreakdown) myCategoryBreakdown.innerHTML = '';
+
+  // ソースタブをリセット（出品中をアクティブに）
+  document.querySelectorAll('.data-source-tabs .source-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.source === 'active');
+  });
+
   // シート固有のデータを再読み込み
   await loadSavedData();
   await updateMarketDataInfo();
