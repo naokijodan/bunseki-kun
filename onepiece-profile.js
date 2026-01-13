@@ -605,6 +605,76 @@ function addCustomOnePieceSet(key, value) {
   ONEPIECE_SETS[key.toLowerCase()] = value;
 }
 
+// =====================================
+// カテゴリフィルタ（関連アイテムのみを集計）
+// =====================================
+
+// 有効なeBayカテゴリ（Active Listings用）
+const VALID_EBAY_CATEGORIES_ONEPIECE = [
+  'CCG Individual Cards',
+  'Collectible Card Games',
+  'Trading Card Singles',
+  'One Piece Individual Cards',
+  'One Piece TCG',
+  'Card Singles',
+  'Trading Cards',
+  'Graded Cards'
+];
+
+// 除外キーワード（タイトルベースフィルタ用、Sold/Orders用）
+const EXCLUDED_KEYWORDS_ONEPIECE = [
+  // フィギュア・ぬいぐるみ
+  'figure', 'figurine', 'statue', 'pop', 'portrait of pirates', 'figuarts', 'plush', 'plushie', 'stuffed',
+  // 衣類・アクセサリー
+  'shirt', 't-shirt', 'hoodie', 'hat', 'cap', 'backpack', 'bag', 'wallet', 'keychain', 'cosplay',
+  // ポスター・印刷物（カード以外）
+  'poster', 'print', 'art print', 'wall art', 'sticker', 'decal', 'wall scroll',
+  // 漫画・書籍
+  'manga', 'comic', 'book', 'volume', 'tankoubon',
+  // DVD・ゲーム
+  'dvd', 'blu-ray', 'movie', 'video game', 'ps4', 'ps5', 'switch',
+  // その他
+  'toy', 'puzzle', 'box set only', 'playmat only', 'sleeves only', 'deck box only'
+];
+
+/**
+ * eBayカテゴリが有効かチェック（Active Listings用）
+ */
+function isValidCategoryOnePiece(ebayCategory) {
+  if (!ebayCategory) return true; // カテゴリがない場合は許可
+  const lowerCategory = ebayCategory.toLowerCase();
+  return VALID_EBAY_CATEGORIES_ONEPIECE.some(cat => lowerCategory.includes(cat.toLowerCase()));
+}
+
+/**
+ * タイトルに除外キーワードが含まれるかチェック（Sold/Orders用）
+ */
+function isExcludedByKeywordOnePiece(title) {
+  if (!title) return false;
+  const lowerTitle = title.toLowerCase();
+
+  // ワンピースカード関連のキーワードがあれば除外しない
+  const hasCardKeyword = /\bcard\b|\bcards\b|\btcg\b|\bccg\b|\bpsa\b|\bbgs\b|\bcgc\b|\bgraded\b|\bparallel\b|\balt\s*art\b|\bsec\b|\bsr\b|\bop\d{2}/i.test(title);
+  if (hasCardKeyword) return false;
+
+  return EXCLUDED_KEYWORDS_ONEPIECE.some(keyword => lowerTitle.includes(keyword));
+}
+
+/**
+ * ワンピースカードとして有効なアイテムかチェック（統合関数）
+ * @param {string} title - 商品タイトル
+ * @param {string} ebayCategory - eBayカテゴリ（Active Listingsの場合）
+ * @returns {boolean}
+ */
+function isValidOnePieceItem(title, ebayCategory) {
+  // eBayカテゴリがある場合（Active Listings）
+  if (ebayCategory && ebayCategory.trim() !== '') {
+    return isValidCategoryOnePiece(ebayCategory);
+  }
+  // カテゴリがない場合（Sold/Orders）はキーワードで除外
+  return !isExcludedByKeywordOnePiece(title);
+}
+
 // グローバルに公開
 window.OnePieceProfile = {
   extractAttributes: extractOnePieceAttributes,
@@ -616,11 +686,17 @@ window.OnePieceProfile = {
   extractCardId: extractOnePieceCardId,
   addCustomCharacter: addCustomOnePieceCharacter,
   addCustomSet: addCustomOnePieceSet,
+  // カテゴリフィルタ関数
+  isValidCategory: isValidCategoryOnePiece,
+  isExcludedByKeyword: isExcludedByKeywordOnePiece,
+  isValidItem: isValidOnePieceItem,
   CHARACTERS: ONEPIECE_CHARACTERS,
   SETS: ONEPIECE_SETS,
   RARITY_PATTERNS: ONEPIECE_RARITY_PATTERNS,
   GRADING_PATTERNS: ONEPIECE_GRADING_PATTERNS,
-  LANGUAGE_PATTERNS: ONEPIECE_LANGUAGE_PATTERNS
+  LANGUAGE_PATTERNS: ONEPIECE_LANGUAGE_PATTERNS,
+  VALID_EBAY_CATEGORIES: VALID_EBAY_CATEGORIES_ONEPIECE,
+  EXCLUDED_KEYWORDS: EXCLUDED_KEYWORDS_ONEPIECE
 };
 
 console.log('OnePiece Profile loaded - Characters:', Object.keys(ONEPIECE_CHARACTERS).length, 'Sets:', Object.keys(ONEPIECE_SETS).length);

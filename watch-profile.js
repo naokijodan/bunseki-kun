@@ -536,6 +536,75 @@
   }
 
   // ============================================
+  // カテゴリフィルタリング
+  // ============================================
+
+  // 有効なeBayカテゴリ（Active Listings用）
+  const VALID_EBAY_CATEGORIES = [
+    'Wristwatches',
+    'Watches, Parts & Accessories',
+    'Pocket Watches',
+    'Watch Accessories',
+    'Watch Bands',
+    'Watch Parts',
+    'Watches'
+  ];
+
+  // 除外キーワード（タイトルベースフィルタ用、Sold/Orders用）
+  const EXCLUDED_KEYWORDS = [
+    // ジュエリー
+    'earring', 'earrings', 'necklace', 'bracelet', 'ring', 'pendant', 'brooch', 'anklet', 'charm',
+    // バッグ・財布
+    'bag', 'handbag', 'wallet', 'purse', 'tote', 'clutch', 'backpack',
+    // 衣類・靴
+    'clothing', 'dress', 'shirt', 'shoes', 'sneaker', 'heel', 'boot', 'sandal',
+    // その他
+    'sunglasses', 'eyeglasses', 'keychain', 'key chain', 'scarf', 'belt'
+  ];
+
+  /**
+   * eBayカテゴリが時計関連かチェック
+   * @param {string} ebayCategory - eBayカテゴリ名
+   * @returns {boolean} - 有効なカテゴリならtrue
+   */
+  function isValidCategory(ebayCategory) {
+    if (!ebayCategory) return true; // カテゴリがない場合はスキップしない（Sold用）
+    const lowerCategory = ebayCategory.toLowerCase();
+    return VALID_EBAY_CATEGORIES.some(cat => lowerCategory.includes(cat.toLowerCase()));
+  }
+
+  /**
+   * タイトルに除外キーワードが含まれているかチェック
+   * @param {string} title - 商品タイトル
+   * @returns {boolean} - 除外すべきならtrue
+   */
+  function isExcludedByKeyword(title) {
+    if (!title) return false;
+    const lowerTitle = title.toLowerCase();
+
+    // 除外キーワードがあっても、watchキーワードがあれば時計として扱う
+    const hasWatchKeyword = /\bwatch\b|\bwristwatch\b|\btimepiece\b|\bchronograph\b/i.test(title);
+    if (hasWatchKeyword) return false;
+
+    return EXCLUDED_KEYWORDS.some(keyword => lowerTitle.includes(keyword));
+  }
+
+  /**
+   * 商品が時計として有効かチェック（カテゴリ + キーワード）
+   * @param {string} title - 商品タイトル
+   * @param {string} ebayCategory - eBayカテゴリ名（nullの場合はキーワードのみで判定）
+   * @returns {boolean} - 有効ならtrue
+   */
+  function isValidWatchItem(title, ebayCategory) {
+    // カテゴリがある場合はカテゴリで判定
+    if (ebayCategory && ebayCategory.trim() !== '') {
+      return isValidCategory(ebayCategory);
+    }
+    // カテゴリがない場合（Sold）は除外キーワードで判定
+    return !isExcludedByKeyword(title);
+  }
+
+  // ============================================
   // グローバル公開
   // ============================================
   window.WatchProfile = {
@@ -548,13 +617,19 @@
     extractBandType,
     extractReference,
     getBrandCategory,
+    // カテゴリフィルタ
+    isValidCategory,
+    isExcludedByKeyword,
+    isValidWatchItem,
     // 辞書へのアクセス
     BRAND_DICTIONARY,
     TYPE_DICTIONARY,
     MOVEMENT_DICTIONARY,
     SIZE_DICTIONARY,
     DIAL_COLOR_DICTIONARY,
-    BAND_TYPE_DICTIONARY
+    BAND_TYPE_DICTIONARY,
+    VALID_EBAY_CATEGORIES,
+    EXCLUDED_KEYWORDS
   };
 
 })();

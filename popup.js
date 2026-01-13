@@ -1525,6 +1525,18 @@ function renderPokemonAttributeBreakdown(items, attrType) {
   const container = document.getElementById('pokemonAttributeBreakdown');
   if (!container) return;
 
+  // プロファイル別のカテゴリフィルタを適用
+  let filteredItems = items;
+  if (currentSheetProfile === 'watch' && typeof WatchProfile !== 'undefined' && WatchProfile.isValidItem) {
+    filteredItems = items.filter(item => WatchProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'pokemon' && typeof PokemonProfile !== 'undefined' && PokemonProfile.isValidItem) {
+    filteredItems = items.filter(item => PokemonProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'yugioh' && typeof YugiohProfile !== 'undefined' && YugiohProfile.isValidItem) {
+    filteredItems = items.filter(item => YugiohProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'onepiece' && typeof OnePieceProfile !== 'undefined' && OnePieceProfile.isValidItem) {
+    filteredItems = items.filter(item => OnePieceProfile.isValidItem(item.title, item.ebayCategory));
+  }
+
   let stats = {};
 
   // プロファイルごとに異なるキー名に対応
@@ -1557,7 +1569,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
 
   switch (attrType) {
     case 'character':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const charObj = getCharacterObj(item.attributes);
         if (!charObj || !charObj.name) return;
         const name = charObj.name;
@@ -1572,7 +1584,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'set':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const setObj = item.attributes?.set;
         if (!setObj || !setObj.name) return;
         const name = setObj.name;
@@ -1585,7 +1597,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'grade':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const grading = item.attributes?.grading;
         if (!grading) return;
         // カード: PSA 10 形式、時計: Automatic 形式
@@ -1599,7 +1611,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
         stats[name].totalPrice += (item.price || 0);
       });
       // 未グレーディングも含めてカウント
-      const ungradedItems = items.filter(item => !item.attributes?.grading?.isGraded);
+      const ungradedItems = filteredItems.filter(item => !item.attributes?.grading?.isGraded);
       if (ungradedItems.length > 0 && !stats['未グレーディング']) {
         stats['未グレーディング'] = { count: ungradedItems.length, totalPrice: 0, sub: '' };
         ungradedItems.forEach(item => {
@@ -1609,7 +1621,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'rarity':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const rarityObj = item.attributes?.rarity;
         if (!rarityObj || !rarityObj.name) return;
         const name = rarityObj.name;
@@ -1671,8 +1683,8 @@ function renderPokemonAttributeBreakdown(items, attrType) {
         expandIcon.textContent = '▼';
         item.classList.add('expanded');
 
-        // 該当する商品を読み込み
-        const matchingItems = items.filter(i => getAttrValue(i) === attrName);
+        // 該当する商品を読み込み（フィルタ済みのアイテムから）
+        const matchingItems = filteredItems.filter(i => getAttrValue(i) === attrName);
         if (matchingItems.length > 0) {
           itemsDiv.innerHTML = matchingItems.slice(0, 10).map(i => `
             <div class="attr-detail-item">
@@ -1700,6 +1712,18 @@ function renderPokemonAttributeBreakdown(items, attrType) {
 function renderMyPokemonAttributeBreakdown(items, attrType) {
   const container = document.getElementById('myPokemonAttributeBreakdown');
   if (!container) return;
+
+  // プロファイル別のカテゴリフィルタを適用
+  let filteredItems = items;
+  if (currentSheetProfile === 'watch' && typeof WatchProfile !== 'undefined' && WatchProfile.isValidItem) {
+    filteredItems = items.filter(item => WatchProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'pokemon' && typeof PokemonProfile !== 'undefined' && PokemonProfile.isValidItem) {
+    filteredItems = items.filter(item => PokemonProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'yugioh' && typeof YugiohProfile !== 'undefined' && YugiohProfile.isValidItem) {
+    filteredItems = items.filter(item => YugiohProfile.isValidItem(item.title, item.ebayCategory));
+  } else if (currentSheetProfile === 'onepiece' && typeof OnePieceProfile !== 'undefined' && OnePieceProfile.isValidItem) {
+    filteredItems = items.filter(item => OnePieceProfile.isValidItem(item.title, item.ebayCategory));
+  }
 
   let stats = {};
 
@@ -1733,7 +1757,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
 
   switch (attrType) {
     case 'character':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const charObj = getCharacterObj(item.attributes);
         if (!charObj || !charObj.name) return;
         const name = charObj.name;
@@ -1748,7 +1772,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'set':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const setObj = item.attributes?.set;
         if (!setObj || !setObj.name) return;
         const name = setObj.name;
@@ -1761,7 +1785,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'grade':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const grading = item.attributes?.grading;
         if (!grading) return;
         // カード: PSA 10 形式、時計: Automatic 形式
@@ -1774,7 +1798,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
       });
-      const ungradedItems = items.filter(item => !item.attributes?.grading?.isGraded);
+      const ungradedItems = filteredItems.filter(item => !item.attributes?.grading?.isGraded);
       if (ungradedItems.length > 0 && !stats['未グレーディング']) {
         stats['未グレーディング'] = { count: ungradedItems.length, totalPrice: 0, sub: '' };
         ungradedItems.forEach(item => {
@@ -1784,7 +1808,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
       break;
 
     case 'rarity':
-      items.forEach(item => {
+      filteredItems.forEach(item => {
         const rarityObj = item.attributes?.rarity;
         if (!rarityObj || !rarityObj.name) return;
         const name = rarityObj.name;
@@ -1845,8 +1869,8 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
         expandIcon.textContent = '▼';
         item.classList.add('expanded');
 
-        // 該当する商品を読み込み
-        const matchingItems = items.filter(i => getAttrValue(i) === attrName);
+        // 該当する商品を読み込み（フィルタ済みのアイテムから）
+        const matchingItems = filteredItems.filter(i => getAttrValue(i) === attrName);
         if (matchingItems.length > 0) {
           itemsDiv.innerHTML = matchingItems.slice(0, 10).map(i => `
             <div class="attr-detail-item">

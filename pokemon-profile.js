@@ -721,6 +721,80 @@ function addCustomPokemonSet(key, value) {
   }
 }
 
+// =====================================
+// カテゴリフィルタ（関連アイテムのみを集計）
+// =====================================
+
+// 有効なeBayカテゴリ（Active Listings用）
+const VALID_EBAY_CATEGORIES_POKEMON = [
+  'CCG Individual Cards',
+  'Collectible Card Games',
+  'Trading Card Singles',
+  'Pokémon Individual Cards',
+  'Pokemon Individual Cards',
+  'Pokémon TCG',
+  'Pokemon TCG',
+  'Card Singles',
+  'Trading Cards',
+  'Graded Cards'
+];
+
+// 除外キーワード（タイトルベースフィルタ用、Sold/Orders用）
+const EXCLUDED_KEYWORDS_POKEMON = [
+  // ぬいぐるみ・フィギュア
+  'plush', 'plushie', 'stuffed', 'figure', 'figurine', 'statue', 'toy', 'action figure',
+  // ゲーム関連
+  'video game', 'game boy', 'nintendo switch', 'game cartridge', 'console', 'controller',
+  // 衣類・アクセサリー
+  'shirt', 't-shirt', 'hoodie', 'hat', 'cap', 'backpack', 'bag', 'wallet', 'keychain',
+  // 食品・日用品
+  'candy', 'snack', 'food', 'drink', 'cup', 'mug', 'plate',
+  // ポスター・印刷物（カード以外）
+  'poster', 'print', 'art print', 'wall art', 'sticker', 'decal',
+  // おもちゃ
+  'building blocks', 'lego', 'puzzle', 'board game',
+  // その他
+  'dvd', 'blu-ray', 'movie', 'manga', 'comic', 'book'
+];
+
+/**
+ * eBayカテゴリが有効かチェック（Active Listings用）
+ */
+function isValidCategoryPokemon(ebayCategory) {
+  if (!ebayCategory) return true; // カテゴリがない場合は許可
+  const lowerCategory = ebayCategory.toLowerCase();
+  return VALID_EBAY_CATEGORIES_POKEMON.some(cat => lowerCategory.includes(cat.toLowerCase()));
+}
+
+/**
+ * タイトルに除外キーワードが含まれるかチェック（Sold/Orders用）
+ */
+function isExcludedByKeywordPokemon(title) {
+  if (!title) return false;
+  const lowerTitle = title.toLowerCase();
+
+  // ポケモンカード関連のキーワードがあれば除外しない
+  const hasCardKeyword = /\bcard\b|\bcards\b|\btcg\b|\bccg\b|\bpsa\b|\bbgs\b|\bcgc\b|\bgraded\b|\bholo\b|\bex\b|\bgx\b|\bvmax\b|\bvstar\b/i.test(title);
+  if (hasCardKeyword) return false;
+
+  return EXCLUDED_KEYWORDS_POKEMON.some(keyword => lowerTitle.includes(keyword));
+}
+
+/**
+ * ポケモンカードとして有効なアイテムかチェック（統合関数）
+ * @param {string} title - 商品タイトル
+ * @param {string} ebayCategory - eBayカテゴリ（Active Listingsの場合）
+ * @returns {boolean}
+ */
+function isValidPokemonItem(title, ebayCategory) {
+  // eBayカテゴリがある場合（Active Listings）
+  if (ebayCategory && ebayCategory.trim() !== '') {
+    return isValidCategoryPokemon(ebayCategory);
+  }
+  // カテゴリがない場合（Sold/Orders）はキーワードで除外
+  return !isExcludedByKeywordPokemon(title);
+}
+
 // グローバルに公開
 window.PokemonProfile = {
   extractAttributes: extractPokemonAttributes,
@@ -732,11 +806,17 @@ window.PokemonProfile = {
   extractCardNumber: extractCardNumber,
   addCustomCard: addCustomPokemonCard,
   addCustomSet: addCustomPokemonSet,
+  // カテゴリフィルタ関数
+  isValidCategory: isValidCategoryPokemon,
+  isExcludedByKeyword: isExcludedByKeywordPokemon,
+  isValidItem: isValidPokemonItem,
   CARDS: POKEMON_CARDS,
   SETS: POKEMON_SETS,
   RARITY_PATTERNS,
   GRADING_PATTERNS,
-  LANGUAGE_PATTERNS
+  LANGUAGE_PATTERNS,
+  VALID_EBAY_CATEGORIES: VALID_EBAY_CATEGORIES_POKEMON,
+  EXCLUDED_KEYWORDS: EXCLUDED_KEYWORDS_POKEMON
 };
 
 console.log('Pokemon Profile loaded - Cards:', Object.keys(POKEMON_CARDS).length, 'Sets:', Object.keys(POKEMON_SETS).length);

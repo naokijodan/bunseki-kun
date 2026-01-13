@@ -527,6 +527,78 @@ function addCustomYugiohSet(key, value) {
   YUGIOH_SETS[key.toLowerCase()] = value;
 }
 
+// =====================================
+// カテゴリフィルタ（関連アイテムのみを集計）
+// =====================================
+
+// 有効なeBayカテゴリ（Active Listings用）
+const VALID_EBAY_CATEGORIES_YUGIOH = [
+  'CCG Individual Cards',
+  'Collectible Card Games',
+  'Trading Card Singles',
+  'Yu-Gi-Oh! Individual Cards',
+  'Yu-Gi-Oh Individual Cards',
+  'YuGiOh Individual Cards',
+  'Yu-Gi-Oh! TCG',
+  'Card Singles',
+  'Trading Cards',
+  'Graded Cards'
+];
+
+// 除外キーワード（タイトルベースフィルタ用、Sold/Orders用）
+const EXCLUDED_KEYWORDS_YUGIOH = [
+  // ぬいぐるみ・フィギュア
+  'plush', 'plushie', 'stuffed', 'figure', 'figurine', 'statue', 'action figure',
+  // ゲーム関連（カードゲーム以外）
+  'video game', 'game boy', 'ps4', 'ps5', 'xbox', 'switch', 'console', 'controller',
+  // 衣類・アクセサリー
+  'shirt', 't-shirt', 'hoodie', 'hat', 'cap', 'backpack', 'bag', 'wallet', 'keychain',
+  // ポスター・印刷物（カード以外）
+  'poster', 'print', 'art print', 'wall art', 'sticker', 'decal',
+  // おもちゃ
+  'toy', 'building blocks', 'lego', 'puzzle',
+  // その他
+  'dvd', 'blu-ray', 'movie', 'manga', 'comic', 'book', 'playmat only', 'dice only', 'sleeves only'
+];
+
+/**
+ * eBayカテゴリが有効かチェック（Active Listings用）
+ */
+function isValidCategoryYugioh(ebayCategory) {
+  if (!ebayCategory) return true; // カテゴリがない場合は許可
+  const lowerCategory = ebayCategory.toLowerCase();
+  return VALID_EBAY_CATEGORIES_YUGIOH.some(cat => lowerCategory.includes(cat.toLowerCase()));
+}
+
+/**
+ * タイトルに除外キーワードが含まれるかチェック（Sold/Orders用）
+ */
+function isExcludedByKeywordYugioh(title) {
+  if (!title) return false;
+  const lowerTitle = title.toLowerCase();
+
+  // 遊戯王カード関連のキーワードがあれば除外しない
+  const hasCardKeyword = /\bcard\b|\bcards\b|\btcg\b|\bccg\b|\bpsa\b|\bbgs\b|\bcgc\b|\bgraded\b|\bholo\b|\bsecret\b|\bultra\b|\bsuper\b|\brare\b|\b1st\s*ed/i.test(title);
+  if (hasCardKeyword) return false;
+
+  return EXCLUDED_KEYWORDS_YUGIOH.some(keyword => lowerTitle.includes(keyword));
+}
+
+/**
+ * 遊戯王カードとして有効なアイテムかチェック（統合関数）
+ * @param {string} title - 商品タイトル
+ * @param {string} ebayCategory - eBayカテゴリ（Active Listingsの場合）
+ * @returns {boolean}
+ */
+function isValidYugiohItem(title, ebayCategory) {
+  // eBayカテゴリがある場合（Active Listings）
+  if (ebayCategory && ebayCategory.trim() !== '') {
+    return isValidCategoryYugioh(ebayCategory);
+  }
+  // カテゴリがない場合（Sold/Orders）はキーワードで除外
+  return !isExcludedByKeywordYugioh(title);
+}
+
 // グローバルに公開
 window.YugiohProfile = {
   extractAttributes: extractYugiohAttributes,
@@ -538,11 +610,17 @@ window.YugiohProfile = {
   extractCardId: extractYugiohCardId,
   addCustomCard: addCustomYugiohCard,
   addCustomSet: addCustomYugiohSet,
+  // カテゴリフィルタ関数
+  isValidCategory: isValidCategoryYugioh,
+  isExcludedByKeyword: isExcludedByKeywordYugioh,
+  isValidItem: isValidYugiohItem,
   CARDS: YUGIOH_CARDS,
   SETS: YUGIOH_SETS,
   RARITY_PATTERNS: YUGIOH_RARITY_PATTERNS,
   GRADING_PATTERNS: YUGIOH_GRADING_PATTERNS,
-  LANGUAGE_PATTERNS: YUGIOH_LANGUAGE_PATTERNS
+  LANGUAGE_PATTERNS: YUGIOH_LANGUAGE_PATTERNS,
+  VALID_EBAY_CATEGORIES: VALID_EBAY_CATEGORIES_YUGIOH,
+  EXCLUDED_KEYWORDS: EXCLUDED_KEYWORDS_YUGIOH
 };
 
 console.log('Yugioh Profile loaded - Cards:', Object.keys(YUGIOH_CARDS).length, 'Sets:', Object.keys(YUGIOH_SETS).length);

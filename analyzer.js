@@ -584,6 +584,9 @@ class EbayAnalyzer {
         }
       }
 
+      // 元のeBayカテゴリ名を保持（プロファイルフィルタ用）
+      const ebayCategory = cols[categoryIdx] || '';
+
       // カテゴリを正規化（英語eBayカテゴリ → 統一日本語カテゴリ）
       const normalizedCategory = this.normalizeCategory(category || '(不明)');
 
@@ -595,6 +598,7 @@ class EbayAnalyzer {
         categoryMain: normalizedCategory.main,  // 大分類
         categorySub: normalizedCategory.sub,    // 細分類
         category: normalizedCategory.main,      // 互換性のため大分類を保持
+        ebayCategory,                           // 元のeBayカテゴリ名（プロファイルフィルタ用）
         sku,
         brand
       });
