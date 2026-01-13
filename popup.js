@@ -7064,10 +7064,10 @@ async function restoreAnalysisResults() {
     }
 
     if (allMyItems.length > 0) {
-      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      // プロファイルに応じて属性を付与（プロファイルが変わった場合も再抽出）
       if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
         allMyItems.forEach(item => {
-          if (!item.attributes && item.title) {
+          if (item.title && item.profileExtracted !== currentSheetProfile) {
             const attributes = extractAttributesByProfile(item.title);
             if (attributes) {
               item.attributes = attributes;
@@ -7373,10 +7373,10 @@ async function restoreAnalysisResults() {
     const marketItems = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
-      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      // プロファイルに応じて属性を付与（プロファイルが変わった場合も再抽出）
       if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
         marketItems.forEach(item => {
-          if (!item.attributes && item.title) {
+          if (item.title && item.profileExtracted !== currentSheetProfile) {
             const attributes = extractAttributesByProfile(item.title);
             if (attributes) {
               item.attributes = attributes;
@@ -12309,10 +12309,10 @@ async function loadMarketAnalysis() {
       return;
     }
 
-    // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+    // プロファイルに応じて属性を付与（プロファイルが変わった場合も再抽出）
     if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
       marketItems.forEach(item => {
-        if (!item.attributes && item.title) {
+        if (item.title && item.profileExtracted !== currentSheetProfile) {
           const attributes = extractAttributesByProfile(item.title);
           if (attributes) {
             item.attributes = attributes;
@@ -12371,10 +12371,10 @@ async function restoreMarketAnalysis() {
     const marketItems = allMarketItems.filter(item => item.sheetId === currentSheetId);
 
     if (marketItems && marketItems.length > 0) {
-      // ポケモンプロファイルの場合、属性が付与されていないアイテムに属性を付与
+      // プロファイルに応じて属性を付与（プロファイルが変わった場合も再抽出）
       if (['pokemon', 'onepiece', 'yugioh', 'watch'].includes(currentSheetProfile)) {
         marketItems.forEach(item => {
-          if (!item.attributes && item.title) {
+          if (item.title && item.profileExtracted !== currentSheetProfile) {
             const attributes = extractAttributesByProfile(item.title);
             if (attributes) {
               item.attributes = attributes;
