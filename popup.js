@@ -1527,14 +1527,21 @@ function renderPokemonAttributeBreakdown(items, attrType) {
 
   let stats = {};
 
+  // プロファイルごとに異なるキー名に対応
+  // ポケモン/時計: cardName, 遊戯王: card, ワンピース: character
+  const getCharacterObj = (attrs) => {
+    if (!attrs) return null;
+    return attrs.cardName || attrs.card || attrs.character || null;
+  };
+
   switch (attrType) {
     case 'character':
       items.forEach(item => {
-        const cardNameObj = item.attributes?.cardName;
-        if (!cardNameObj || !cardNameObj.name) return;
-        const name = cardNameObj.name;
+        const charObj = getCharacterObj(item.attributes);
+        if (!charObj || !charObj.name) return;
+        const name = charObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: cardNameObj.nameEn || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: charObj.nameEn || charObj.crew || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1547,7 +1554,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
         if (!setObj || !setObj.name) return;
         const name = setObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: setObj.era || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: setObj.era || setObj.nameJp || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1558,18 +1565,17 @@ function renderPokemonAttributeBreakdown(items, attrType) {
       items.forEach(item => {
         const grading = item.attributes?.grading;
         if (!grading) return;
-        // グレーディングなし/ありで分類
+        // カード: PSA 10 形式、時計: Automatic 形式
         const name = grading.isGraded && grading.company ?
-          `${grading.company} ${grading.grade || ''}`.trim() :
+          (grading.grade !== null ? `${grading.company} ${grading.grade}`.trim() : grading.company) :
           '未グレーディング';
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: grading.gradeStr || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
       });
       // 未グレーディングも含めてカウント
-      const gradedItems = items.filter(item => item.attributes?.grading?.isGraded);
       const ungradedItems = items.filter(item => !item.attributes?.grading?.isGraded);
       if (ungradedItems.length > 0 && !stats['未グレーディング']) {
         stats['未グレーディング'] = { count: ungradedItems.length, totalPrice: 0, sub: '' };
@@ -1585,7 +1591,7 @@ function renderPokemonAttributeBreakdown(items, attrType) {
         if (!rarityObj || !rarityObj.name) return;
         const name = rarityObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: rarityObj.code || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: rarityObj.code || rarityObj.nameJp || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1635,14 +1641,21 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
 
   let stats = {};
 
+  // プロファイルごとに異なるキー名に対応
+  // ポケモン/時計: cardName, 遊戯王: card, ワンピース: character
+  const getCharacterObj = (attrs) => {
+    if (!attrs) return null;
+    return attrs.cardName || attrs.card || attrs.character || null;
+  };
+
   switch (attrType) {
     case 'character':
       items.forEach(item => {
-        const cardNameObj = item.attributes?.cardName;
-        if (!cardNameObj || !cardNameObj.name) return;
-        const name = cardNameObj.name;
+        const charObj = getCharacterObj(item.attributes);
+        if (!charObj || !charObj.name) return;
+        const name = charObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: cardNameObj.nameEn || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: charObj.nameEn || charObj.crew || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1655,7 +1668,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
         if (!setObj || !setObj.name) return;
         const name = setObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: setObj.era || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: setObj.era || setObj.nameJp || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1666,11 +1679,12 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
       items.forEach(item => {
         const grading = item.attributes?.grading;
         if (!grading) return;
+        // カード: PSA 10 形式、時計: Automatic 形式
         const name = grading.isGraded && grading.company ?
-          `${grading.company} ${grading.grade || ''}`.trim() :
+          (grading.grade !== null ? `${grading.company} ${grading.grade}`.trim() : grading.company) :
           '未グレーディング';
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: grading.gradeStr || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1690,7 +1704,7 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
         if (!rarityObj || !rarityObj.name) return;
         const name = rarityObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: rarityObj.code || '' };
+          stats[name] = { count: 0, totalPrice: 0, sub: rarityObj.code || rarityObj.nameJp || '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);

@@ -456,6 +456,7 @@
     const reference = extractReference(title, brand);
 
     return {
+      // 時計固有の詳細情報
       brand: brand,
       type: type ? type.name : null,
       typeJp: type ? type.nameJp : null,
@@ -475,15 +476,30 @@
       movementKey: movement ? movement.key : null,
       sizeKey: size ? size.key : null,
       // カード系プロファイルとの互換性（タブ表示用）
-      // character = ブランド, set = タイプ, grade = ムーブメント, rarity = サイズ
-      character: brand,
-      characterJp: brand,
-      set: type ? type.name : null,
-      setJp: type ? type.nameJp : null,
-      grade: movement ? movement.name : null,
-      gradeJp: movement ? movement.nameJp : null,
-      rarity: size ? size.name : null,
-      rarityJp: size ? size.nameJp : null
+      // cardName = ブランド, set = タイプ, grading = ムーブメント, rarity = サイズ
+      cardName: brand ? {
+        name: brand,
+        nameEn: brand,
+        category: getBrandCategory(brand)
+      } : null,
+      set: type ? {
+        name: type.name,
+        nameJp: type.nameJp,
+        code: type.key,
+        era: null
+      } : null,
+      grading: {
+        company: movement ? movement.name : null,
+        grade: null,
+        gradeStr: movement ? movement.nameJp : null,
+        isGraded: movement !== null
+      },
+      rarity: size ? {
+        code: size.key,
+        name: size.name,
+        nameJp: size.nameJp,
+        tier: null
+      } : null
     };
   }
 
