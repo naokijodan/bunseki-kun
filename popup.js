@@ -1239,7 +1239,9 @@ function initMyPokemonAnalysisTabs() {
       document.querySelectorAll('#myPokemonAnalysisContent .pokemon-tab-content').forEach(content => {
         content.style.display = 'none';
       });
-      const targetContent = document.getElementById(tabId);
+      // tabIdをコンテンツIDに変換（my-character-ranking → my-pokemon-character-ranking）
+      const contentId = tabId.replace('my-', 'my-pokemon-');
+      const targetContent = document.getElementById(contentId);
       if (targetContent) {
         targetContent.style.display = 'block';
       }
