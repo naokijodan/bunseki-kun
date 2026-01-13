@@ -1534,6 +1534,27 @@ function renderPokemonAttributeBreakdown(items, attrType) {
     return attrs.cardName || attrs.card || attrs.character || null;
   };
 
+  // 属性値からアイテムを取得する関数
+  const getAttrValue = (item) => {
+    switch (attrType) {
+      case 'character':
+        const charObj = getCharacterObj(item.attributes);
+        return charObj?.name || null;
+      case 'set':
+        return item.attributes?.set?.name || null;
+      case 'grade':
+        const grading = item.attributes?.grading;
+        if (!grading) return null;
+        return grading.isGraded && grading.company ?
+          (grading.grade !== null ? `${grading.company} ${grading.grade}`.trim() : grading.company) :
+          '未グレーディング';
+      case 'rarity':
+        return item.attributes?.rarity?.name || null;
+      default:
+        return null;
+    }
+  };
+
   switch (attrType) {
     case 'character':
       items.forEach(item => {
@@ -1541,7 +1562,9 @@ function renderPokemonAttributeBreakdown(items, attrType) {
         if (!charObj || !charObj.name) return;
         const name = charObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: charObj.nameEn || charObj.crew || '' };
+          // サブ表示: 名前と同じ場合は表示しない（時計の重複防止）
+          const sub = charObj.nameEn || charObj.crew || '';
+          stats[name] = { count: 0, totalPrice: 0, sub: sub !== name ? sub : '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1616,18 +1639,57 @@ function renderPokemonAttributeBreakdown(items, attrType) {
     return;
   }
 
+  // 展開機能付きで描画
   container.innerHTML = sorted.map(([name, data]) => {
     const avgPrice = data.count > 0 ? data.totalPrice / data.count : 0;
     return `
-      <div class="attr-item">
-        <span class="attr-name">${escapeHtml(name)}${data.sub ? `<span class="attr-sub">${escapeHtml(data.sub)}</span>` : ''}</span>
-        <div class="attr-stats">
-          <span class="attr-count">${data.count}件</span>
-          <span class="attr-price">$${avgPrice.toFixed(0)}</span>
+      <div class="attr-item expandable" data-attr-name="${escapeHtml(name)}" data-attr-type="${attrType}">
+        <div class="attr-header">
+          <span class="expand-icon">▶</span>
+          <span class="attr-name">${escapeHtml(name)}${data.sub ? `<span class="attr-sub">${escapeHtml(data.sub)}</span>` : ''}</span>
+          <div class="attr-stats">
+            <span class="attr-count">${data.count}件</span>
+            <span class="attr-price">平均 $${avgPrice.toFixed(0)}</span>
+          </div>
+        </div>
+        <div class="attr-items" style="display: none;">
+          <div class="loading-items">読み込み中...</div>
         </div>
       </div>
     `;
   }).join('');
+
+  // 展開クリックイベント
+  container.querySelectorAll('.attr-item.expandable').forEach(item => {
+    item.querySelector('.attr-header').addEventListener('click', function() {
+      const attrName = item.dataset.attrName;
+      const itemsDiv = item.querySelector('.attr-items');
+      const expandIcon = item.querySelector('.expand-icon');
+
+      if (itemsDiv.style.display === 'none') {
+        itemsDiv.style.display = 'block';
+        expandIcon.textContent = '▼';
+        item.classList.add('expanded');
+
+        // 該当する商品を読み込み
+        const matchingItems = items.filter(i => getAttrValue(i) === attrName);
+        if (matchingItems.length > 0) {
+          itemsDiv.innerHTML = matchingItems.slice(0, 10).map(i => `
+            <div class="attr-detail-item">
+              <span class="item-title" title="${escapeHtml(i.title || '')}">${escapeHtml((i.title || '').substring(0, 50))}${(i.title || '').length > 50 ? '...' : ''}</span>
+              <span class="item-price">$${(i.price || 0).toLocaleString()}</span>
+            </div>
+          `).join('') + (matchingItems.length > 10 ? `<div class="more-items">他 ${matchingItems.length - 10}件</div>` : '');
+        } else {
+          itemsDiv.innerHTML = '<div class="no-items">該当する商品がありません</div>';
+        }
+      } else {
+        itemsDiv.style.display = 'none';
+        expandIcon.textContent = '▶';
+        item.classList.remove('expanded');
+      }
+    });
+  });
 }
 
 /**
@@ -1648,6 +1710,27 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
     return attrs.cardName || attrs.card || attrs.character || null;
   };
 
+  // 属性値からアイテムを取得する関数
+  const getAttrValue = (item) => {
+    switch (attrType) {
+      case 'character':
+        const charObj = getCharacterObj(item.attributes);
+        return charObj?.name || null;
+      case 'set':
+        return item.attributes?.set?.name || null;
+      case 'grade':
+        const grading = item.attributes?.grading;
+        if (!grading) return null;
+        return grading.isGraded && grading.company ?
+          (grading.grade !== null ? `${grading.company} ${grading.grade}`.trim() : grading.company) :
+          '未グレーディング';
+      case 'rarity':
+        return item.attributes?.rarity?.name || null;
+      default:
+        return null;
+    }
+  };
+
   switch (attrType) {
     case 'character':
       items.forEach(item => {
@@ -1655,7 +1738,9 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
         if (!charObj || !charObj.name) return;
         const name = charObj.name;
         if (!stats[name]) {
-          stats[name] = { count: 0, totalPrice: 0, sub: charObj.nameEn || charObj.crew || '' };
+          // サブ表示: 名前と同じ場合は表示しない（時計の重複防止）
+          const sub = charObj.nameEn || charObj.crew || '';
+          stats[name] = { count: 0, totalPrice: 0, sub: sub !== name ? sub : '' };
         }
         stats[name].count++;
         stats[name].totalPrice += (item.price || 0);
@@ -1728,18 +1813,57 @@ function renderMyPokemonAttributeBreakdown(items, attrType) {
     return;
   }
 
+  // 展開機能付きで描画
   container.innerHTML = sorted.map(([name, data]) => {
     const avgPrice = data.count > 0 ? data.totalPrice / data.count : 0;
     return `
-      <div class="attr-item">
-        <span class="attr-name">${escapeHtml(name)}${data.sub ? `<span class="attr-sub">${escapeHtml(data.sub)}</span>` : ''}</span>
-        <div class="attr-stats">
-          <span class="attr-count">${data.count}件</span>
-          <span class="attr-price">$${avgPrice.toFixed(0)}</span>
+      <div class="attr-item expandable" data-attr-name="${escapeHtml(name)}" data-attr-type="${attrType}">
+        <div class="attr-header">
+          <span class="expand-icon">▶</span>
+          <span class="attr-name">${escapeHtml(name)}${data.sub ? `<span class="attr-sub">${escapeHtml(data.sub)}</span>` : ''}</span>
+          <div class="attr-stats">
+            <span class="attr-count">${data.count}件</span>
+            <span class="attr-price">平均 $${avgPrice.toFixed(0)}</span>
+          </div>
+        </div>
+        <div class="attr-items" style="display: none;">
+          <div class="loading-items">読み込み中...</div>
         </div>
       </div>
     `;
   }).join('');
+
+  // 展開クリックイベント
+  container.querySelectorAll('.attr-item.expandable').forEach(item => {
+    item.querySelector('.attr-header').addEventListener('click', function() {
+      const attrName = item.dataset.attrName;
+      const itemsDiv = item.querySelector('.attr-items');
+      const expandIcon = item.querySelector('.expand-icon');
+
+      if (itemsDiv.style.display === 'none') {
+        itemsDiv.style.display = 'block';
+        expandIcon.textContent = '▼';
+        item.classList.add('expanded');
+
+        // 該当する商品を読み込み
+        const matchingItems = items.filter(i => getAttrValue(i) === attrName);
+        if (matchingItems.length > 0) {
+          itemsDiv.innerHTML = matchingItems.slice(0, 10).map(i => `
+            <div class="attr-detail-item">
+              <span class="item-title" title="${escapeHtml(i.title || '')}">${escapeHtml((i.title || '').substring(0, 50))}${(i.title || '').length > 50 ? '...' : ''}</span>
+              <span class="item-price">$${(i.price || 0).toLocaleString()}</span>
+            </div>
+          `).join('') + (matchingItems.length > 10 ? `<div class="more-items">他 ${matchingItems.length - 10}件</div>` : '');
+        } else {
+          itemsDiv.innerHTML = '<div class="no-items">該当する商品がありません</div>';
+        }
+      } else {
+        itemsDiv.style.display = 'none';
+        expandIcon.textContent = '▶';
+        item.classList.remove('expanded');
+      }
+    });
+  });
 }
 
 /**

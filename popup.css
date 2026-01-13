@@ -7059,20 +7059,41 @@ body {
   border-color: #1976d2;
 }
 
-/* 属性内訳リストのアイテム */
-#pokemonAttributeBreakdown .attr-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 8px;
-  font-size: 11px;
+/* 属性内訳リストのアイテム - 市場データ用・自分のデータ用共通 */
+#pokemonAttributeBreakdown .attr-item,
+#myPokemonAttributeBreakdown .attr-item {
   border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
 }
 
-#pokemonAttributeBreakdown .attr-item:hover {
+#pokemonAttributeBreakdown .attr-item.expandable,
+#myPokemonAttributeBreakdown .attr-item.expandable {
+  cursor: pointer;
+}
+
+#pokemonAttributeBreakdown .attr-header,
+#myPokemonAttributeBreakdown .attr-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  gap: 4px;
+}
+
+#pokemonAttributeBreakdown .attr-header:hover,
+#myPokemonAttributeBreakdown .attr-header:hover {
   background: #f5f5f5;
 }
 
-#pokemonAttributeBreakdown .attr-name {
+#pokemonAttributeBreakdown .expand-icon,
+#myPokemonAttributeBreakdown .expand-icon {
+  font-size: 9px;
+  color: #888;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+#pokemonAttributeBreakdown .attr-name,
+#myPokemonAttributeBreakdown .attr-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7080,26 +7101,105 @@ body {
   color: #333;
 }
 
-#pokemonAttributeBreakdown .attr-name .attr-sub {
+#pokemonAttributeBreakdown .attr-name .attr-sub,
+#myPokemonAttributeBreakdown .attr-name .attr-sub {
   font-size: 9px;
   color: #888;
   margin-left: 4px;
 }
 
-#pokemonAttributeBreakdown .attr-stats {
+#pokemonAttributeBreakdown .attr-stats,
+#myPokemonAttributeBreakdown .attr-stats {
   display: flex;
   gap: 8px;
   font-size: 10px;
   color: #666;
 }
 
-#pokemonAttributeBreakdown .attr-count {
+#pokemonAttributeBreakdown .attr-count,
+#myPokemonAttributeBreakdown .attr-count {
   min-width: 40px;
   text-align: right;
 }
 
-#pokemonAttributeBreakdown .attr-price {
-  min-width: 60px;
+#pokemonAttributeBreakdown .attr-price,
+#myPokemonAttributeBreakdown .attr-price {
+  min-width: 70px;
   text-align: right;
   color: #2e7d32;
+}
+
+/* 展開時の商品一覧 */
+#pokemonAttributeBreakdown .attr-items,
+#myPokemonAttributeBreakdown .attr-items {
+  background: #fafafa;
+  border-top: 1px solid #eee;
+  padding: 4px 8px 4px 24px;
+}
+
+#pokemonAttributeBreakdown .attr-detail-item,
+#myPokemonAttributeBreakdown .attr-detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 10px;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+#pokemonAttributeBreakdown .attr-detail-item:last-child,
+#myPokemonAttributeBreakdown .attr-detail-item:last-child {
+  border-bottom: none;
+}
+
+#pokemonAttributeBreakdown .item-title,
+#myPokemonAttributeBreakdown .item-title {
+  flex: 1;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+#pokemonAttributeBreakdown .item-price,
+#myPokemonAttributeBreakdown .item-price {
+  color: #2e7d32;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#pokemonAttributeBreakdown .more-items,
+#myPokemonAttributeBreakdown .more-items {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+  padding: 4px 0;
+  font-style: italic;
+}
+
+#pokemonAttributeBreakdown .no-items,
+#myPokemonAttributeBreakdown .no-items {
+  font-size: 10px;
+  color: #999;
+  text-align: center;
+  padding: 8px 0;
+}
+
+#pokemonAttributeBreakdown .loading-items,
+#myPokemonAttributeBreakdown .loading-items {
+  font-size: 10px;
+  color: #888;
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* 展開時のハイライト */
+#pokemonAttributeBreakdown .attr-item.expanded,
+#myPokemonAttributeBreakdown .attr-item.expanded {
+  background: #f9f9f9;
+}
+
+#pokemonAttributeBreakdown .attr-item.expanded .expand-icon,
+#myPokemonAttributeBreakdown .attr-item.expanded .expand-icon {
+  color: #f5a623;
 }

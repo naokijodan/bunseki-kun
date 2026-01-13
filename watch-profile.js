@@ -47,6 +47,7 @@
   };
 
   // ブランドの正規化マップ（表記ゆれ対応）
+  // 注意: 短いイニシャル（dw, mk, ax, fc）は型番と誤認識するため削除
   const BRAND_ALIASES = {
     'tag heuer': 'TAG Heuer',
     'tagheuer': 'TAG Heuer',
@@ -64,12 +65,12 @@
     'applewatch': 'Apple Watch',
     'michael kors': 'Michael Kors',
     'michaelkors': 'Michael Kors',
-    'mk': 'Michael Kors',
+    // 'mk' 削除: 型番と誤認識
     'daniel wellington': 'Daniel Wellington',
-    'dw': 'Daniel Wellington',
+    // 'dw' 削除: Casio DW-5600などと誤認識
     'armani exchange': 'Armani Exchange',
     'a/x': 'Armani Exchange',
-    'ax': 'Armani Exchange',
+    // 'ax' 削除: 型番と誤認識
     'emporio armani': 'Emporio Armani',
     'anne klein': 'Anne Klein',
     'kate spade': 'Kate Spade',
@@ -79,7 +80,7 @@
     'bell ross': 'Bell & Ross',
     'bell and ross': 'Bell & Ross',
     'frederique constant': 'Frederique Constant',
-    'fc': 'Frederique Constant',
+    // 'fc' 削除: 型番と誤認識
     'orient bambino': 'Orient Bambino',
     'seiko 5': 'Seiko 5',
     'seiko5': 'Seiko 5',
@@ -479,7 +480,7 @@
       // cardName = ブランド, set = タイプ, grading = ムーブメント, rarity = サイズ
       cardName: brand ? {
         name: brand,
-        nameEn: brand,
+        nameEn: getCategoryNameJp(getBrandCategory(brand)),  // サブ表示用にカテゴリ名
         category: getBrandCategory(brand)
       } : null,
       set: type ? {
@@ -516,6 +517,22 @@
       }
     }
     return 'other';
+  }
+
+  /**
+   * カテゴリの日本語名を取得
+   */
+  function getCategoryNameJp(category) {
+    const categoryNames = {
+      luxury: '高級',
+      midHigh: '中〜高級',
+      entry: 'エントリー',
+      fashion: 'ファッション',
+      digital: 'デジタル',
+      vintage: 'ヴィンテージ',
+      other: 'その他'
+    };
+    return categoryNames[category] || 'その他';
   }
 
   // ============================================
