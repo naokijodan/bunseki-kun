@@ -1174,16 +1174,25 @@ function updateMyPokemonAnalysisVisibility() {
  * ポケモン分析タブのイベントを初期化
  */
 function initPokemonAnalysisTabs() {
-  document.querySelectorAll('.pokemon-subtab').forEach(tab => {
+  document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
     tab.addEventListener('click', () => {
       const tabId = tab.dataset.pokemonTab;
 
-      // タブのアクティブ状態
-      document.querySelectorAll('.pokemon-subtab').forEach(t => t.classList.remove('active'));
+      // タブのアクティブ状態（市場比較用のみ）
+      document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
 
+      // 通常のサブタブを非アクティブに
+      document.querySelectorAll('.market-subtab').forEach(t => t.classList.remove('active'));
+
+      // 通常のコンテンツエリアを非表示、ポケモン/時計用コンテンツを表示
+      const marketAnalysisContent = document.getElementById('marketAnalysisContent');
+      const pokemonAnalysisContent = document.getElementById('pokemonAnalysisContent');
+      if (marketAnalysisContent) marketAnalysisContent.style.display = 'none';
+      if (pokemonAnalysisContent) pokemonAnalysisContent.style.display = 'block';
+
       // コンテンツ表示切り替え
-      document.querySelectorAll('.pokemon-tab-content').forEach(content => {
+      document.querySelectorAll('#pokemonAnalysisContent .pokemon-tab-content').forEach(content => {
         content.style.display = 'none';
       });
       const targetContent = document.getElementById(`pokemon-${tabId}`);
@@ -12949,6 +12958,15 @@ function switchMarketTab(tabId) {
   document.querySelectorAll('.market-subtab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.marketTab === tabId);
   });
+
+  // ポケモン/時計分析タブを非アクティブに
+  document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(t => t.classList.remove('active'));
+
+  // 通常のコンテンツエリアを表示、ポケモン/時計用コンテンツを非表示
+  const marketAnalysisContent = document.getElementById('marketAnalysisContent');
+  const pokemonAnalysisContent = document.getElementById('pokemonAnalysisContent');
+  if (marketAnalysisContent) marketAnalysisContent.style.display = 'block';
+  if (pokemonAnalysisContent) pokemonAnalysisContent.style.display = 'none';
 
   // コンテンツの表示切り替え
   document.querySelectorAll('.market-tab-content').forEach(content => {
