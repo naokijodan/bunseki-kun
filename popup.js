@@ -7042,7 +7042,13 @@ async function importMarketCsv(file) {
     // IndexedDBに保存
     await BunsekiDB.addMarketData(enrichedItems);
 
-    showAlert(`${items.length}件のデータをインポートしました`, 'success');
+    // 旧形式の場合は自動補完を通知
+    let message = `${items.length}件のデータをインポートしました`;
+    if (items._isLegacyFormat) {
+      const colCount = items._detectedFormat || 2;
+      message += `（${colCount}列形式 → ブランド・カテゴリを自動補完）`;
+    }
+    showAlert(message, 'success');
     await updateMarketDataInfo();
   } catch (error) {
     console.error('CSVインポートエラー:', error);
@@ -7053,34 +7059,81 @@ async function importMarketCsv(file) {
 }
 
 /**
- * 市場データCSVパース
+ * 市場データCSVパース（2/3/5列対応、後方互換性あり）
+ *
+ * 対応形式:
+ * - 2列: タイトル, 価格
+ * - 3列: タイトル, 価格, カテゴリ
+ * - 5列: タイトル, 価格, ブランド, カテゴリ, 取得日時（出力形式と同じ）
+ *
+ * 欠損値は自動補完:
+ * - ブランド: タイトルから自動抽出
+ * - カテゴリ: タイトルから自動判定
+ * - 取得日時: インポート時刻
  */
 function parseMarketCsv(content) {
   const lines = content.split('\n');
   const items = [];
+  let detectedFormat = null;
+  let headerSkipped = false;
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
     // CSVパース（カンマ区切り、クォート対応）
     const cols = parseCSVLine(line);
 
+    // ヘッダー行の検出（最初の行で「タイトル」「価格」などが含まれていればスキップ）
+    if (!headerSkipped) {
+      const firstCol = cols[0]?.toLowerCase() || '';
+      if (firstCol.includes('タイトル') || firstCol.includes('title') ||
+          firstCol.includes('商品名') || firstCol.includes('名前')) {
+        headerSkipped = true;
+        // 列数からフォーマットを検出
+        detectedFormat = cols.length;
+        continue;
+      }
+      headerSkipped = true;
+      detectedFormat = cols.length;
+    }
+
     if (cols.length >= 2) {
       const title = cols[0];
       const price = parseFloat(cols[1]) || 0;
-      const brand = extractBrandFromTitle(title);
-      const category = cols[2] || detectCategoryFromTitle(title);
+
+      let brand, category, capturedAt;
+
+      if (cols.length >= 5) {
+        // 5列形式（出力形式と同じ）: タイトル, 価格, ブランド, カテゴリ, 取得日時
+        brand = cols[2] || extractBrandFromTitle(title);
+        category = cols[3] || detectCategoryFromTitle(title);
+        capturedAt = cols[4] || new Date().toISOString();
+      } else if (cols.length >= 3) {
+        // 3列形式（旧形式）: タイトル, 価格, カテゴリ
+        brand = extractBrandFromTitle(title);
+        category = cols[2] || detectCategoryFromTitle(title);
+        capturedAt = new Date().toISOString();
+      } else {
+        // 2列形式（最小形式）: タイトル, 価格
+        brand = extractBrandFromTitle(title);
+        category = detectCategoryFromTitle(title);
+        capturedAt = new Date().toISOString();
+      }
 
       items.push({
         title,
         price,
         brand,
         category,
-        capturedAt: new Date().toISOString()
+        capturedAt
       });
     }
   }
+
+  // パース結果にフォーマット情報を付加（通知用）
+  items._detectedFormat = detectedFormat;
+  items._isLegacyFormat = detectedFormat && detectedFormat < 5;
 
   return items;
 }
