@@ -1171,10 +1171,12 @@ function updateMyPokemonAnalysisVisibility() {
 }
 
 /**
- * ポケモン分析タブのイベントを初期化
+ * ポケモン分析タブのイベントを初期化（市場比較用）
  */
 function initPokemonAnalysisTabs() {
-  document.querySelectorAll('#pokemonAnalysisTabs .pokemon-subtab').forEach(tab => {
+  // 市場比較用のタブのみ対象（data-pokemon-tab属性を持つもの）
+  const tabs = document.querySelectorAll('[data-pokemon-tab]');
+  tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const tabId = tab.dataset.pokemonTab;
 
@@ -1213,8 +1215,20 @@ async function loadPokemonAnalysisData(tabId) {
   const marketData = await BunsekiDB.getMarketDataForSheet(BunsekiDB.currentSheetId);
   if (!marketData || marketData.length === 0) return;
 
+  // 現在のプロファイルで属性を再抽出（自分の分析と同じ処理）
+  let allItems = marketData.map(item => {
+    // 属性がないか、プロファイルが変わった場合は再抽出
+    if (!item.attributes || item.profileExtracted !== currentSheetProfile) {
+      const attributes = extractAttributesByProfile(item.title);
+      if (attributes) {
+        return { ...item, attributes, profileExtracted: currentSheetProfile };
+      }
+    }
+    return item;
+  });
+
   // 属性付きのアイテムのみフィルタ
-  const itemsWithAttrs = marketData.filter(item => item.attributes);
+  const itemsWithAttrs = allItems.filter(item => item.attributes);
 
   switch (tabId) {
     case 'character-ranking':
