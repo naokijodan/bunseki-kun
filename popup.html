@@ -301,23 +301,44 @@
       <!-- ===================== -->
       <section id="market-data-tab" class="tab-content">
         <div class="data-section">
-          <!-- URL入力 -->
-          <div class="url-input-group">
-            <input type="text" id="ebayUrlInput" class="url-input" placeholder="https://www.ebay.com/sch/... のURLを入力">
-            <button id="captureMarketBtn" class="action-btn primary">
-              <span class="btn-icon">📡</span>
-              取得
-            </button>
-          </div>
-          <p class="input-hint">eBay検索結果ページのURLを入力して市場データを取得</p>
+          <!-- ===== 入力エリア（常に表示） ===== -->
+          <div class="market-input-area">
+            <!-- URL入力 -->
+            <div class="url-input-group">
+              <input type="text" id="ebayUrlInput" class="url-input" placeholder="https://www.ebay.com/sch/... のURLを入力">
+              <button id="captureMarketBtn" class="action-btn primary">
+                <span class="btn-icon">📡</span>
+                取得
+              </button>
+            </div>
+            <p class="input-hint">eBay検索結果ページのURLを入力して市場データを取得</p>
 
-          <!-- 取得結果表示 -->
-          <div id="marketCaptureResult" class="capture-result" style="display: none;">
-            <span class="added">+<span id="marketAddedCount">0</span>件追加</span>
-            <span class="duplicates">(<span id="marketDuplicateCount">0</span>件重複スキップ)</span>
+            <!-- 取得結果表示 -->
+            <div id="marketCaptureResult" class="capture-result" style="display: none;">
+              <span class="added">+<span id="marketAddedCount">0</span>件追加</span>
+              <span class="duplicates">(<span id="marketDuplicateCount">0</span>件重複スキップ)</span>
+            </div>
+
+            <!-- CSV/ZIPインポート（常に表示） -->
+            <div class="csv-import-area">
+              <div class="import-divider">
+                <span>または ファイルからインポート</span>
+              </div>
+              <div class="import-buttons">
+                <button id="importMarketCsvBtn" class="action-btn secondary">
+                  <span class="btn-icon">📄</span>
+                  CSVインポート
+                </button>
+                <button id="importMarketZipBtn" class="action-btn secondary" disabled title="準備中">
+                  <span class="btn-icon">📦</span>
+                  ZIPインポート
+                </button>
+              </div>
+              <p class="import-hint">CSV形式: タイトル, 価格, [ブランド], [カテゴリ], [取得日時]</p>
+            </div>
           </div>
 
-          <!-- 市場データサマリー -->
+          <!-- ===== データサマリー（データがある時のみ表示） ===== -->
           <div class="data-summary" id="marketDataSummary" style="display: none;">
             <div class="summary-item">
               <span class="summary-label">登録件数</span>
@@ -329,27 +350,23 @@
             </div>
           </div>
 
-          <!-- 市場データ操作ボタン -->
+          <!-- ===== 操作ボタン（データがある時のみ表示） ===== -->
           <div class="market-data-actions" id="marketDataActions" style="display: none;">
             <button id="analyzeMarketDataBtn" class="action-btn info small">
               <span class="btn-icon">🔍</span>
               分析する
             </button>
-            <button id="importMarketCsvBtn" class="action-btn secondary small">
-              <span class="btn-icon">📁</span>
-              CSV
+            <button id="exportMarketCsvBtn" class="action-btn primary small">
+              <span class="btn-icon">📤</span>
+              CSV出力
+            </button>
+            <button id="clearMarketAnalysisBtn" class="action-btn secondary small">
+              <span class="btn-icon">🔄</span>
+              分析クリア
             </button>
             <button id="clearMarketDataBtn" class="action-btn danger small">
               <span class="btn-icon">🗑️</span>
               データクリア
-            </button>
-            <button id="clearMarketAnalysisBtn" class="action-btn secondary small">
-              <span class="btn-icon">🔄</span>
-              分析結果クリア
-            </button>
-            <button id="exportMarketCsvBtn" class="action-btn primary small">
-              <span class="btn-icon">📤</span>
-              CSV出力
             </button>
           </div>
 
