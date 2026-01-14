@@ -3227,6 +3227,20 @@ function initDataInput() {
     });
   }
 
+  // ZIPインポート
+  const importMarketZipBtn = document.getElementById('importMarketZipBtn');
+  const marketZipFile = document.getElementById('marketZipFile');
+
+  if (importMarketZipBtn) {
+    importMarketZipBtn.addEventListener('click', () => marketZipFile?.click());
+  }
+
+  if (marketZipFile) {
+    marketZipFile.addEventListener('change', (e) => {
+      importMarketZip(e.target.files[0]);
+    });
+  }
+
   if (clearMarketDataBtn) {
     clearMarketDataBtn.addEventListener('click', clearMarketData);
   }
@@ -7053,6 +7067,99 @@ async function importMarketCsv(file) {
   } catch (error) {
     console.error('CSVインポートエラー:', error);
     showAlert('CSVのインポートに失敗しました: ' + error.message, 'danger');
+  } finally {
+    hideLoading();
+  }
+}
+
+/**
+ * ZIPファイルから市場データをインポート
+ * 複数のCSVファイルを一括処理、部分的成功をサポート
+ */
+async function importMarketZip(file) {
+  if (!file) return;
+
+  // JSZipが読み込まれているか確認
+  if (typeof JSZip === 'undefined') {
+    showAlert('ZIP機能を読み込めませんでした。ページを再読み込みしてください。', 'danger');
+    return;
+  }
+
+  showLoading('ZIPファイルを処理中...');
+
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const csvFiles = [];
+
+    // CSVファイルをリストアップ
+    zip.forEach((relativePath, zipEntry) => {
+      if (!zipEntry.dir && relativePath.toLowerCase().endsWith('.csv')) {
+        csvFiles.push({ path: relativePath, entry: zipEntry });
+      }
+    });
+
+    if (csvFiles.length === 0) {
+      throw new Error('ZIPファイル内にCSVファイルが見つかりませんでした');
+    }
+
+    let totalItems = 0;
+    let successFiles = 0;
+    let failedFiles = [];
+    let legacyCount = 0;
+
+    // 各CSVファイルを処理
+    for (const { path, entry } of csvFiles) {
+      try {
+        const content = await entry.async('string');
+        const items = parseMarketCsv(content);
+
+        if (items.length > 0) {
+          // プロファイルに応じて属性を抽出
+          const enrichedItems = enrichMarketDataWithAttributes(items);
+          await BunsekiDB.addMarketData(enrichedItems);
+
+          totalItems += items.length;
+          successFiles++;
+
+          if (items._isLegacyFormat) {
+            legacyCount++;
+          }
+        }
+      } catch (fileError) {
+        console.error(`CSVファイル処理エラー (${path}):`, fileError);
+        failedFiles.push(path);
+      }
+    }
+
+    // 結果メッセージを構築
+    let message = '';
+    if (successFiles > 0) {
+      message = `${successFiles}ファイルから${totalItems}件のデータをインポートしました`;
+      if (legacyCount > 0) {
+        message += `（${legacyCount}ファイルで自動補完）`;
+      }
+    }
+
+    if (failedFiles.length > 0) {
+      if (message) message += '\n';
+      message += `⚠️ ${failedFiles.length}ファイルの処理に失敗: ${failedFiles.slice(0, 3).join(', ')}`;
+      if (failedFiles.length > 3) {
+        message += `...他${failedFiles.length - 3}件`;
+      }
+    }
+
+    if (successFiles === 0 && failedFiles.length > 0) {
+      showAlert('すべてのCSVファイルの処理に失敗しました', 'danger');
+    } else if (failedFiles.length > 0) {
+      showAlert(message, 'warning');
+    } else {
+      showAlert(message, 'success');
+    }
+
+    await updateMarketDataInfo();
+  } catch (error) {
+    console.error('ZIPインポートエラー:', error);
+    showAlert('ZIPのインポートに失敗しました: ' + error.message, 'danger');
   } finally {
     hideLoading();
   }

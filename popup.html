@@ -329,7 +329,7 @@
                   <span class="btn-icon">📄</span>
                   CSVインポート
                 </button>
-                <button id="importMarketZipBtn" class="action-btn secondary" disabled title="準備中">
+                <button id="importMarketZipBtn" class="action-btn secondary">
                   <span class="btn-icon">📦</span>
                   ZIPインポート
                 </button>
@@ -582,6 +582,7 @@
 
           <!-- 市場データCSVインポート（hidden） -->
           <input type="file" id="marketCsvFile" accept=".csv" hidden>
+          <input type="file" id="marketZipFile" accept=".zip" hidden>
         </div>
       </section>
 
@@ -1368,6 +1369,7 @@
 
   </div>
 
+  <script src="jszip.min.js"></script>
   <script src="chart.min.js"></script>
   <script src="category-rules.js"></script>
   <script src="brand-master.js"></script>
