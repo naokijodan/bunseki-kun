@@ -1227,13 +1227,23 @@ async function loadPokemonAnalysisData(tabId) {
  * 自分の分析用ポケモン分析タブのイベントを初期化
  */
 function initMyPokemonAnalysisTabs() {
-  document.querySelectorAll('[data-my-pokemon-tab]').forEach(tab => {
+  const tabs = document.querySelectorAll('[data-my-pokemon-tab]');
+  tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const tabId = tab.dataset.myPokemonTab;
 
       // タブのアクティブ状態（自分の分析用のみ）
       document.querySelectorAll('#myPokemonAnalysisTabs .pokemon-subtab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
+
+      // 通常のサブタブを非アクティブに
+      document.querySelectorAll('.my-analysis-subtab').forEach(t => t.classList.remove('active'));
+
+      // 通常のコンテンツエリアを非表示、ポケモン/時計用コンテンツを表示
+      const myAnalysisContent = document.getElementById('myAnalysisContent');
+      const myPokemonAnalysisContent = document.getElementById('myPokemonAnalysisContent');
+      if (myAnalysisContent) myAnalysisContent.style.display = 'none';
+      if (myPokemonAnalysisContent) myPokemonAnalysisContent.style.display = 'block';
 
       // コンテンツ表示切り替え
       document.querySelectorAll('#myPokemonAnalysisContent .pokemon-tab-content').forEach(content => {
@@ -8408,6 +8418,15 @@ function switchMyAnalysisTab(tabId) {
   document.querySelectorAll('.my-analysis-subtab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.myTab === tabId);
   });
+
+  // ポケモン/時計分析タブを非アクティブに
+  document.querySelectorAll('#myPokemonAnalysisTabs .pokemon-subtab').forEach(t => t.classList.remove('active'));
+
+  // 通常のコンテンツエリアを表示、ポケモン/時計用コンテンツを非表示
+  const myAnalysisContent = document.getElementById('myAnalysisContent');
+  const myPokemonAnalysisContent = document.getElementById('myPokemonAnalysisContent');
+  if (myAnalysisContent) myAnalysisContent.style.display = 'block';
+  if (myPokemonAnalysisContent) myPokemonAnalysisContent.style.display = 'none';
 
   // コンテンツの表示を切り替え
   document.querySelectorAll('.my-tab-content').forEach(content => {
