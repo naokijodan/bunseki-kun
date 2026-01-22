@@ -7092,16 +7092,19 @@ async function importMarketZip(file) {
 }
 
 /**
- * 市場データCSVパース（2/3/5列対応、後方互換性あり）
+ * 市場データCSVパース（2/3/5/7列対応、後方互換性あり）
  *
  * 対応形式:
  * - 2列: タイトル, 価格
  * - 3列: タイトル, 価格, カテゴリ
- * - 5列: タイトル, 価格, ブランド, カテゴリ, 取得日時（出力形式と同じ）
+ * - 5列: タイトル, 価格, ブランド, カテゴリ, 取得日時（旧出力形式）
+ * - 7列: タイトル, 価格, ブランド, カテゴリ, 販売数, 販売日, 取得日時（新出力形式）
  *
  * 欠損値は自動補完:
  * - ブランド: タイトルから自動抽出
  * - カテゴリ: タイトルから自動判定
+ * - 販売数: 0
+ * - 販売日: 空
  * - 取得日時: インポート時刻
  */
 function parseMarketCsv(content) {
@@ -7135,22 +7138,35 @@ function parseMarketCsv(content) {
       const title = cols[0];
       const price = parseFloat(cols[1]) || 0;
 
-      let brand, category, capturedAt;
+      let brand, category, sold, saleDate, capturedAt;
 
-      if (cols.length >= 5) {
-        // 5列形式（出力形式と同じ）: タイトル, 価格, ブランド, カテゴリ, 取得日時
+      if (cols.length >= 7) {
+        // 7列形式（新出力形式）: タイトル, 価格, ブランド, カテゴリ, 販売数, 販売日, 取得日時
         brand = cols[2] || extractBrandFromTitle(title);
         category = cols[3] || detectCategoryFromTitle(title);
+        sold = parseInt(cols[4]) || 0;
+        saleDate = cols[5] || '';
+        capturedAt = cols[6] || new Date().toISOString();
+      } else if (cols.length >= 5) {
+        // 5列形式（旧出力形式）: タイトル, 価格, ブランド, カテゴリ, 取得日時
+        brand = cols[2] || extractBrandFromTitle(title);
+        category = cols[3] || detectCategoryFromTitle(title);
+        sold = 0;
+        saleDate = '';
         capturedAt = cols[4] || new Date().toISOString();
       } else if (cols.length >= 3) {
         // 3列形式（旧形式）: タイトル, 価格, カテゴリ
         brand = extractBrandFromTitle(title);
         category = cols[2] || detectCategoryFromTitle(title);
+        sold = 0;
+        saleDate = '';
         capturedAt = new Date().toISOString();
       } else {
         // 2列形式（最小形式）: タイトル, 価格
         brand = extractBrandFromTitle(title);
         category = detectCategoryFromTitle(title);
+        sold = 0;
+        saleDate = '';
         capturedAt = new Date().toISOString();
       }
 
@@ -7159,6 +7175,8 @@ function parseMarketCsv(content) {
         price,
         brand,
         category,
+        sold,
+        saleDate,
         capturedAt
       });
     }
@@ -7166,7 +7184,7 @@ function parseMarketCsv(content) {
 
   // パース結果にフォーマット情報を付加（通知用）
   items._detectedFormat = detectedFormat;
-  items._isLegacyFormat = detectedFormat && detectedFormat < 5;
+  items._isLegacyFormat = detectedFormat && detectedFormat < 7;
 
   return items;
 }
@@ -7215,7 +7233,7 @@ async function exportMarketCsv() {
     }
 
     // CSVヘッダー
-    const headers = ['タイトル', '価格', 'ブランド', 'カテゴリ', '取得日時'];
+    const headers = ['タイトル', '価格', 'ブランド', 'カテゴリ', '販売数', '販売日', '取得日時'];
 
     // CSVデータ行を作成
     const rows = sheetData.map(item => {
@@ -7224,6 +7242,8 @@ async function exportMarketCsv() {
         item.price || 0,
         escapeCSVField(item.brand || ''),
         escapeCSVField(item.category || ''),
+        item.sold || 0,
+        item.saleDate || '',
         item.capturedAt || ''
       ].join(',');
     });

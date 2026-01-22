@@ -313,6 +313,7 @@ class BunsekiKunHighlighter {
       const row = titleSpan.closest('tr') || titleSpan.closest('[class*="row"]') || titleSpan.parentElement?.parentElement?.parentElement;
       let price = null;
       let sold = 0;
+      let saleDate = null;
 
       if (row) {
         const priceMatch = row.textContent.match(/\$[\d,.]+/);
@@ -324,6 +325,9 @@ class BunsekiKunHighlighter {
         if (soldMatch) {
           sold = parseInt(soldMatch[1]) || 0;
         }
+
+        // 販売日を抽出（Date last sold: "Oct 15, 2025" 形式）
+        saleDate = this.extractSaleDateFromRow(row);
       }
 
       items.push({
@@ -331,6 +335,7 @@ class BunsekiKunHighlighter {
         brand,
         price,
         sold,
+        saleDate,
         element: titleSpan
       });
     });
@@ -352,6 +357,7 @@ class BunsekiKunHighlighter {
           const cells = row.querySelectorAll('td');
           let price = null;
           let sold = 0;
+          let saleDate = null;
 
           cells.forEach(cell => {
             const text = cell.textContent;
@@ -364,11 +370,15 @@ class BunsekiKunHighlighter {
             }
           });
 
+          // 販売日を抽出
+          saleDate = this.extractSaleDateFromRow(row);
+
           items.push({
             title,
             brand,
             price,
             sold,
+            saleDate,
             element: titleEl
           });
         }
@@ -452,6 +462,60 @@ class BunsekiKunHighlighter {
     if (match) {
       return parseFloat(match[0].replace(/,/g, ''));
     }
+    return null;
+  }
+
+  /**
+   * 行から販売日を抽出（Terapeak "Date last sold" カラム）
+   * 形式例: "Oct 15, 2025", "Dec 19, 2025"
+   */
+  extractSaleDateFromRow(row) {
+    if (!row) return null;
+
+    const cells = row.querySelectorAll('td');
+    // 最後のセルが販売日の可能性が高い（Terapeakのテーブル構造）
+    for (let i = cells.length - 1; i >= 0; i--) {
+      const text = cells[i].textContent.trim();
+      // 月名 + 日 + 年 の形式をチェック（例: "Oct 15, 2025"）
+      const dateMatch = text.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}$/i);
+      if (dateMatch) {
+        return this.parseTerapeakDate(text);
+      }
+    }
+
+    // テキスト全体から日付パターンを探す（フォールバック）
+    const rowText = row.textContent;
+    const datePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/gi;
+    const matches = rowText.match(datePattern);
+    if (matches && matches.length > 0) {
+      // 最後の日付を返す（Date last soldは通常最後のカラム）
+      return this.parseTerapeakDate(matches[matches.length - 1]);
+    }
+
+    return null;
+  }
+
+  /**
+   * Terapeak形式の日付をISO形式に変換
+   * "Oct 15, 2025" → "2025-10-15"
+   */
+  parseTerapeakDate(dateStr) {
+    if (!dateStr) return null;
+
+    const months = {
+      'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+      'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+      'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+    };
+
+    const match = dateStr.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (match) {
+      const month = months[match[1].toLowerCase()];
+      const day = match[2].padStart(2, '0');
+      const year = match[3];
+      return `${year}-${month}-${day}`;
+    }
+
     return null;
   }
 
@@ -1229,6 +1293,7 @@ class BunsekiKunHighlighter {
         brand: item.brand,
         price: item.price,
         sold: item.sold,
+        saleDate: item.saleDate,
         source: window.location.href
       }));
 
