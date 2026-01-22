@@ -35,6 +35,9 @@ let currentAIResult = null;
 // 現在のシートID（sheet1〜sheet10）
 let currentSheetId = 'sheet1';
 
+// ポップアップが開かれた時点のタブ情報（規約対応: 手動で開いたページのみ取得可能）
+let currentActiveTab = null;
+
 /**
  * シート固有のストレージキーを生成
  */
@@ -204,6 +207,23 @@ const ANALYSIS_CATEGORIES = {
 // =====================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // ポップアップが開かれた時点のアクティブタブを保存
+  // ※規約対応: ユーザーが手動で開いたページの情報を取得
+  try {
+    // ポップアップ以外の通常のタブを取得
+    const allTabs = await chrome.tabs.query({ active: true });
+    // chrome-extension:// 以外のタブをフィルタリング
+    const normalTabs = allTabs.filter(tab => !tab.url.startsWith('chrome-extension://'));
+    if (normalTabs.length > 0) {
+      currentActiveTab = normalTabs[0];
+      console.log('[popup.js] 現在のタブを保存:', currentActiveTab.url);
+    } else {
+      console.log('[popup.js] 通常のタブが見つかりません。全タブ:', allTabs.map(t => t.url));
+    }
+  } catch (e) {
+    console.error('[popup.js] タブ情報取得エラー:', e);
+  }
+
   // ブランドマスターを初期化
   if (typeof brandMaster !== 'undefined') {
     await brandMaster.init();
@@ -6859,18 +6879,47 @@ async function fetchMarketDataFromCurrentTab() {
   showLoading('eBayからデータを取得中...');
 
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    // DOMContentLoaded時に保存したタブ情報を使用
+    // （ポップアップが開かれた時点でユーザーが見ていたページ）
+    const tab = currentActiveTab;
 
-    if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('ebay')) {
+    console.log('[popup.js] fetchMarketDataFromCurrentTab tab:', tab);
+    console.log('[popup.js] tab url:', tab?.url);
+
+    if (!tab || !tab.url || !tab.url.includes('ebay')) {
       showAlert('テラピークまたはeBay検索結果ページを開いてから実行してください', 'warning');
       return;
     }
 
     console.log('[popup.js] fetchMarketDataFromCurrentTab sending sheetId:', currentSheetId);
-    const response = await chrome.tabs.sendMessage(tabs[0].id, {
-      action: 'captureMarketData',
-      sheetId: currentSheetId
-    });
+
+    // content scriptへのメッセージ送信（リトライ付き）
+    let response = null;
+    let retries = 3;
+    let lastError = null;
+
+    while (retries > 0) {
+      try {
+        response = await chrome.tabs.sendMessage(tab.id, {
+          action: 'captureMarketData',
+          sheetId: currentSheetId
+        });
+        break;
+      } catch (e) {
+        lastError = e;
+        console.log('[popup.js] sendMessageエラー:', e.message, 'リトライ残り:', retries - 1);
+        retries--;
+        if (retries > 0) {
+          // content scriptが読み込まれるのを待つ
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    if (!response && lastError) {
+      throw new Error('ページとの通信に失敗しました。ページを再読み込みしてから再度お試しください。');
+    }
+
     console.log('[popup.js] fetchMarketDataFromCurrentTab response:', response);
 
     if (response && response.success) {
@@ -6885,7 +6934,7 @@ async function fetchMarketDataFromCurrentTab() {
     }
   } catch (error) {
     console.error('市場データ取得エラー:', error);
-    showAlert('市場データの取得に失敗しました。eBayの検索結果ページで実行してください。', 'danger');
+    showAlert(error.message || '市場データの取得に失敗しました', 'danger');
   } finally {
     hideLoading();
   }
