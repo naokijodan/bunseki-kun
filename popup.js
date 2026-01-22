@@ -6843,136 +6843,13 @@ function setupMarketCategoryUnclassifiedItemActions(container) {
 }
 
 /**
- * URLから市場データを取得
- * URLを自動で開き、データ取得後にタブを閉じる
+ * 現在開いているページから市場データを取得
+ * ※eBay規約対応: バックグラウンドタブ自動オープン機能を削除
+ *   ユーザーが手動でページを開いた後にのみデータ取得可能
  */
 async function captureMarketDataFromUrl() {
-  const urlInput = document.getElementById('ebayUrlInput');
-  const url = urlInput?.value.trim();
-
-  // URLが入力されている場合
-  if (url) {
-    if (!url.includes('ebay.com') && !url.includes('ebay.co.uk') && !url.includes('ebay.de') && !url.includes('ebay.fr') && !url.includes('ebay.it') && !url.includes('ebay.es') && !url.includes('ebay.com.au')) {
-      showAlert('eBayのURLを入力してください', 'warning');
-      return;
-    }
-
-    showLoading('ページを開いています...');
-
-    let createdTabId = null;
-
-    try {
-      // バックグラウンドでタブを開く
-      const tab = await chrome.tabs.create({
-        url: url,
-        active: false  // バックグラウンドで開く
-      });
-      createdTabId = tab.id;
-
-      showLoading('ページの読み込みを待っています...');
-
-      // ページの読み込み完了を待つ
-      await waitForTabComplete(tab.id, 30000); // 最大30秒待機
-
-      showLoading('市場データを取得中...');
-
-      // 少し待ってからcontent scriptにメッセージ送信
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // content scriptにメッセージ送信（リトライ付き）
-      let response = null;
-      let retries = 5;
-
-      while (retries > 0) {
-        try {
-          console.log('[popup.js] captureMarketDataFromUrl sending sheetId:', currentSheetId);
-          response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'captureMarketData',
-            sheetId: currentSheetId
-          });
-          break;
-        } catch (e) {
-          console.log('sendMessageエラー:', e.message, 'リトライ残り:', retries - 1);
-          retries--;
-          if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-          }
-        }
-      }
-
-      // タブを閉じる
-      try {
-        await chrome.tabs.remove(tab.id);
-        createdTabId = null;
-      } catch (e) {
-        console.log('タブ削除エラー:', e.message);
-      }
-
-      if (response && response.success) {
-        const added = response.added || response.count || 0;
-        const duplicates = response.duplicates || 0;
-
-        // 結果を表示
-        showCaptureResult(added, duplicates);
-        showAlert(`${added}件のデータを取得しました`, 'success');
-        await updateMarketDataInfo();
-
-        // 入力をクリア
-        urlInput.value = '';
-      } else {
-        throw new Error(response?.error || 'データ取得に失敗しました');
-      }
-    } catch (error) {
-      console.error('市場データ取得エラー:', error);
-      showAlert('市場データの取得に失敗しました: ' + error.message, 'danger');
-
-      // エラー時もタブを閉じる
-      if (createdTabId) {
-        try {
-          await chrome.tabs.remove(createdTabId);
-        } catch (e) {
-          console.log('エラー時タブ削除失敗:', e.message);
-        }
-      }
-    } finally {
-      hideLoading();
-    }
-  } else {
-    // URLが空の場合は現在のタブから取得
-    await fetchMarketDataFromCurrentTab();
-  }
-}
-
-/**
- * タブの読み込み完了を待つ
- */
-function waitForTabComplete(tabId, timeout = 30000) {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-
-    const checkTab = async () => {
-      try {
-        const tab = await chrome.tabs.get(tabId);
-
-        if (tab.status === 'complete') {
-          resolve(tab);
-          return;
-        }
-
-        if (Date.now() - startTime > timeout) {
-          reject(new Error('ページ読み込みタイムアウト'));
-          return;
-        }
-
-        // 500ms後に再チェック
-        setTimeout(checkTab, 500);
-      } catch (e) {
-        reject(new Error('タブが見つかりません: ' + e.message));
-      }
-    };
-
-    checkTab();
-  });
+  // 常に現在のタブから取得（バックグラウンドタブ機能は削除済み）
+  await fetchMarketDataFromCurrentTab();
 }
 
 /**
@@ -6985,7 +6862,7 @@ async function fetchMarketDataFromCurrentTab() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
 
     if (!tabs[0] || !tabs[0].url || !tabs[0].url.includes('ebay')) {
-      showAlert('eBayのURLを入力するか、eBayページを開いてください', 'warning');
+      showAlert('テラピークまたはeBay検索結果ページを開いてから実行してください', 'warning');
       return;
     }
 
