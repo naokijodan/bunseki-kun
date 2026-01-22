@@ -316,18 +316,12 @@ class BunsekiKunHighlighter {
       let saleDate = null;
 
       if (row) {
-        const priceMatch = row.textContent.match(/\$[\d,.]+/);
-        if (priceMatch) {
-          price = this.parsePrice(priceMatch[0]);
-        }
-
-        const soldMatch = row.textContent.match(/(\d+)\s*sold/i);
-        if (soldMatch) {
-          sold = parseInt(soldMatch[1]) || 0;
-        }
-
-        // 販売日を抽出（Date last sold: "Oct 15, 2025" 形式）
-        saleDate = this.extractSaleDateFromRow(row);
+        // テーブルセルから各データを抽出
+        const cells = row.querySelectorAll('td');
+        const extracted = this.extractTerapeakRowData(cells);
+        price = extracted.price;
+        sold = extracted.sold;
+        saleDate = extracted.saleDate;
       }
 
       items.push({
@@ -355,30 +349,14 @@ class BunsekiKunHighlighter {
 
           const brand = this.extractBrandFromTitle(title);
           const cells = row.querySelectorAll('td');
-          let price = null;
-          let sold = 0;
-          let saleDate = null;
-
-          cells.forEach(cell => {
-            const text = cell.textContent;
-            if (!price && text.includes('$')) {
-              price = this.parsePrice(text);
-            }
-            if (text.toLowerCase().includes('sold')) {
-              const match = text.match(/(\d+)/);
-              if (match) sold = parseInt(match[1]) || 0;
-            }
-          });
-
-          // 販売日を抽出
-          saleDate = this.extractSaleDateFromRow(row);
+          const extracted = this.extractTerapeakRowData(cells);
 
           items.push({
             title,
             brand,
-            price,
-            sold,
-            saleDate,
+            price: extracted.price,
+            sold: extracted.sold,
+            saleDate: extracted.saleDate,
             element: titleEl
           });
         }
@@ -386,6 +364,57 @@ class BunsekiKunHighlighter {
     }
 
     return items;
+  }
+
+  /**
+   * Terapeakテーブル行からデータを抽出
+   * カラム順序: Listing, Actions, Avg sold price, Avg shipping, ?, Total sold, Item sales, Bids, Date last sold
+   */
+  extractTerapeakRowData(cells) {
+    let price = null;
+    let sold = 0;
+    let saleDate = null;
+
+    if (!cells || cells.length === 0) {
+      return { price, sold, saleDate };
+    }
+
+    // 各セルを解析
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const text = cell.textContent.trim();
+
+      // 価格（$XXX.XX形式）- 最初に見つかった価格を使用
+      if (price === null && text.includes('$')) {
+        const priceMatch = text.match(/\$[\d,.]+/);
+        if (priceMatch) {
+          price = this.parsePrice(priceMatch[0]);
+        }
+      }
+
+      // 販売日（月名 日, 年 形式）
+      if (saleDate === null) {
+        const dateMatch = text.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}$/i);
+        if (dateMatch) {
+          saleDate = this.parseTerapeakDate(text);
+        }
+      }
+
+      // 販売数（純粋な数字のみのセル、通常5番目以降のカラム）
+      // ただし価格や日付ではないセルで、小さな整数（1-9999）
+      if (i >= 4 && sold === 0) {
+        const numMatch = text.match(/^(\d{1,4})$/);
+        if (numMatch && !text.includes('$') && !text.includes(',')) {
+          const num = parseInt(numMatch[1]);
+          // 販売数は通常1桁〜3桁程度
+          if (num >= 1 && num <= 9999) {
+            sold = num;
+          }
+        }
+      }
+    }
+
+    return { price, sold, saleDate };
   }
 
   /**
@@ -441,7 +470,28 @@ class BunsekiKunHighlighter {
       { pattern: /\b(SEIKO)\b/i, brand: 'SEIKO' },
       { pattern: /\b(CASIO)\b/i, brand: 'CASIO' },
       { pattern: /\b(NIKE)\b/i, brand: 'NIKE' },
-      { pattern: /\b(ADIDAS)\b/i, brand: 'ADIDAS' }
+      { pattern: /\b(ADIDAS)\b/i, brand: 'ADIDAS' },
+      // 釣り具ブランド
+      { pattern: /\b(SHIMANO)\b/i, brand: 'SHIMANO' },
+      { pattern: /\b(DAIWA)\b/i, brand: 'DAIWA' },
+      { pattern: /\b(ABU GARCIA|ABU)\b/i, brand: 'ABU GARCIA' },
+      { pattern: /\b(PENN)\b/i, brand: 'PENN' },
+      { pattern: /\b(OKUMA)\b/i, brand: 'OKUMA' },
+      { pattern: /\b(ZEBCO)\b/i, brand: 'ZEBCO' },
+      { pattern: /\b(PFLUEGER)\b/i, brand: 'PFLUEGER' },
+      { pattern: /\b(LEW'?S)\b/i, brand: "LEW'S" },
+      { pattern: /\b(MEGABASS)\b/i, brand: 'MEGABASS' },
+      { pattern: /\b(EVERGREEN)\b/i, brand: 'EVERGREEN' },
+      { pattern: /\b(DEPS)\b/i, brand: 'DEPS' },
+      { pattern: /\b(JACKALL)\b/i, brand: 'JACKALL' },
+      { pattern: /\b(GAMAKATSU)\b/i, brand: 'GAMAKATSU' },
+      { pattern: /\b(OWNER)\b/i, brand: 'OWNER' },
+      { pattern: /\b(RAPALA)\b/i, brand: 'RAPALA' },
+      { pattern: /\b(BERKLEY)\b/i, brand: 'BERKLEY' },
+      { pattern: /\b(FENWICK)\b/i, brand: 'FENWICK' },
+      { pattern: /\b(G\.?\s*LOOMIS|G\s*LOOMIS)\b/i, brand: 'G.LOOMIS' },
+      { pattern: /\b(ST\.?\s*CROIX)\b/i, brand: 'ST.CROIX' },
+      { pattern: /\b(UGLY STIK)\b/i, brand: 'UGLY STIK' }
     ];
 
     for (const { pattern, brand } of fallbackPatterns) {
@@ -462,36 +512,6 @@ class BunsekiKunHighlighter {
     if (match) {
       return parseFloat(match[0].replace(/,/g, ''));
     }
-    return null;
-  }
-
-  /**
-   * 行から販売日を抽出（Terapeak "Date last sold" カラム）
-   * 形式例: "Oct 15, 2025", "Dec 19, 2025"
-   */
-  extractSaleDateFromRow(row) {
-    if (!row) return null;
-
-    const cells = row.querySelectorAll('td');
-    // 最後のセルが販売日の可能性が高い（Terapeakのテーブル構造）
-    for (let i = cells.length - 1; i >= 0; i--) {
-      const text = cells[i].textContent.trim();
-      // 月名 + 日 + 年 の形式をチェック（例: "Oct 15, 2025"）
-      const dateMatch = text.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}$/i);
-      if (dateMatch) {
-        return this.parseTerapeakDate(text);
-      }
-    }
-
-    // テキスト全体から日付パターンを探す（フォールバック）
-    const rowText = row.textContent;
-    const datePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/gi;
-    const matches = rowText.match(datePattern);
-    if (matches && matches.length > 0) {
-      // 最後の日付を返す（Date last soldは通常最後のカラム）
-      return this.parseTerapeakDate(matches[matches.length - 1]);
-    }
-
     return null;
   }
 
