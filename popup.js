@@ -6924,10 +6924,14 @@ async function fetchMarketDataFromCurrentTab() {
 
     if (response && response.success) {
       const added = response.added || response.count || 0;
-      const duplicates = response.duplicates || 0;
+      const updated = response.updated || 0;
+      const skipped = response.skipped || response.duplicates || 0;
 
-      showCaptureResult(added, duplicates);
-      showAlert(`${added}件のデータを取得しました`, 'success');
+      showCaptureResult(added, updated, skipped);
+      const msg = updated > 0
+        ? `${added}件追加、${updated}件更新しました`
+        : `${added}件のデータを取得しました`;
+      showAlert(msg, 'success');
       await updateMarketDataInfo();
     } else {
       throw new Error(response?.error || 'データ取得に失敗しました');
@@ -6943,14 +6947,19 @@ async function fetchMarketDataFromCurrentTab() {
 /**
  * 取得結果を表示
  */
-function showCaptureResult(added, duplicates) {
+function showCaptureResult(added, updated, skipped) {
   const resultDiv = document.getElementById('marketCaptureResult');
   const addedSpan = document.getElementById('marketAddedCount');
   const duplicatesSpan = document.getElementById('marketDuplicateCount');
 
   if (resultDiv && addedSpan && duplicatesSpan) {
     addedSpan.textContent = added;
-    duplicatesSpan.textContent = duplicates;
+    // 更新件数がある場合は表示に含める
+    if (updated > 0) {
+      duplicatesSpan.textContent = `${skipped} (${updated}件更新)`;
+    } else {
+      duplicatesSpan.textContent = skipped;
+    }
     resultDiv.style.display = 'flex';
 
     // 5秒後に非表示
@@ -10345,7 +10354,7 @@ function showBrandChartForCategory(mainCategory, subCategory, source = 'my-data'
       }
     });
   } else if (source === 'market') {
-    // 市場データから集計
+    // 市場データから集計（販売個数 sold を合計）
     const marketData = window.currentMarketData || [];
 
     marketData.forEach(item => {
@@ -10355,12 +10364,14 @@ function showBrandChartForCategory(mainCategory, subCategory, source = 'my-data'
       if (itemMainCat === mainCategory && itemSubCat === subCategory) {
         const brand = item.brand || item.detectedBrand || '(不明)';
         const price = item.soldPrice || item.price || 0;
+        const soldCount = item.sold || 1; // soldがない場合は1件としてカウント
 
         if (!brandData[brand]) {
-          brandData[brand] = { brand, count: 0, totalPrice: 0 };
+          brandData[brand] = { brand, count: 0, totalPrice: 0, totalSold: 0 };
         }
         brandData[brand].count++;
         brandData[brand].totalPrice += price;
+        brandData[brand].totalSold += soldCount;
         totalCount++;
         totalPrice += price;
       }
@@ -10531,14 +10542,15 @@ async function generateCategoryComparisonAnalysis() {
     myCategories[category].sold++;
   });
 
-  // 市場データを集計
+  // 市場データを集計（販売個数 sold を合計）
   marketData.forEach(item => {
     const category = item.category || detectCategoryFromTitle(item.title);
     if (!marketCategories[category]) {
-      marketCategories[category] = { count: 0, totalPrice: 0 };
+      marketCategories[category] = { count: 0, totalPrice: 0, totalSold: 0 };
     }
     marketCategories[category].count++;
     marketCategories[category].totalPrice += item.price || 0;
+    marketCategories[category].totalSold += item.sold || 1; // soldがない場合は1件としてカウント
   });
 
   // 比較データを構築
@@ -10550,13 +10562,14 @@ async function generateCategoryComparisonAnalysis() {
   const comparisonData = [];
   allCategories.forEach(category => {
     const my = myCategories[category] || { active: 0, sold: 0 };
-    const market = marketCategories[category] || { count: 0, totalPrice: 0 };
+    const market = marketCategories[category] || { count: 0, totalPrice: 0, totalSold: 0 };
 
     comparisonData.push({
       category,
       myActive: my.active,
       mySold: my.sold,
       marketCount: market.count,
+      marketTotalSold: market.totalSold,
       marketAvgPrice: market.count > 0 ? Math.round(market.totalPrice / market.count) : 0
     });
   });
@@ -10578,6 +10591,7 @@ async function generateCategoryComparisonAnalysis() {
             <th>自分（出品中）</th>
             <th>自分（売却済）</th>
             <th>市場件数</th>
+            <th>販売個数</th>
             <th>市場平均価格</th>
           </tr>
         </thead>
@@ -10588,6 +10602,7 @@ async function generateCategoryComparisonAnalysis() {
               <td>${row.myActive}</td>
               <td>${row.mySold}</td>
               <td>${row.marketCount}</td>
+              <td>${row.marketTotalSold}</td>
               <td>$${row.marketAvgPrice}</td>
             </tr>
           `).join('')}

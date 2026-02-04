@@ -10,6 +10,22 @@ const BunsekiDB = {
   currentSheetId: 'sheet1',  // 現在選択中のシート
 
   /**
+   * タイトル文字列を正規化（重複判定用）
+   * - NFKC正規化（全角・半角統一）
+   * - 小文字化
+   * - 前後の空白削除
+   * - 連続する空白を1つに置換
+   */
+  normalizeTitle(title) {
+    if (!title) return '';
+    return title
+      .normalize('NFKC')           // 全角・半角統一
+      .toLowerCase()               // 小文字化
+      .trim()                      // 前後の空白削除
+      .replace(/\s+/g, ' ');       // 連続空白を1つに置換
+  },
+
+  /**
    * データベースを初期化
    */
   async init() {
@@ -395,15 +411,15 @@ const BunsekiDB = {
   // ========================================
 
   /**
-   * 市場データを追加（重複は除外して蓄積、現在のシートに保存）
-   * @returns {Object} { added: 追加件数, duplicates: 重複件数 }
+   * 市場データを追加（重複時はUpsert、現在のシートに保存）
+   * @returns {Object} { added: 追加件数, updated: 更新件数, skipped: スキップ件数 }
    */
   async addMarketData(items) {
     await this.init();
 
     // 空の配列の場合
     if (!items || items.length === 0) {
-      return { added: 0, duplicates: 0 };
+      return { added: 0, updated: 0, skipped: 0 };
     }
 
     const targetSheetId = this.currentSheetId;
@@ -413,41 +429,68 @@ const BunsekiDB = {
       const store = tx.objectStore('marketData');
 
       let added = 0;
-      let duplicates = 0;
+      let updated = 0;
+      let skipped = 0;
       const capturedAt = new Date().toISOString();
-      const seenTitles = new Set(); // メモリ内で重複チェック
+      const seenKeys = new Map(); // キー → {id, sold, record} のマップ
 
-      // 既存のタイトルを先に取得
+      // 既存のデータを先に取得
       const getAllRequest = store.getAll();
 
       getAllRequest.onsuccess = () => {
-        // 現在シートの既存データのタイトルをSetに追加
+        // 現在シートの既存データのキー（タイトル+販売日）をMapに追加
         const existingItems = getAllRequest.result || [];
         existingItems
           .filter(item => item.sheetId === targetSheetId)
           .forEach(item => {
             if (item.titleLower) {
-              seenTitles.add(item.titleLower);
+              const saleDate = item.saleDate || '';
+              const uniqueKey = `${item.titleLower}_${saleDate}`;
+              seenKeys.set(uniqueKey, {
+                id: item.id,
+                sold: item.sold || 0,
+                record: item
+              });
             }
           });
 
-        console.log(`既存市場データ (${targetSheetId}):`, seenTitles.size, '件');
+        console.log(`既存市場データ (${targetSheetId}):`, seenKeys.size, '件');
 
-        // 新しいアイテムを追加
+        // 新しいアイテムを追加/更新
         items.forEach(item => {
-          const titleLower = (item.title || '').toLowerCase().trim();
+          const titleLower = this.normalizeTitle(item.title);
+          const saleDate = item.saleDate || '';
+          const uniqueKey = `${titleLower}_${saleDate}`;
 
           if (!titleLower) {
             return;
           }
 
-          if (seenTitles.has(titleLower)) {
-            duplicates++;
+          const existing = seenKeys.get(uniqueKey);
+          const newSold = item.sold || 0;
+
+          if (existing) {
+            // 既存データがある場合: sold数が大きければ更新（Upsert）
+            if (newSold > existing.sold) {
+              const updatedRecord = {
+                ...existing.record,
+                ...item,
+                id: existing.id, // IDを維持
+                titleLower,
+                sheetId: targetSheetId,
+                capturedAt
+              };
+              store.put(updatedRecord);
+              seenKeys.set(uniqueKey, { id: existing.id, sold: newSold, record: updatedRecord });
+              updated++;
+            } else {
+              skipped++;
+            }
             return;
           }
 
-          // 重複なし → 追加
-          seenTitles.add(titleLower);
+          // 新規追加
+          seenKeys.set(uniqueKey, { id: null, sold: newSold, record: item });
           const record = {
             ...item,
             titleLower,
@@ -464,7 +507,7 @@ const BunsekiDB = {
           addRequest.onerror = (e) => {
             // ConstraintError（重複）は無視
             if (e.target.error && e.target.error.name === 'ConstraintError') {
-              duplicates++;
+              skipped++;
             }
             e.preventDefault(); // エラーを伝播させない
           };
@@ -476,15 +519,15 @@ const BunsekiDB = {
       };
 
       tx.oncomplete = () => {
-        console.log(`Market data (${targetSheetId}): ${added} added, ${duplicates} duplicates skipped`);
-        resolve({ added, duplicates });
+        console.log(`Market data (${targetSheetId}): ${added} added, ${updated} updated, ${skipped} skipped`);
+        resolve({ added, updated, skipped });
       };
 
       tx.onerror = (e) => {
         console.error('Transaction error:', e.target.error);
         // ConstraintErrorの場合は成功として扱う
         if (e.target.error && e.target.error.name === 'ConstraintError') {
-          resolve({ added, duplicates });
+          resolve({ added, updated, skipped });
         } else {
           reject(tx.error);
         }

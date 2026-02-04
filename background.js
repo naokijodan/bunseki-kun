@@ -1108,13 +1108,25 @@ async function analyzeCategoryWithAI(data, apiKey) {
 }
 
 /**
- * 市場データをIndexedDBに保存
+ * タイトル文字列を正規化（重複判定用）
+ */
+function normalizeTitle(title) {
+  if (!title) return '';
+  return title
+    .normalize('NFKC')           // 全角・半角統一
+    .toLowerCase()               // 小文字化
+    .trim()                      // 前後の空白削除
+    .replace(/\s+/g, ' ');       // 連続空白を1つに置換
+}
+
+/**
+ * 市場データをIndexedDBに保存（Upsert対応）
  * @param {Array} items - 保存する市場データ
  * @param {string} sheetId - シートID（デフォルト: 'all'）
  */
 async function saveMarketDataToDB(items, sheetId = 'all') {
   if (!items || items.length === 0) {
-    return { added: 0, duplicates: 0 };
+    return { added: 0, updated: 0, skipped: 0 };
   }
 
   return new Promise((resolve, reject) => {
@@ -1222,11 +1234,12 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
       const store = tx.objectStore('marketData');
 
       let added = 0;
-      let duplicates = 0;
+      let updated = 0;
+      let skipped = 0;
       const capturedAt = new Date().toISOString();
-      const seenTitles = new Set();
+      const seenKeys = new Map(); // キー → {id, sold, record} のマップ
 
-      // 既存データのタイトルを取得（該当シートのみ）
+      // 既存データのキーを取得（該当シートのみ）
       const getAllRequest = store.getAll();
 
       getAllRequest.onsuccess = () => {
@@ -1236,25 +1249,52 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
         const filteredItems = existingItems.filter(item => item.sheetId === sheetId);
         filteredItems.forEach(item => {
           if (item.titleLower) {
-            seenTitles.add(item.titleLower);
+            const saleDate = item.saleDate || '';
+            const uniqueKey = `${item.titleLower}_${saleDate}`;
+            seenKeys.set(uniqueKey, {
+              id: item.id,
+              sold: item.sold || 0,
+              record: item
+            });
           }
         });
 
-        console.log(`[background] 既存市場データ (${sheetId}): ${seenTitles.size}件 (フィルタ後: ${filteredItems.length}件)`);
+        console.log(`[background] 既存市場データ (${sheetId}): ${seenKeys.size}件 (フィルタ後: ${filteredItems.length}件)`);
 
-        // 新しいデータを追加
+        // 新しいデータを追加/更新
         console.log(`[background] 追加予定アイテム数: ${items.length}件`);
         items.forEach(item => {
-          const titleLower = (item.title || '').toLowerCase().trim();
+          const titleLower = normalizeTitle(item.title);
+          const saleDate = item.saleDate || '';
+          const uniqueKey = `${titleLower}_${saleDate}`;
 
           if (!titleLower) return;
 
-          if (seenTitles.has(titleLower)) {
-            duplicates++;
+          const existing = seenKeys.get(uniqueKey);
+          const newSold = item.sold || 0;
+
+          if (existing) {
+            // 既存データがある場合: sold数が大きければ更新（Upsert）
+            if (newSold > existing.sold) {
+              const updatedRecord = {
+                ...existing.record,
+                ...item,
+                id: existing.id,
+                titleLower,
+                sheetId,
+                capturedAt
+              };
+              store.put(updatedRecord);
+              seenKeys.set(uniqueKey, { id: existing.id, sold: newSold, record: updatedRecord });
+              updated++;
+            } else {
+              skipped++;
+            }
             return;
           }
 
-          seenTitles.add(titleLower);
+          // 新規追加
+          seenKeys.set(uniqueKey, { id: null, sold: newSold, record: item });
           const record = {
             ...item,
             titleLower,
@@ -1269,7 +1309,7 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
           addReq.onerror = (e) => {
             console.error('[background] addReq error:', e.target.error);
             if (e.target.error?.name === 'ConstraintError') {
-              duplicates++;
+              skipped++;
             }
             e.preventDefault();
           };
@@ -1278,8 +1318,8 @@ async function saveMarketDataToDB(items, sheetId = 'all') {
 
       tx.oncomplete = () => {
         db.close();
-        console.log(`Market data saved (${sheetId}): ${added} added, ${duplicates} duplicates`);
-        resolve({ added, duplicates });
+        console.log(`Market data saved (${sheetId}): ${added} added, ${updated} updated, ${skipped} skipped`);
+        resolve({ added, updated, skipped });
       };
 
       tx.onerror = () => {
