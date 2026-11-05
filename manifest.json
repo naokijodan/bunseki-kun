@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ぶんせき君",
   "short_name": "ぶんせき君",
-  "version": "4.7.0",
+  "version": "4.6.1",
   "description": "eBayからダウンロードしたCSVの分析、市場データのCSV・ZIP読み込み、AIによる販売戦略の提案を行う統合ツール（OpenAI, Claude, Gemini対応）",
   "permissions": [
     "storage"

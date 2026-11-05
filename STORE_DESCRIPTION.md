@@ -96,7 +96,7 @@ Bunseki-kun is a comprehensive analysis tool for eBay sellers.
 
 ---
 
-## v4.7.0 変更点
+## v4.6.1 変更点
 - eBayの利用規約（User Agreement Section 3：eBayの許可なくデータ収集・抽出ツールでサービスにアクセスすることの禁止）に配慮し、eBay検索結果・テラピーク画面からデータを読み取る機能をすべて停止
 - コンテンツスクリプト（eBayページへの埋め込み）と、eBayサイトへのアクセス権限（host_permissions）を削除
 - 不要になった権限（tabs、activeTab）を削除

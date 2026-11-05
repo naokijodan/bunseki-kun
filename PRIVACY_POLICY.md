@@ -2,7 +2,7 @@
 
 **ぶんせき君 - eBay分析ツール**
 
-最終更新日: 2026年11月5日（v4.7.0）
+最終更新日: 2026年11月5日（v4.6.1）
 
 ---
 
@@ -23,7 +23,7 @@
 - **設定情報**: APIキー、シート名、表示設定など
 - **認証情報**: ライセンス認証状態
 
-本拡張機能は、eBayやテラピークなどのウェブページからデータを読み取りません（v4.7.0以降）。また、eBayサイトへのアクセス権限を持ちません。
+本拡張機能は、eBayやテラピークなどのウェブページからデータを読み取りません（v4.6.1以降）。また、eBayサイトへのアクセス権限を持ちません。
 
 これらのデータはすべて**ユーザーのブラウザ内（chrome.storage.local、IndexedDB）**に保存され、外部サーバーには送信されません。
 
@@ -85,7 +85,7 @@ This extension collects and stores the following information:
 - **Settings**: API keys, sheet names, display settings, etc.
 - **Authentication information**: License authentication status
 
-As of v4.7.0, this extension does not read data from eBay, Terapeak or any other web page, and holds no permission to access eBay sites.
+As of v4.6.1, this extension does not read data from eBay, Terapeak or any other web page, and holds no permission to access eBay sites.
 
 All of this data is stored **within the user's browser (chrome.storage.local, IndexedDB)** and is not transmitted to external servers.
 

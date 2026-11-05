@@ -8,7 +8,7 @@
  * - Google Gemini (gemini-pro)
  */
 
-// v4.7.0: アップデート時にお知らせページを1回だけ開く（新規インストールでは開かない）
+// v4.6.1: アップデート時にお知らせページを1回だけ開く（新規インストールでは開かない）
 function isVersionLower(a, b) {
   const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
   const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
@@ -21,7 +21,7 @@ function isVersionLower(a, b) {
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'update' && details.previousVersion &&
-      isVersionLower(details.previousVersion, '4.7.0')) {
+      isVersionLower(details.previousVersion, '4.6.1')) {
     chrome.tabs.create({ url: chrome.runtime.getURL('notice.html') });
   }
 });
