@@ -1716,6 +1716,7 @@ body {
   font-size: 12px;
   padding: 50px 20px;
   line-height: 1.6;
+  flex-shrink: 0;
 }
 
 .chat-input-area-large {
@@ -7343,4 +7344,15 @@ body {
 #pokemonAttributeBreakdown .attr-item.expanded .expand-icon,
 #myPokemonAttributeBreakdown .attr-item.expanded .expand-icon {
   color: #f5a623;
+}
+
+/* v4.7.0 お知らせバナー（常時表示） */
+.notice-banner {
+  background: #fff3cd;
+  color: #3d2e00;
+  border-bottom: 2px solid #e0a800;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  flex-shrink: 0;
 }

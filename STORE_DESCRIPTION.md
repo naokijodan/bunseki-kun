@@ -4,7 +4,7 @@
 ぶんせき君 - eBay分析ツール
 
 ## 短い説明（132文字以内）
-eBay出品データを分析し、市場比較・競合分析・AI提案を行う統合ツール。ブランド・カテゴリ別の売上分析、市場トレンド把握、3つのAI（GPT-4、Claude、Gemini）による販売戦略提案に対応。
+eBayからダウンロードしたCSVを分析し、市場データ（CSV・ZIP）との比較・AI提案を行う統合ツール。ブランド・カテゴリ別の売上分析、3つのAI（GPT-4、Claude、Gemini）による販売戦略提案に対応。
 
 ## 詳細な説明
 
@@ -21,9 +21,9 @@ eBay出品データを分析し、市場比較・競合分析・AI提案を行�
 • Watch数分析で注目商品を特定
 
 【市場データ分析】
-• eBay検索結果ページから市場データを取得
+• 市場データのCSV・ZIPファイルを読み込み
 • 競合の価格帯・ブランド構成を分析
-• 市場トレンドをリアルタイムで把握
+• 保存した市場データから傾向を把握
 
 【市場比較】
 • 自分のデータと市場データを比較
@@ -41,7 +41,8 @@ eBay出品データを分析し、市場比較・競合分析・AI提案を行�
 
 🔒 **プライバシー重視**
 • データはすべてお使いのブラウザ内に保存
-• 外部サーバーへの送信なし（AI機能使用時を除く）
+• 外部サーバーへの送信なし（AI機能使用時を除く。AI機能はご自身のAPIキーで各AIサービスに直接送信）
+• eBayやテラピークのページからデータを読み取る機能はありません
 
 💡 **こんな方におすすめ**
 • eBayでの売上を伸ばしたいセラー
@@ -64,9 +65,9 @@ Bunseki-kun is a comprehensive analysis tool for eBay sellers.
 • Identify popular items through Watch count analysis
 
 【Market Data Analysis】
-• Capture market data from eBay search result pages
+• Import market data from CSV / ZIP files
 • Analyze competitor pricing and brand composition
-• Real-time market trend tracking
+• Track trends from your saved market data
 
 【Market Comparison】
 • Compare your data with market data
@@ -84,7 +85,8 @@ Bunseki-kun is a comprehensive analysis tool for eBay sellers.
 
 🔒 **Privacy-Focused**
 • All data stored within your browser
-• No transmission to external servers (except when using AI features)
+• No transmission to external servers (except AI features, which call the AI service directly with your own API key)
+• The extension does not read data from eBay or Terapeak pages
 
 💡 **Recommended For**
 • Sellers looking to increase eBay sales
@@ -93,6 +95,20 @@ Bunseki-kun is a comprehensive analysis tool for eBay sellers.
 • Power sellers handling multiple categories
 
 ---
+
+## v4.7.0 変更点
+- eBayの利用規約（User Agreement Section 3：eBayの許可なくデータ収集・抽出ツールでサービスにアクセスすることの禁止）に配慮し、eBay検索結果・テラピーク画面からデータを読み取る機能をすべて停止
+- コンテンツスクリプト（eBayページへの埋め込み）と、eBayサイトへのアクセス権限（host_permissions）を削除
+- 不要になった権限（tabs、activeTab）を削除
+- ポップアップ上部にお知らせを常時表示。アップデート後に初めて1回だけお知らせページを表示
+- 保存済みの市場データは削除されず、閲覧・エクスポート可能。市場データはCSV・ZIP読み込みで引き続き利用可能
+
+## 権限の使用理由（Permissions justification）
+- storage：分析データ・設定・ご自身のAPIキーをブラウザ内（chrome.storage.local）に保存するため
+- host_permissions https://api.openai.com/* ：ユーザーが選んだ場合に、OpenAIへAI提案のリクエストを送るため
+- host_permissions https://api.anthropic.com/* ：同上（Anthropic Claude）
+- host_permissions https://generativelanguage.googleapis.com/* ：同上（Google Gemini）
+- ※eBayサイトへのアクセス権限、tabs、activeTab、コンテンツスクリプトは使用していません
 
 ## カテゴリ
 生産性 / Productivity

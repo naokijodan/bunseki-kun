@@ -8,6 +8,24 @@
  * - Google Gemini (gemini-pro)
  */
 
+// v4.7.0: アップデート時にお知らせページを1回だけ開く（新規インストールでは開かない）
+function isVersionLower(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'update' && details.previousVersion &&
+      isVersionLower(details.previousVersion, '4.7.0')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('notice.html') });
+  }
+});
+
 // ウィンドウIDを保持
 let popupWindowId = null;
 
@@ -144,15 +162,6 @@ async function handleExcludedBrandUpdate(brand, exclude) {
   }
 
   await chrome.storage.local.set({ excludedBrands });
-
-  // アクティブなタブに変更を通知
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs[0] && tabs[0].url && tabs[0].url.includes('ebay.com')) {
-    chrome.tabs.sendMessage(tabs[0].id, {
-      action: 'excludedBrandsUpdated',
-      brands: excludedBrands
-    }).catch(() => {});
-  }
 }
 
 /**

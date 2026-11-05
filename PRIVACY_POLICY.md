@@ -2,7 +2,7 @@
 
 **ぶんせき君 - eBay分析ツール**
 
-最終更新日: 2025年12月18日
+最終更新日: 2026年11月5日（v4.7.0）
 
 ---
 
@@ -18,15 +18,17 @@
 
 #### 2.1 ローカルに保存されるデータ
 - **eBay出品データ**: ユーザーがアップロードしたCSVファイルの内容（Active Listings、Orders）
-- **市場データ**: eBay検索結果から取得した商品情報
+- **市場データ**: ユーザーがCSV・ZIPファイルで読み込んだ市場の商品情報
 - **分析結果**: ブランド分類、カテゴリ分類などの分析結果
 - **設定情報**: APIキー、シート名、表示設定など
 - **認証情報**: ライセンス認証状態
 
+本拡張機能は、eBayやテラピークなどのウェブページからデータを読み取りません（v4.7.0以降）。また、eBayサイトへのアクセス権限を持ちません。
+
 これらのデータはすべて**ユーザーのブラウザ内（chrome.storage.local、IndexedDB）**に保存され、外部サーバーには送信されません。
 
 #### 2.2 外部に送信されるデータ
-- **AI分析リクエスト**: AI提案機能を使用する場合、分析対象のデータ（商品タイトル、価格、カテゴリ等）がユーザーが選択したAIサービス（OpenAI、Anthropic Claude、Google Gemini）に送信されます。
+- **AI分析リクエスト**: AI提案機能を使用する場合、分析対象のデータ（商品タイトル、価格、カテゴリ等）がユーザーが選択したAIサービス（OpenAI、Anthropic Claude、Google Gemini）に、ユーザー自身のAPIキーを用いて直接送信されます。
 - **決済情報**: 有料版を購入する場合、決済処理はStripe経由で行われます。本拡張機能はクレジットカード情報を直接収集・保存しません。
 
 ### 3. 情報の使用目的
@@ -78,15 +80,17 @@ This extension collects and stores the following information:
 
 #### 2.1 Data Stored Locally
 - **eBay listing data**: Contents of CSV files uploaded by the user (Active Listings, Orders)
-- **Market data**: Product information obtained from eBay search results
+- **Market data**: Market product information imported by the user from CSV / ZIP files
 - **Analysis results**: Brand classification, category classification, and other analysis results
 - **Settings**: API keys, sheet names, display settings, etc.
 - **Authentication information**: License authentication status
 
+As of v4.7.0, this extension does not read data from eBay, Terapeak or any other web page, and holds no permission to access eBay sites.
+
 All of this data is stored **within the user's browser (chrome.storage.local, IndexedDB)** and is not transmitted to external servers.
 
 #### 2.2 Data Transmitted Externally
-- **AI analysis requests**: When using the AI suggestion feature, data to be analyzed (product titles, prices, categories, etc.) is sent to the AI service selected by the user (OpenAI, Anthropic Claude, Google Gemini).
+- **AI analysis requests**: When using the AI suggestion feature, data to be analyzed (product titles, prices, categories, etc.) is sent to the AI service selected by the user (OpenAI, Anthropic Claude, Google Gemini) directly, using the user's own API key.
 - **Payment information**: When purchasing the paid version, payment processing is handled via Stripe. This extension does not directly collect or store credit card information.
 
 ### 3. Purpose of Use

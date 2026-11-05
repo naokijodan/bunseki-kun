@@ -8,6 +8,7 @@
 </head>
 <body>
   <div class="app-container">
+    <div id="noticeBanner" class="notice-banner" role="note">お知らせ（v4.7.0）：eBayの利用規約で、eBayの画面からデータを集めるツールの使用が禁止されているため、eBayの検索結果・テラピークの画面からデータを読み取る機能を停止しました。自分のデータ（CSV）の分析、市場データのCSV・ZIP読み込み、AIへの相談はこれまでどおり使えます。保存済みのデータは消えていません。</div>
     <!-- ヘッダー -->
     <header class="app-header">
       <div class="header-left">
@@ -304,13 +305,7 @@
           <!-- ===== 入力エリア（常に表示） ===== -->
           <div class="market-input-area">
             <!-- 現在のページから取得 -->
-            <div class="capture-from-page">
-              <button id="captureMarketBtn" class="action-btn primary full-width">
-                <span class="btn-icon">📡</span>
-                現在のページから市場データを取得
-              </button>
-            </div>
-            <p class="input-hint">⚠️ テラピークまたはeBay検索結果ページを開いてからボタンを押してください</p>
+            <p class="input-hint">この機能は停止しました（eBay利用規約によりデータの読み取りができないため）。市場データはCSV・ZIPの読み込みをご利用ください。</p>
 
             <!-- 取得結果表示 -->
             <div id="marketCaptureResult" class="capture-result" style="display: none;">
